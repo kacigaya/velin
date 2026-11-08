@@ -1,0 +1,72 @@
+name: Set up Velin build
+description: JDK, Android SDK, Rust, the pinned Tuta release and the native Tuta SDK.
+
+runs:
+  using: composite
+  steps:
+    - name: Set up JDK
+      uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+      with:
+        distribution: temurin
+        java-version: "21"
+
+    - name: Set up Gradle
+      uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+
+    - name: Install Android SDK packages
+      shell: bash
+      run: |
+        yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
+        "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" "build-tools;36.0.0" > /dev/null
+        echo "sdk.dir=$ANDROID_HOME" > local.properties
+
+    - name: Install native toolchain
+      shell: bash
+      run: |
+        sudo apt-get update -q
+        sudo apt-get install -y -q clang lld llvm-18 unzip
+
+    - name: Set up Rust
+      uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master, 2026-11
+      with:
+        toolchain: "1.97.1"
+        targets: aarch64-linux-android,x86_64-linux-android
+
+    - name: Read upstream pin
+      id: pin
+      shell: bash
+      run: |
+        echo "tag=$(python3 -c 'import json; print(json.load(open("tools/backend/upstream.json"))["tag"])')" >> "$GITHUB_OUTPUT"
+        echo "ndk=$(python3 -c 'import json; print(json.load(open("tools/backend/upstream.json"))["ndkSha256"])')" >> "$GITHUB_OUTPUT"
+
+    # Only the pinned release tag is fetched; build-sdk.sh verifies it against the pinned commit.
+    - name: Fetch pinned Tuta release
+      shell: bash
+      env:
+        TAG: ${{ steps.pin.outputs.tag }}
+      run: |
+        git init -q "$RUNNER_TEMP/tutanota"
+        git -C "$RUNNER_TEMP/tutanota" remote add origin https://github.com/tutao/tutanota.git
+        git -C "$RUNNER_TEMP/tutanota" fetch -q --depth 1 origin "refs/tags/$TAG:refs/tags/$TAG"
+
+    - name: Cache NDK archive
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: core/sdk/build/native/ndk.zip
+        key: ndk-r29-${{ steps.pin.outputs.ndk }}
+
+    - name: Cache Rust build
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          core/sdk/build/native/target
+        key: rust-1.97.1-${{ hashFiles('tools/backend/upstream.json', 'tools/backend/overlay/**', 'tools/backend/build-sdk.sh') }}
+        restore-keys: rust-1.97.1-
+
+    - name: Build native Tuta SDK
+      shell: bash
+      env:
+        TUTA_REFERENCE: ${{ runner.temp }}/tutanota
+      run: tools/backend/build-sdk.sh

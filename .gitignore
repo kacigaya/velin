@@ -7,3 +7,9 @@ local.properties
 captures/
 .cxx/
 .externalNativeBuild/
+
+# Signing keys never belong in the repository.
+*.jks
+*.keystore
+*.p12
+keystore.properties

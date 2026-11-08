@@ -19,8 +19,23 @@ android {
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
     }
 
+    // Release signing comes from the environment only (CI secrets). Without it the release
+    // build stays unsigned; no key material ever lives in the repository.
+    val keystorePath = providers.environmentVariable("VELIN_KEYSTORE_PATH").orNull
+    signingConfigs {
+        if (keystorePath != null) {
+            create("release") {
+                storeFile = file(keystorePath)
+                storePassword = providers.environmentVariable("VELIN_KEYSTORE_PASSWORD").get()
+                keyAlias = providers.environmentVariable("VELIN_KEY_ALIAS").get()
+                keyPassword = providers.environmentVariable("VELIN_KEY_PASSWORD").get()
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (keystorePath != null) signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
