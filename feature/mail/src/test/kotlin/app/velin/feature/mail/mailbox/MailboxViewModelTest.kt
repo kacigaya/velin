@@ -54,6 +54,19 @@ class MailboxViewModelTest {
     }
 
     @Test
+    fun ordersSystemFoldersLikeOtherMailApps() = runTest {
+        mailbox.folders.value = listOf(trash, archive, inbox, folder("drafts", FolderKind.Drafts))
+        val vm = viewModel()
+        assertEquals(listOf("Inbox", "Drafts", "Archive", "Trash"), vm.folderPane.value.systemFolders.map { it.kind.name })
+    }
+
+    @Test
+    fun syncsOnceWhenOpened() = runTest {
+        viewModel()
+        assertEquals(1, mailbox.syncs)
+    }
+
+    @Test
     fun archiveAndTrashMoveToSystemFolders() = runTest {
         val vm = viewModel()
         vm.onEvent(MailboxEvent.Archive(setOf("mails/m1")))

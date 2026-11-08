@@ -61,7 +61,8 @@ internal class FakeMailbox(folders: List<Folder>) : MailboxRepository {
     override fun labels(account: AccountId): Flow<List<Label>> = flowOf(emptyList())
     override fun senders(account: AccountId): Flow<List<SenderAlias>> = flowOf(emptyList())
     override fun syncState(account: AccountId): Flow<SyncState> = sync
-    override suspend fun sync(account: AccountId): Outcome<Unit> = Outcome.Success(Unit)
+    var syncs = 0
+    override suspend fun sync(account: AccountId): Outcome<Unit> { syncs++; return Outcome.Success(Unit) }
 }
 
 internal class FakeMailRepo : MailRepository {

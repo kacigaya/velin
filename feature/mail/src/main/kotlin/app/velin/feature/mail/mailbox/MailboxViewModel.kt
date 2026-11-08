@@ -80,7 +80,8 @@ class MailboxViewModel(
     val folderPane: StateFlow<FolderPaneState> = combine(folders, mailbox.labels(account.id), currentFolder) { all, labels, current ->
         FolderPaneState(
             account = accountUi,
-            systemFolders = all.filter { it.kind != DomainFolderKind.Custom }.map { it.toUi() }.toImmutableList(),
+            // Fixed order like other mail apps; the server returns system folders unordered.
+            systemFolders = all.filter { it.kind != DomainFolderKind.Custom }.sortedBy { it.kind.ordinal }.map { it.toUi() }.toImmutableList(),
             customFolders = all.filter { it.kind == DomainFolderKind.Custom }.map { it.toUi() }.toImmutableList(),
             labels = labels.map { it.toUi() }.toImmutableList(),
             selectedId = current?.id?.value?.toUiId(),
@@ -111,6 +112,11 @@ class MailboxViewModel(
             openMailId = open,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), MailboxUiState(account = accountUi))
+
+    init {
+        // Repositories load folders on sync; the first sync happens when the mailbox opens.
+        viewModelScope.launch { report(mailbox.sync(account.id)) }
+    }
 
     private val accountUi get() = AccountUi(account.id.value.value, account.address.name, account.address.address)
 
