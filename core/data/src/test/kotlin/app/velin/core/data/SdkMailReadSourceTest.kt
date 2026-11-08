@@ -112,6 +112,19 @@ class SdkMailReadSourceTest {
         assertTrue(draft.isDraft)
         assertEquals(MailFinding.DeprecatedSenderKey, draft.finding)
     }
+    @Test fun onlyRealSignalsProduceFindings() = runBlocking {
+        val id = ReadId("mails", "one")
+        val reader = Reader()
+        val source = source(reader)
+        fun finding(status: Long) = run {
+            reader.loadedMessage = readMessage(id).copy(phishing = 0, encryptionAuth = 0, mailAuthStatus = status)
+            runBlocking { (source.message(account, MailId(id.domain())) as Outcome.Success).value.finding }
+        }
+        assertEquals(null, finding(0))
+        assertEquals(MailFinding.AuthenticationFailed, finding(1))
+        assertEquals(MailFinding.AuthenticationUncertain, finding(2))
+        assertEquals(MailFinding.AuthenticationFailed, finding(3))
+    }
     @Test fun conversationUsesEntryListAndSortsMessages() = runBlocking {
         val reader = Reader().apply { conversationMails = listOf(ReadId("mails", "two"), ReadId("mails", "one"), ReadId("mails", "one")) }
         val id = ConversationId(ReadId("conversation", "entry").domain())

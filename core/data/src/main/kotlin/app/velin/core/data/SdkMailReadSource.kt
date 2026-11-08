@@ -54,7 +54,10 @@ internal class SdkMailReadSource(private val sessions: SessionReadAccess) : Mail
                 mail.phishing == 1L -> MailFinding.Phishing
                 mail.mailAuthStatus in listOf(1L, 3L, 4L) -> MailFinding.AuthenticationFailed
                 mail.encryptionAuth == 5L -> MailFinding.DeprecatedSenderKey
-                else -> MailFinding.AuthenticationUncertain
+                // MailViewerViewModel.ts:427-442: only SOFT_FAIL (2) is "uncertain". Missing sender-key
+                // verification is Velin's own gap, so it must not put a warning on every mail.
+                mail.mailAuthStatus == 2L -> MailFinding.AuthenticationUncertain
+                else -> null
             }, mail.scheduledMillis?.let(Instant::ofEpochMilli))
     }
     override suspend fun body(account: AccountId, id: MailId): Outcome<String> = read(account) { sdk ->
