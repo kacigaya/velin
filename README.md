@@ -17,8 +17,8 @@
   <a href="https://github.com/kacigaya/velin/blob/main/LICENSE"><img alt="GPL-3.0 License" src="https://shieldcn.dev/github/license/kacigaya/velin.svg?variant=secondary"></a>
 </p>
 
-Velin is an independent, native open-source Android mail client for [Tuta](https://tuta.com).
-While the official client wraps a TypeScript web client in a WebView shell, Velin is built from the ground up as a native Android app: fluid gesture navigation, adaptive split-pane layouts for tablets and foldables, dynamic Material 3 Expressive theming, and an isolated Rust cryptographic core running compiled machine code for end-to-end encryption.
+Velin is an independent, open-source Android mail client for [Tuta](https://tuta.com).
+It uses a native Android interface with gesture navigation, adaptive layouts for tablets and foldables, and Material 3 Expressive theming. Its cryptographic core uses the upstream Rust SDK, compiled as native machine code.
 
 > [!NOTE]
 > Velin is an independent open-source project and is not affiliated with, endorsed by, or connected to Tuta GmbH.
@@ -40,13 +40,13 @@ While the official client wraps a TypeScript web client in a WebView shell, Veli
 
 ## Features
 
-- **Pixel-native interface:** Built with `MaterialExpressiveTheme` and expressive motion tokens. Supports Android 12+ dynamic color (Material You), with high, medium, and standard contrast palettes generated from M3 tokens.
+- **Native interface:** Uses `MaterialExpressiveTheme` and expressive motion tokens. Supports Android 12+ dynamic color (Material You), with high, medium, and standard contrast palettes from M3 tokens.
 - **Adaptive layouts:** Responsive single-pane navigation on phones and dual-pane list-detail layouts on foldables and tablets using `androidx.compose.material3.adaptive` and Navigation 3.
 - **Native cryptographic core:** Pinned upstream Rust SDK compiled to native shared libraries (`arm64-v8a` and `x86_64`) with UniFFI Kotlin bindings for entity cryptography and key derivation.
 - **Tuta end-to-end encryption:** Unaltered cryptographic model. Argon2id and bcrypt KDF, TOTP/2FA support, and session keys protected by Android Keystore (AES-GCM).
 - **Privacy-first HTML email rendering:** Strict HTML sanitization powered by jsoup. Strips executable scripts, dangerous tags, and external CSS. Remote tracking pixels and external images are blocked by default until explicit per-view consent.
 - **Offline-ready architecture:** Decoupled repository layer with Room and SQLCipher for local encrypted caching.
-- **Zero tracking:** No analytics, no crash telemetries, no third-party network pings.
+- **No tracking:** No analytics, crash telemetry, or third-party network pings.
 
 ## Status
 
@@ -65,7 +65,7 @@ The project is under active development across sequential milestones. See [docs/
 
 ## Architecture
 
-Velin uses a **hybrid architecture** that pairs upstream's battle-tested Rust core with modern native Android UI:
+Velin combines the upstream Rust core with a native Android interface:
 
 ```
 ┌────────────────────────────────────────────────────────┐
