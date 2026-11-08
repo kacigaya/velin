@@ -7,6 +7,7 @@ import app.velin.core.domain.Outcome
 import app.velin.feature.mail.FakeMailRepo
 import app.velin.feature.mail.FakeMailbox
 import app.velin.feature.mail.folder
+import app.velin.feature.mail.label
 import app.velin.feature.mail.summary
 import app.velin.feature.mail.model.toUi
 import app.velin.feature.mail.testAccount
@@ -120,6 +121,47 @@ class MailboxViewModelTest {
         mailbox.folders.value = mailbox.folders.value + folder("scheduled", FolderKind.Scheduled)
         val vm = viewModel()
         assertEquals(listOf("folders/archive", "folders/trash"), vm.moveTargets().map { it.id })
+    }
+
+    @Test
+    fun labelChangesKeepEachMailsOtherLabelsAndGroupCalls() = runTest {
+        repo.pages[inbox.id] = MutableStateFlow(MailPage(listOf(
+            summary("m1", labels = listOf(label("a"), label("b"))),
+            summary("m2", labels = listOf(label("b"))),
+            summary("m3", labels = listOf(label("b"))),
+        ), null))
+        val vm = viewModel()
+        vm.applyLabels(setOf("mails/m1", "mails/m2", "mails/m3"), added = setOf("labels/c"), removed = setOf("labels/b"))
+        val calls = repo.labelCalls.associate { (mails, labels) -> mails.map { it.value.element.value }.toSet() to labels.map { it.value.element.value }.toSet() }
+        assertEquals(mapOf(setOf("m1") to setOf("a", "c"), setOf("m2", "m3") to setOf("c")), calls)
+    }
+
+    @Test
+    fun refusesMoreThanFiveLabels() = runTest {
+        repo.pages[inbox.id] = MutableStateFlow(MailPage(listOf(summary("m1", labels = (1..5).map { label("l$it") })), null))
+        val vm = viewModel()
+        vm.applyLabels(setOf("mails/m1"), added = setOf("labels/l6"), removed = emptySet())
+        assertEquals(MailboxEffect.TooManyLabels, vm.effects.first())
+        assertTrue(repo.labelCalls.isEmpty())
+    }
+
+    @Test
+    fun trashInTrashAsksThenDeletesForGood() = runTest {
+        repo.pages[trash.id] = MutableStateFlow(MailPage(listOf(summary("m9")), null))
+        val vm = viewModel()
+        vm.selectFolder("folders/trash")
+        vm.onEvent(MailboxEvent.Trash(setOf("mails/m9")))
+        assertEquals(MailboxEffect.ConfirmDelete(setOf("mails/m9")), vm.effects.first())
+        assertTrue(repo.moves.isEmpty())
+        vm.deleteForever(setOf("mails/m9"))
+        assertEquals(1, repo.deletes.size)
+    }
+
+    @Test
+    fun deleteForeverIsIgnoredOutsideTrashAndSpam() = runTest {
+        val vm = viewModel()
+        vm.deleteForever(setOf("mails/m1"))
+        assertTrue(repo.deletes.isEmpty())
     }
 
     @Test

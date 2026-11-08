@@ -92,6 +92,7 @@
         <item quantity="one">%1$d mail moved to %2$s</item>
         <item quantity="other">%1$d mails moved to %2$s</item>
     </plurals>
+    <string name="too_many_labels">A mail can have up to 5 labels.</string>
     <string name="delete_forever_title">Delete permanently?</string>
     <plurals name="delete_forever_body">
         <item quantity="one">This mail will be deleted for good. You cannot undo this.</item>

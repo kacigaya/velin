@@ -40,7 +40,9 @@ internal val testAccount = Account(AccountId(ElementId("u1")), Address("alex@tut
 
 internal fun folder(id: String, kind: FolderKind, unread: Int = 0) = Folder(FolderId(eid("folders", id)), id, kind, unread)
 
-internal fun summary(id: String, unread: Boolean = false) = MailSummary(
+internal fun label(id: String) = Label(LabelId(eid("labels", id)), id, null)
+
+internal fun summary(id: String, unread: Boolean = false, labels: List<Label> = emptyList()) = MailSummary(
     id = MailId(eid("mails", id)),
     conversationId = ConversationId(eid("conv", id)),
     heading = listOf(Address("lena@tuta.com", "Lena")),
@@ -50,7 +52,7 @@ internal fun summary(id: String, unread: Boolean = false) = MailSummary(
     hasAttachments = false,
     confidential = true,
     replyType = ReplyType.None,
-    labels = emptyList(),
+    labels = labels,
     conversationSize = 1,
 )
 
@@ -88,7 +90,16 @@ internal class FakeMailRepo : MailRepository {
         moves += ids to target
         return moveResult
     }
-    override suspend fun setLabels(account: AccountId, ids: List<MailId>, labels: List<LabelId>): Outcome<Unit> = Outcome.Success(Unit)
+    val labelCalls = mutableListOf<Pair<Set<MailId>, Set<LabelId>>>()
+    val deletes = mutableListOf<List<MailId>>()
+    override suspend fun setLabels(account: AccountId, ids: List<MailId>, labels: List<LabelId>): Outcome<Unit> {
+        labelCalls += ids.toSet() to labels.toSet()
+        return Outcome.Success(Unit)
+    }
+    override suspend fun delete(account: AccountId, ids: List<MailId>): Outcome<Unit> {
+        deletes += ids
+        return Outcome.Success(Unit)
+    }
     override suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<DraftId> = Outcome.Failed(app.velin.core.domain.Failure.Unsupported)
     override suspend fun sendDraft(account: AccountId, id: DraftId): Outcome<Unit> = Outcome.Success(Unit)
     override suspend fun downloadAttachment(account: AccountId, id: AttachmentId): Outcome<File> = Outcome.Failed(app.velin.core.domain.Failure.Unsupported)

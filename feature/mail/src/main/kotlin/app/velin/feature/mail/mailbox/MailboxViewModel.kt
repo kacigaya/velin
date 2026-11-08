@@ -6,6 +6,7 @@ import app.velin.core.domain.Account
 import app.velin.core.domain.Failure
 import app.velin.core.domain.Folder
 import app.velin.core.domain.FolderId
+import app.velin.core.domain.LabelId
 import app.velin.core.domain.FolderKind as DomainFolderKind
 import app.velin.core.domain.MailId
 import app.velin.core.domain.MailPage
@@ -14,6 +15,7 @@ import app.velin.core.domain.MailboxRepository
 import app.velin.core.domain.Outcome
 import app.velin.core.domain.SyncState
 import app.velin.feature.mail.model.AccountUi
+import app.velin.feature.mail.model.FolderKind
 import app.velin.feature.mail.model.FolderUi
 import app.velin.feature.mail.model.entityIdOf
 import app.velin.feature.mail.model.toUi
@@ -51,6 +53,10 @@ sealed interface MailboxEffect {
     data class ActionFailed(val failure: Failure) : MailboxEffect
     /** Mails left the current folder; the host offers [MailboxViewModel.undoLastMove]. */
     data class Moved(val count: Int, val target: FolderUi) : MailboxEffect
+    /** Trash or Spam: deleting is permanent, so the host asks before [MailboxViewModel.deleteForever]. */
+    data class ConfirmDelete(val mailIds: Set<String>) : MailboxEffect
+    /** A mail would end up with more labels than Tuta allows. */
+    data object TooManyLabels : MailboxEffect
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -152,7 +158,11 @@ class MailboxViewModel(
             MailboxEvent.OpenAccount -> effectChannel.trySend(MailboxEffect.OpenAccount)
             is MailboxEvent.Search -> effectChannel.trySend(MailboxEffect.OpenSearch(event.query))
             is MailboxEvent.Archive -> moveTo(event.mailIds, DomainFolderKind.Archive)
-            is MailboxEvent.Trash -> moveTo(event.mailIds, DomainFolderKind.Trash)
+            is MailboxEvent.Trash -> if (inPermanentDeleteFolder()) {
+                effectChannel.trySend(MailboxEffect.ConfirmDelete(event.mailIds))
+            } else {
+                moveTo(event.mailIds, DomainFolderKind.Trash)
+            }
             is MailboxEvent.ReportSpam -> moveTo(event.mailIds, DomainFolderKind.Spam)
             is MailboxEvent.SetUnread -> act(event.mailIds) { mail.setUnread(account.id, it, event.unread) }
             is MailboxEvent.RestoreToInbox -> moveTo(event.mailIds, DomainFolderKind.Inbox)
@@ -189,6 +199,43 @@ class MailboxViewModel(
 
     private var lastMove: Pair<List<MailId>, FolderId>? = null
 
+    /** Deletes for good. Only offered in Trash and Spam (upstream isPermanentDeleteAllowedMailSetKind). */
+    fun deleteForever(mailIds: Set<String>) {
+        if (!inPermanentDeleteFolder()) return
+        act(mailIds) { mail.delete(account.id, it) }
+    }
+
+    private fun inPermanentDeleteFolder(): Boolean =
+        state.value.folder?.kind.let { it == FolderKind.Trash || it == FolderKind.Spam }
+
+    /** Label states for the label sheet, from the labels the selected mails carry now. */
+    fun labelChoices(mailIds: Set<String>): List<LabelChoice> {
+        val selected = state.value.mails.filter { it.id in mailIds }.map { mail -> mail.labels.map { it.id }.toSet() }
+        return labelChoices(folderPane.value.labels, selected)
+    }
+
+    /**
+     * Applies label changes. Tuta replaces the whole label set per mail, so each mail gets its
+     * current labels minus [removed] plus [added]; mails that end with the same set share a call.
+     */
+    fun applyLabels(mailIds: Set<String>, added: Set<String>, removed: Set<String>) {
+        if (added.isEmpty() && removed.isEmpty()) return
+        val finals = state.value.mails.filter { it.id in mailIds }
+            .associate { mail -> mail.id to (mail.labels.map { it.id }.toSet() - removed + added) }
+        if (finals.values.any { it.size > MAX_LABELS_PER_MAIL }) {
+            effectChannel.trySend(MailboxEffect.TooManyLabels)
+            return
+        }
+        selection.value = persistentSetOf()
+        viewModelScope.launch {
+            for ((labels, group) in finals.entries.groupBy({ it.value }, { it.key })) {
+                val outcome = mail.setLabels(account.id, group.map { MailId(entityIdOf(it)) }, labels.map { LabelId(entityIdOf(it)) })
+                report(outcome)
+                if (outcome is Outcome.Failed) break
+            }
+        }
+    }
+
     private fun moveTo(mailIds: Set<String>, kind: DomainFolderKind) {
         val target = folders.value.firstOrNull { it.kind == kind } ?: return
         moveMails(mailIds, target)
@@ -221,5 +268,8 @@ class MailboxViewModel(
 
     private companion object {
         const val STOP_TIMEOUT_MS = 5_000L
+
+        // Upstream limit on labels per mail, enforced again by the repository.
+        const val MAX_LABELS_PER_MAIL = 5
     }
 }

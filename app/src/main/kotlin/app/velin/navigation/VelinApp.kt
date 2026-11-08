@@ -38,6 +38,8 @@ import app.velin.core.domain.MailboxRepository
 import app.velin.feature.auth.SignInScreen
 import app.velin.feature.auth.SignInViewModel
 import app.velin.feature.mail.mailbox.FolderPane
+import app.velin.feature.mail.mailbox.DeleteForeverDialog
+import app.velin.feature.mail.mailbox.LabelSheet
 import app.velin.feature.mail.mailbox.MoveToSheet
 import app.velin.feature.mail.mailbox.folderName
 import app.velin.feature.mail.R as MailR
@@ -94,6 +96,9 @@ private fun MailApp(account: Account, auth: AuthRepository, mailbox: MailboxRepo
 
     val undoLabel = stringResource(MailR.string.action_undo)
     var moveRequest by remember { mutableStateOf<Set<String>?>(null) }
+    var labelRequest by remember { mutableStateOf<Set<String>?>(null) }
+    var deleteRequest by remember { mutableStateOf<Set<String>?>(null) }
+    val tooManyLabels = stringResource(MailR.string.too_many_labels)
 
     LaunchedEffect(mailboxViewModel) {
         mailboxViewModel.effects.collect { effect ->
@@ -102,6 +107,9 @@ private fun MailApp(account: Account, auth: AuthRepository, mailbox: MailboxRepo
                 is MailboxEffect.OpenConversation -> backStack.showDetail(ConversationRoute(effect.conversationId))
                 MailboxEffect.OpenFolders -> drawerState.open()
                 is MailboxEffect.PickFolder -> moveRequest = effect.mailIds
+                is MailboxEffect.PickLabels -> labelRequest = effect.mailIds
+                is MailboxEffect.ConfirmDelete -> deleteRequest = effect.mailIds
+                MailboxEffect.TooManyLabels -> scope.launch { snackbar.showSnackbar(tooManyLabels) }
                 is MailboxEffect.Moved -> scope.launch {
                     val resources = context.resources
                     val text = resources.getQuantityString(
@@ -111,13 +119,33 @@ private fun MailApp(account: Account, auth: AuthRepository, mailbox: MailboxRepo
                     if (result == SnackbarResult.ActionPerformed) mailboxViewModel.undoLastMove()
                 }
                 is MailboxEffect.ActionFailed -> scope.launch { snackbar.showSnackbar(actionFailed) }
-                // Composer, search, account switching and labels land with their milestones.
-                MailboxEffect.OpenComposer, MailboxEffect.OpenAccount, is MailboxEffect.OpenSearch,
-                is MailboxEffect.PickLabels -> scope.launch { snackbar.showSnackbar(notAvailable) }
+                // Composer, search and account switching land with their milestones.
+                MailboxEffect.OpenComposer, MailboxEffect.OpenAccount, is MailboxEffect.OpenSearch ->
+                    scope.launch { snackbar.showSnackbar(notAvailable) }
             }
         }
     }
 
+    labelRequest?.let { ids ->
+        LabelSheet(
+            choices = remember(ids) { mailboxViewModel.labelChoices(ids) },
+            onApply = { added, removed ->
+                labelRequest = null
+                mailboxViewModel.applyLabels(ids, added, removed)
+            },
+            onDismiss = { labelRequest = null },
+        )
+    }
+    deleteRequest?.let { ids ->
+        DeleteForeverDialog(
+            count = ids.size,
+            onConfirm = {
+                deleteRequest = null
+                mailboxViewModel.deleteForever(ids)
+            },
+            onDismiss = { deleteRequest = null },
+        )
+    }
     moveRequest?.let { ids ->
         MoveToSheet(
             folders = mailboxViewModel.moveTargets(),
