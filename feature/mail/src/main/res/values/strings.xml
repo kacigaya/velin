@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Folders -->
+    <string name="folder_inbox">Inbox</string>
+    <string name="folder_drafts">Drafts</string>
+    <string name="folder_sent">Sent</string>
+    <string name="folder_scheduled">Scheduled</string>
+    <string name="folder_archive">Archive</string>
+    <string name="folder_spam">Spam</string>
+    <string name="folder_trash">Trash</string>
+    <string name="folders_your_folders">Your folders</string>
+    <string name="folders_labels">Labels</string>
+    <string name="settings">Settings</string>
+
+    <!-- Mailbox -->
+    <string name="mailbox_search_hint">Search mail</string>
+    <string name="mailbox_search_in">Search in %1$s</string>
+    <string name="mailbox_open_folders">Open folders</string>
+    <string name="mailbox_compose">Compose</string>
+    <string name="mailbox_loading">Loading mail</string>
+    <string name="mailbox_empty_title">Nothing here</string>
+    <string name="mailbox_empty_body">Mail in this folder shows here.</string>
+    <string name="mailbox_offline">Offline. Showing saved mail.</string>
+    <string name="mailbox_selected_count">%1$d selected</string>
+    <string name="mailbox_clear_selection">Clear selection</string>
+
+    <!-- Mail row -->
+    <string name="mail_unread">Unread</string>
+    <string name="mail_has_attachments">Has attachments</string>
+    <string name="mail_confidential">End-to-end encrypted</string>
+    <string name="mail_replied">Replied</string>
+    <string name="mail_forwarded">Forwarded</string>
+    <string name="mail_replied_forwarded">Replied and forwarded</string>
+    <string name="mail_no_subject">(No subject)</string>
+    <plurals name="mail_conversation_size">
+        <item quantity="one">%1$d mail in conversation</item>
+        <item quantity="other">%1$d mails in conversation</item>
+    </plurals>
+
+    <!-- Actions -->
+    <string name="action_archive">Archive</string>
+    <string name="action_trash">Move to trash</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_move">Move</string>
+    <string name="action_label">Label</string>
+    <string name="action_mark_read">Mark as read</string>
+    <string name="action_mark_unread">Mark as unread</string>
+    <string name="action_report_spam">Report spam</string>
+    <string name="action_not_spam">Not spam</string>
+    <string name="action_move_to_inbox">Move to inbox</string>
+    <string name="action_reply">Reply</string>
+    <string name="action_reply_all">Reply all</string>
+    <string name="action_forward">Forward</string>
+    <string name="action_more">More options</string>
+    <string name="action_back">Back</string>
+    <string name="action_undo">Undo</string>
+    <string name="action_retry">Retry</string>
+    <string name="action_select">Select</string>
+</resources>
