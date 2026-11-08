@@ -21,12 +21,26 @@ class BackendReadRepositoryTest {
         emptyList(), emptyList(), id.value.element.value, Instant.ofEpochSecond(if (id.value.element.value == "old") 1 else 2),
         true, true, false, BodyState.Loading, listOf(attachment), MailAuthentication.Unknown, null, null)
     private inner class Source : MailReadSource {
+        var actionFailure = false
+        var deleted = false
+        var currentFolder = folder
+        val label = Label(LabelId(entity("label")), "Work", null)
+        override suspend fun setUnread(account: AccountId, ids: List<MailId>, unread: Boolean) = actionResult()
+        override suspend fun move(account: AccountId, ids: List<MailId>, target: FolderId): Outcome<Unit> {
+            if (!actionFailure) currentFolder = target
+            return actionResult()
+        }
+        override suspend fun setLabels(account: AccountId, ids: List<MailId>, labels: List<LabelId>) = actionResult()
+        override suspend fun currentFolders(account: AccountId, ids: List<MailId>) = Outcome.Success(ids.associateWith { currentFolder })
+        override suspend fun delete(account: AccountId, ids: List<MailId>): Outcome<Unit> { deleted = true; return actionResult() }
+        private fun actionResult(): Outcome<Unit> = if (actionFailure) Outcome.Failed(Failure.Offline) else Outcome.Success(Unit)
         var failure = false
         var requested: PageCursor? = null
         var bodyCalls = 0
         override suspend fun mailbox(account: AccountId) = Outcome.Success(MailboxSnapshot(listOf(
             Folder(folder, "Inbox", FolderKind.Inbox, 3),
-            Folder(FolderId(entity("child")), "Child", FolderKind.Custom, 1, folder)), emptyList(), emptyList()))
+            Folder(FolderId(entity("child")), "Child", FolderKind.Custom, 1, folder),
+            Folder(FolderId(entity("trash")), "Trash", FolderKind.Trash, 0)), listOf(label), emptyList()))
         override suspend fun page(account: AccountId, folder: FolderId, cursor: PageCursor?): Outcome<MailPage> {
             requested = cursor
             return Outcome.Success(if (cursor == null) MailPage(listOf(summary("new", 2)), PageCursor(ElementId("entry")))
@@ -49,7 +63,7 @@ class BackendReadRepositoryTest {
         try {
             val repo = BackendReadRepository(source, cache)
             assertEquals(Outcome.Success(Unit), repo.sync(account))
-            assertEquals(1, repo.folders(account).first().last().depth)
+            assertEquals(1, repo.folders(account).first().single { it.id == FolderId(entity("child")) }.depth)
             val pages = mutableListOf<MailPage>()
             val job = launch(start = CoroutineStart.UNDISPATCHED) { repo.messages(account, folder).take(2).toList(pages) }
             withTimeout(5000) { while (pages.isEmpty()) yield() }
@@ -114,6 +128,73 @@ class BackendReadRepositoryTest {
             assertTrue(validateInlineImage(AttachmentContent(attachment.copy(mimeType = mime), bytes)) is Outcome.Failed)
         }
         assertTrue(validateInlineImage(AttachmentContent(attachment.copy(mimeType = "image/gif", sizeBytes = 6), "GIF89a".toByteArray())) is Outcome.Success)
+    }
+    @Test fun mutationsPublishOnlyAfterSuccessAndUndoRestoresPage() = runBlocking {
+        val source = Source()
+        val cache = Files.createTempDirectory("mail-actions").toFile()
+        val repo = BackendReadRepository(source, cache)
+        val pages = mutableListOf<MailPage>()
+        val conversations = mutableListOf<Outcome<Conversation>>()
+        val pageJob = launch { repo.messages(account, folder).toList(pages) }
+        val conversationJob = launch { repo.conversation(account, thread).toList(conversations) }
+        try {
+            withTimeout(5000) { while (pages.isEmpty() || conversations.isEmpty()) yield() }
+            val id = pages.last().mails.single().id
+            assertEquals(Outcome.Success(Unit), repo.setUnread(account, listOf(id), false))
+            withTimeout(5000) { while (pages.last().mails.single().unread) yield() }
+            assertFalse((repo.load(account, id) as Outcome.Success).value.unread)
+            assertEquals(Outcome.Success(Unit), repo.setLabels(account, listOf(id), listOf(source.label.id)))
+            withTimeout(5000) { while (pages.last().mails.single().labels.isEmpty()) yield() }
+            assertEquals(listOf(source.label), pages.last().mails.single().labels)
+            withTimeout(5000) { while ((conversations.last() as Outcome.Success).value.labels.isEmpty()) yield() }
+            source.actionFailure = true
+            assertEquals(Outcome.Failed(Failure.Offline), repo.setUnread(account, listOf(id), true))
+            assertEquals(Outcome.Failed(Failure.Offline), repo.setLabels(account, listOf(id), emptyList()))
+            assertEquals(Outcome.Failed(Failure.Offline), repo.move(account, listOf(id), FolderId(entity("trash"))))
+            assertFalse((repo.load(account, id) as Outcome.Success).value.unread)
+            assertEquals(listOf(source.label), pages.last().mails.single().labels)
+            source.actionFailure = false
+            val before = (repo.currentFolders(account, listOf(id)) as Outcome.Success).value
+            assertEquals(Outcome.Success(Unit), repo.move(account, listOf(id), FolderId(entity("trash"))))
+            withTimeout(5000) { while (pages.last().mails.isNotEmpty()) yield() }
+            assertEquals(Outcome.Success(Unit), repo.move(account, listOf(id), before.getValue(id)))
+            withTimeout(5000) { while (pages.last().mails.isEmpty()) yield() }
+            assertEquals(id, pages.last().mails.single().id)
+            assertEquals(Outcome.Success(Unit), repo.setLabels(account, listOf(id), emptyList()))
+            withTimeout(5000) { while (pages.last().mails.single().labels.isNotEmpty()) yield() }
+            withTimeout(5000) { while ((conversations.last() as Outcome.Success).value.labels.isNotEmpty()) yield() }
+            assertEquals(Outcome.Failed(Failure.Protocol(409)), repo.delete(account, listOf(id)))
+            assertFalse(source.deleted)
+            repo.move(account, listOf(id), FolderId(entity("trash")))
+            source.actionFailure = true
+            assertEquals(Outcome.Failed(Failure.Offline), repo.delete(account, listOf(id)))
+            assertFalse((repo.load(account, id) as Outcome.Success).value.unread)
+            source.actionFailure = false
+            assertEquals(Outcome.Success(Unit), repo.delete(account, listOf(id)))
+            withTimeout(5000) { while ((conversations.last() as Outcome.Success).value.messages.any { it.id == id }) yield() }
+        } finally { pageJob.cancelAndJoin(); conversationJob.cancelAndJoin(); cache.deleteRecursively() }
+    }
+    @Test fun syncReplacesLocalMutationsWithServerTruth() = runBlocking {
+        val source = Source()
+        val cache = Files.createTempDirectory("mail-sync").toFile()
+        val repo = BackendReadRepository(source, cache)
+        val pages = mutableListOf<MailPage>()
+        val conversations = mutableListOf<Outcome<Conversation>>()
+        val pageJob = launch { repo.messages(account, folder).toList(pages) }
+        val conversationJob = launch { repo.conversation(account, thread).toList(conversations) }
+        try {
+            withTimeout(5000) { while (pages.isEmpty() || conversations.isEmpty()) yield() }
+            val id = pages.last().mails.single().id
+            repo.setUnread(account, listOf(id), false)
+            repo.setLabels(account, listOf(id), listOf(source.label.id))
+            withTimeout(5000) { while (pages.last().mails.single().unread) yield() }
+            assertEquals(Outcome.Success(Unit), repo.sync(account))
+            withTimeout(5000) { while (!pages.last().mails.single().unread) yield() }
+            assertTrue(pages.last().mails.single().labels.isEmpty())
+            assertTrue((repo.load(account, id) as Outcome.Success).value.unread)
+            withTimeout(5000) { while (!(conversations.last() as Outcome.Success).value.messages.single { it.id == id }.unread) yield() }
+            assertTrue((conversations.last() as Outcome.Success).value.labels.isEmpty())
+        } finally { pageJob.cancelAndJoin(); conversationJob.cancelAndJoin(); cache.deleteRecursively() }
     }
     @Test fun cyclesAreRejectedAndOrphansBecomeRoots() {
         assertThrows(IllegalArgumentException::class.java) { folderTree(listOf(Folder(folder, "cycle", FolderKind.Custom, 0, folder))) }
