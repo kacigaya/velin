@@ -67,7 +67,7 @@ import kotlinx.collections.immutable.persistentListOf
 
 data class SavedAccountUi(val id: String, val address: String)
 
-enum class SignInError { InvalidCredentials, TooManyAttempts, Offline, InvalidCode, SecurityKeyUnsupported, Unknown }
+enum class SignInError { InvalidCredentials, TooManyAttempts, Offline, InvalidCode, SecurityKeyUnsupported, OutdatedClient, Unknown }
 
 sealed interface SignInUiState {
     val busy: Boolean
@@ -316,6 +316,7 @@ private fun ErrorText(error: SignInError?) {
             SignInError.Offline -> R.string.signin_error_offline
             SignInError.InvalidCode -> R.string.signin_error_code
             SignInError.SecurityKeyUnsupported -> R.string.signin_error_security_key
+            SignInError.OutdatedClient -> R.string.signin_error_outdated
             SignInError.Unknown -> R.string.signin_error_unknown
         },
     )

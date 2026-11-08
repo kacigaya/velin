@@ -24,5 +24,6 @@
     <string name="signin_error_offline">No connection. Check your network and try again.</string>
     <string name="signin_error_code">Wrong code. Try again.</string>
     <string name="signin_error_security_key">Security keys are not supported in Velin yet. Use another method.</string>
+    <string name="signin_error_outdated">Tuta no longer accepts this version of Velin. Update the app.</string>
     <string name="signin_error_unknown">Sign-in failed. Try again.</string>
 </resources>
