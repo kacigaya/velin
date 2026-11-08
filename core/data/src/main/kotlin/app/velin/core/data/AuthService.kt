@@ -71,7 +71,7 @@ internal class AuthService(private val baseUrl: String, private val transport: B
         return response.body?.takeIf { it.isNotEmpty() }?.let { JSONObject(String(it, Charsets.UTF_8)) } ?: JSONObject()
     }
     private suspend fun request(url: String, method: RequestMethod, body: ByteArray?, token: String? = null): BinaryResponse {
-        val headers = mutableMapOf("v" to "158", "cv" to SDK_CLIENT_VERSION, "cp" to ANDROID_MAIL_PLATFORM,
+        val headers = mutableMapOf("v" to TutaRelease.SYS_MODEL_VERSION.toString(), "cv" to SDK_CLIENT_VERSION, "cp" to ANDROID_MAIL_PLATFORM,
             "Accept" to "application/json", "Content-Type" to "application/json")
         token?.let { headers["accessToken"] = it }
         return transport.request(BinaryRequest(url, method, headers, body)).also { ServiceClient.checkStatus(it.status) }

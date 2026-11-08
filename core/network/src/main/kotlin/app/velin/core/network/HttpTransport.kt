@@ -10,7 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 // Upstream tuta-sdk/rust/sdk/src/lib.rs:113,160-169; ClientDetector.ts:389-396.
-const val SDK_CLIENT_VERSION = "366.261105.0"
+const val SDK_CLIENT_VERSION = TutaRelease.CLIENT_VERSION
 const val ANDROID_MAIL_PLATFORM = "2"
 
 sealed class ProtocolException : Exception() {
