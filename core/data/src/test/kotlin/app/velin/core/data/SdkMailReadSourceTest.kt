@@ -71,9 +71,10 @@ class SdkMailReadSourceTest {
         val reader = Reader().apply { sets = listOf(inbox) }
         assertNull((source(reader).page(account, FolderId(inbox.id.domain()), null) as Outcome.Success).value.next)
     }
-    @Test fun invalidCountersAndUnknownKindsFailClosed() = runBlocking {
+    @Test fun invalidCountersDoNotBlockFoldersButUnknownKindsFail() = runBlocking {
         val reader = Reader().apply { sets = listOf(inbox); count = -1 }
-        assertTrue(source(reader).mailbox(account) is Outcome.Failed)
+        val snapshot = source(reader).mailbox(account) as Outcome.Success
+        assertEquals(0, snapshot.value.folders.single().unreadCount)
         reader.count = 0; reader.sets = listOf(inbox.copy(kind = 999))
         assertTrue(source(reader).mailbox(account) is Outcome.Failed)
     }

@@ -15,13 +15,21 @@ internal class SdkMailReadSource(private val sessions: SessionReadAccess) : Mail
         val sets = sdk.folders()
         val labels = sets.filter { it.kind == 8L }.map { Label(LabelId(it.id.domain()), it.name, it.color) }
         val folders = sets.filter { it.kind != 8L && it.kind != 7L }.map {
-            val count = sdk.unread(it)
-            require(count in 0..Int.MAX_VALUE.toLong())
-            Folder(FolderId(it.id.domain()), it.name, folderKind(it.kind), count.toInt(),
+            Folder(FolderId(it.id.domain()), it.name, folderKind(it.kind), unreadOrZero(sdk, it),
                 it.parent?.let { p -> FolderId(p.domain()) })
         }
         MailboxSnapshot(folders, labels, emptyList())
     }
+    /**
+     * Upstream receives unread counts over the event bus (WebsocketCounterData, MailModel.ts:455-478),
+     * not from CounterService GET, which the server rejects with 400 for mail folders. Until the
+     * event bus exists (M4) the count is best effort, so one counter never blocks the folder list.
+     */
+    private suspend fun unreadOrZero(sdk: SdkMailReader, folder: ReadFolder): Int = try {
+        sdk.unread(folder).takeIf { it in 0..Int.MAX_VALUE.toLong() }?.toInt() ?: 0
+    } catch (e: CancellationException) { throw e
+    } catch (_: SdkException) { 0 }
+
     override suspend fun page(account: AccountId, folder: FolderId, cursor: PageCursor?): Outcome<MailPage> = read(account) { sdk ->
         val sets = sdk.folders()
         val target = sets.singleOrNull { it.id.domain() == folder.value } ?: return@read null
