@@ -103,6 +103,7 @@ sealed interface MailboxEvent {
     data class SetUnread(val mailIds: Set<String>, val unread: Boolean) : MailboxEvent
     data class ReportSpam(val mailIds: Set<String>) : MailboxEvent
     data class Move(val mailIds: Set<String>) : MailboxEvent
+    data class RestoreToInbox(val mailIds: Set<String>) : MailboxEvent
     data class Label(val mailIds: Set<String>) : MailboxEvent
 }
 
@@ -231,7 +232,7 @@ private fun SwipeableMailRow(
     val ids = setOf(mail.id)
     // Matches the official client: start-to-end archives (or restores to inbox from the
     // archive), end-to-start moves to trash.
-    val archiveEvent = if (folderKind == FolderKind.Archive) MailboxEvent.Move(ids) else MailboxEvent.Archive(ids)
+    val archiveEvent = if (folderKind == FolderKind.Archive) MailboxEvent.RestoreToInbox(ids) else MailboxEvent.Archive(ids)
     val actions = MailRowActions(
         onArchive = { onEvent(archiveEvent) },
         onTrash = { onEvent(MailboxEvent.Trash(ids)) },
