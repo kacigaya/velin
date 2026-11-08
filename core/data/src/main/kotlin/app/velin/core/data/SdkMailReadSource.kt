@@ -9,8 +9,62 @@ internal interface SessionReadAccess {
     suspend fun <T> read(account: AccountId, operation: suspend (SdkMailReader) -> Outcome<T>): Outcome<T>
 }
 
-/** Read-only adapter. Sender authentication remains unverified. */
+/** Session adapter. Sender authentication remains unverified. */
 internal class SdkMailReadSource(private val sessions: SessionReadAccess) : MailReadSource {
+    override suspend fun setUnread(account: AccountId, ids: List<MailId>, unread: Boolean): Outcome<Unit> = read(account) { sdk ->
+        ids.distinct().chunked(50).forEach { batch -> sdk.setUnread(batch.map { it.value.readId() }, unread) }
+    }
+    override suspend fun currentFolders(account: AccountId, ids: List<MailId>): Outcome<Map<MailId, FolderId>> = read(account) { sdk ->
+        val folders = sdk.folders().filter { it.kind != 7L && it.kind != 8L }
+        ids.distinct().associateWith { id ->
+            val mail = sdk.summary(id.value.readId())
+            require(mail.id == id.value.readId())
+            FolderId(requireNotNull(folders.singleOrNull { it.id in mail.sets }).id.domain())
+        }
+    }
+    override suspend fun move(account: AccountId, ids: List<MailId>, target: FolderId): Outcome<Unit> = read(account) { sdk ->
+        val folder = sdk.folders().singleOrNull { it.id.domain() == target.value && it.kind != 7L && it.kind != 8L }
+            ?: return@read null
+        batches(ids).forEach { sdk.move(it, folder) }
+    }
+    override suspend fun setLabels(account: AccountId, ids: List<MailId>, labels: List<LabelId>): Outcome<Unit> = read(account) { sdk ->
+        val sets = sdk.folders()
+        val available = sets.filter { it.kind == 8L }.map { it.id }.toSet()
+        val desired = labels.distinct().map { it.value.readId() }.toSet()
+        require(desired.size <= 5 && available.containsAll(desired))
+        // Preflight every mail before writing. Label replacement is per mail, never per conversation.
+        val changes = ids.distinct().map { id ->
+            val mail = sdk.summary(id.value.readId())
+            require(mail.id == id.value.readId())
+            val existing = mail.sets.filter { it in available }.toSet()
+            Triple(id.value.readId(), (desired - existing).toList(), (existing - desired).toList())
+        }
+        changes.groupBy { Triple(it.first.list, it.second, it.third) }.forEach { (_, group) ->
+            val added = group.first().second
+            val removed = group.first().third
+            if (added.isNotEmpty() || removed.isNotEmpty()) group.chunked(50).forEach { batch ->
+                sdk.applyLabels(batch.map { it.first }, added, removed)
+            }
+        }
+    }
+    override suspend fun delete(account: AccountId, ids: List<MailId>): Outcome<Unit> = read(account) { sdk ->
+        val folders = sdk.folders().filter { it.kind != 7L && it.kind != 8L }
+        val locations = ids.distinct().map { id ->
+            val mail = sdk.summary(id.value.readId())
+            require(mail.id == id.value.readId())
+            val folder = requireNotNull(folders.singleOrNull { it.id in mail.sets })
+            require(folder.kind == 3L || folder.kind == 5L)
+            id.value.readId() to folder.id
+        }
+        locations.groupBy { it.second }.forEach { (folder, mails) ->
+            mails.map { it.first }.groupBy { it.list }.values.forEach { bag ->
+                bag.chunked(50).forEach { sdk.delete(it, folder) }
+            }
+        }
+    }
+    private fun batches(ids: List<MailId>): List<List<ReadId>> = ids.distinct().map { it.value.readId() }
+        .groupBy { it.list }.values.flatMap { it.chunked(50) }
+
     override suspend fun mailbox(account: AccountId): Outcome<MailboxSnapshot> = read(account) { sdk ->
         val sets = sdk.folders()
         val labels = sets.filter { it.kind == 8L }.map { Label(LabelId(it.id.domain()), it.name, it.color) }

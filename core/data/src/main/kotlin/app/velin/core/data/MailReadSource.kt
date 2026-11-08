@@ -4,6 +4,11 @@ import app.velin.core.domain.*
 
 /** Decrypted source boundary. Implementations must authenticate before returning plaintext. */
 interface MailReadSource {
+    suspend fun setUnread(account: AccountId, ids: List<MailId>, unread: Boolean): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)
+    suspend fun move(account: AccountId, ids: List<MailId>, target: FolderId): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)
+    suspend fun setLabels(account: AccountId, ids: List<MailId>, labels: List<LabelId>): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)
+    suspend fun currentFolders(account: AccountId, ids: List<MailId>): Outcome<Map<MailId, FolderId>> = Outcome.Failed(Failure.Unsupported)
+    suspend fun delete(account: AccountId, ids: List<MailId>): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)
     suspend fun mailbox(account: AccountId): Outcome<MailboxSnapshot>
     suspend fun page(account: AccountId, folder: FolderId, cursor: PageCursor?): Outcome<MailPage>
     suspend fun conversation(account: AccountId, id: ConversationId): Outcome<List<MailSummary>>

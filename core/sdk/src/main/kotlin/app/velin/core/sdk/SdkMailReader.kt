@@ -22,6 +22,10 @@ data class ReadMessage(val id: ReadId, val sender: ReadAddress, val to: List<Rea
     val scheduledMillis: Long?, val mailAuthStatus: Long = -1, val attachments: List<ReadAttachment> = emptyList())
 
 interface SdkMailReader {
+    suspend fun setUnread(ids: List<ReadId>, unread: Boolean): Unit = throw SdkException(SdkFailure.Protocol)
+    suspend fun move(ids: List<ReadId>, target: ReadFolder): Unit = throw SdkException(SdkFailure.Protocol)
+    suspend fun applyLabels(ids: List<ReadId>, added: List<ReadId>, removed: List<ReadId>): Unit = throw SdkException(SdkFailure.Protocol)
+    suspend fun delete(ids: List<ReadId>, folder: ReadId): Unit = throw SdkException(SdkFailure.Protocol)
     suspend fun folders(): List<ReadFolder>
     suspend fun unread(folder: ReadFolder): Long
     suspend fun entries(list: String, cursor: String?): List<ReadEntry>
@@ -32,6 +36,19 @@ interface SdkMailReader {
 }
 
 internal class NativeMailReader(private val facade: MailFacade) : SdkMailReader, AutoCloseable {
+    override suspend fun setUnread(ids: List<ReadId>, unread: Boolean): Unit = api {
+        facade.setUnreadStatusForMails(ids.distinct().map { it.native() }, unread)
+    }
+    override suspend fun move(ids: List<ReadId>, target: ReadFolder): Unit = api {
+        // Exact folder IDs are required for undo, including Trash and Archive.
+        facade.velinMove(ids.map { it.native() }, target.id.native())
+    }
+    override suspend fun applyLabels(ids: List<ReadId>, added: List<ReadId>, removed: List<ReadId>): Unit = api {
+        facade.velinLabels(ids.map { it.native() }, added.map { it.native() }, removed.map { it.native() })
+    }
+    override suspend fun delete(ids: List<ReadId>, folder: ReadId): Unit = api {
+        facade.velinDelete(ids.map { it.native() }, folder.native())
+    }
     private val attachmentParents = LinkedHashMap<ReadId, ReadId>()
     override fun close() { synchronized(attachmentParents) { attachmentParents.clear() }; facade.close() }
     private fun TutanotaFile.metadata(): ReadAttachment {
@@ -108,3 +125,5 @@ internal class NativeMailReader(private val facade: MailFacade) : SdkMailReader,
 private fun IdTupleGenerated.readId() = ReadId(listId, elementId)
 
 private fun ULong.millis(): Long { require(this <= Long.MAX_VALUE.toULong()); return toLong() }
+
+private fun ReadId.native() = IdTupleGenerated(list, element)

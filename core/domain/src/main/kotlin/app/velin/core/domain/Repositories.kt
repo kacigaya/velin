@@ -29,7 +29,12 @@ interface MailRepository {
     suspend fun inlineImage(account: AccountId, id: AttachmentId): Outcome<InlineImage> = Outcome.Failed(Failure.Unsupported)
     suspend fun setUnread(account: AccountId, ids: List<MailId>, unread: Boolean): Outcome<Unit>
     suspend fun move(account: AccountId, ids: List<MailId>, target: FolderId): Outcome<Unit>
+    /** Replaces labels on each selected mail. An empty list removes all labels. At most five labels per mail. */
     suspend fun setLabels(account: AccountId, ids: List<MailId>, labels: List<LabelId>): Outcome<Unit>
+    /** Read before moving. Keep this map for undo, then move each group back to its folder. */
+    suspend fun currentFolders(account: AccountId, ids: List<MailId>): Outcome<Map<MailId, FolderId>> = Outcome.Failed(Failure.Unsupported)
+    /** Permanent deletion is restricted to mails currently in Trash or Spam. */
+    suspend fun delete(account: AccountId, ids: List<MailId>): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)
     suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<DraftId>
     suspend fun sendDraft(account: AccountId, id: DraftId): Outcome<Unit>
     suspend fun downloadAttachment(account: AccountId, id: AttachmentId): Outcome<java.io.File>

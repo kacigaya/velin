@@ -19,6 +19,7 @@ class BackendReadRepository(private val source: MailReadSource, private val cach
         val conversations = mutableMapOf<ConversationId, MutableStateFlow<Outcome<Conversation>>>()
         val viewers = mutableMapOf<ConversationId, Int>()
         val messages = mutableMapOf<MailId, MailMessage>()
+        val summaries = mutableMapOf<MailId, MailSummary>()
         val rawBodies = mutableMapOf<MailId, String>()
         val consent = mutableSetOf<MailId>()
     }
@@ -32,6 +33,7 @@ class BackendReadRepository(private val source: MailReadSource, private val cach
                     state.pages.values.forEach { it.value = MailPage(emptyList(), null) }
                     state.conversations.values.forEach { it.value = Outcome.Failed(Failure.Unauthorized) }
                     state.messages.clear()
+                    state.summaries.clear()
                     state.rawBodies.clear()
                     state.consent.clear()
                 }
@@ -52,6 +54,27 @@ class BackendReadRepository(private val source: MailReadSource, private val cach
                 is Outcome.Failed -> { state.sync.value = SyncState.Failed(result.failure); result }
                 is Outcome.Success -> {
                     state.mailbox.value = result.value.copy(folders = folderTree(result.value.folders))
+                    state.messages.clear()
+                    state.rawBodies.clear()
+                    for ((folder, flow) in state.pages) {
+                        when (val page = source.page(account, folder, null)) {
+                            is Outcome.Failed -> { state.sync.value = SyncState.Failed(page.failure); return@io page }
+                            is Outcome.Success -> {
+                                page.value.mails.forEach { state.summaries[it.id] = it }
+                                flow.value = page.value.copy(mails = newest(page.value.mails))
+                            }
+                        }
+                    }
+                    for ((id, flow) in state.conversations) {
+                        if ((state.viewers[id] ?: 0) > 0) {
+                            val refreshed = refreshConversation(account, id)
+                            flow.value = refreshed
+                            if (refreshed is Outcome.Failed) {
+                                state.sync.value = SyncState.Failed(refreshed.failure)
+                                return@io refreshed
+                            }
+                        }
+                    }
                     state.sync.value = SyncState.Idle
                     Outcome.Success(Unit)
                 }
@@ -67,7 +90,10 @@ class BackendReadRepository(private val source: MailReadSource, private val cach
         val page = mutex.withLock { state.pages.getOrPut(folder) { MutableStateFlow(MailPage(emptyList(), null)) } }
         io {
             when (val result = source.page(account, folder, null)) {
-                is Outcome.Success -> page.value = result.value.copy(mails = newest(result.value.mails))
+                is Outcome.Success -> {
+                    result.value.mails.forEach { state.summaries[it.id] = it }
+                    page.value = result.value.copy(mails = newest(result.value.mails))
+                }
                 is Outcome.Failed -> state.sync.value = SyncState.Failed(result.failure)
             }
             Outcome.Success(Unit)
@@ -81,6 +107,7 @@ class BackendReadRepository(private val source: MailReadSource, private val cach
             is Outcome.Failed -> result
             is Outcome.Success -> {
                 if (result.value.next == cursor) return@io Outcome.Failed(Failure.Protocol(502))
+                result.value.mails.forEach { this.account(account).summaries[it.id] = it }
                 page.value = MailPage(newest((page.value.mails + result.value.mails).distinctBy { it.id }), result.value.next)
                 Outcome.Success(Unit)
             }
@@ -116,21 +143,7 @@ class BackendReadRepository(private val source: MailReadSource, private val cach
         mutex.withLock { state.viewers[id] = (state.viewers[id] ?: 0) + 1 }
         try {
             io {
-                conversation.value = when (val result = source.conversation(account, id)) {
-                    is Outcome.Failed -> result
-                    is Outcome.Success -> {
-                        val summaries = result.value.filter { it.conversationId == id }.distinctBy { it.id }.sortedBy { it.receivedAt }
-                        val messages = mutableListOf<MailMessage>()
-                        var failure: Failure? = null
-                        for (summary in summaries) when (val loaded = loadMessage(account, summary.id)) {
-                            is Outcome.Failed -> { failure = loaded.failure; break }
-                            is Outcome.Success -> messages += loaded.value
-                        }
-                        failure?.let { Outcome.Failed(it) } ?: Outcome.Success(Conversation(id,
-                            messages.lastOrNull()?.subject.orEmpty(), summaries.flatMap { it.labels }.distinctBy { it.id }, null,
-                            messages.sortedBy { it.sentAt }))
-                    }
-                }
+                conversation.value = refreshConversation(account, id)
                 Outcome.Success(Unit)
             }
             emitAll(conversation)
@@ -153,6 +166,25 @@ class BackendReadRepository(private val source: MailReadSource, private val cach
                         }
                     }
                 }
+            }
+        }
+    }
+    private suspend fun refreshConversation(account: AccountId, id: ConversationId): Outcome<Conversation> {
+        val state = this.account(account)
+        return when (val result = source.conversation(account, id)) {
+            is Outcome.Failed -> result
+            is Outcome.Success -> {
+                val summaries = result.value.filter { it.conversationId == id }.distinctBy { it.id }.sortedBy { it.receivedAt }
+                summaries.forEach { state.summaries[it.id] = it }
+                val messages = mutableListOf<MailMessage>()
+                var failure: Failure? = null
+                for (summary in summaries) when (val loaded = loadMessage(account, summary.id)) {
+                    is Outcome.Failed -> { failure = loaded.failure; break }
+                    is Outcome.Success -> messages += loaded.value
+                }
+                failure?.let { Outcome.Failed(it) } ?: Outcome.Success(Conversation(id,
+                    messages.lastOrNull()?.subject.orEmpty(), summaries.flatMap { it.labels }.distinctBy { it.id }, null,
+                    messages.sortedBy { it.sentAt }))
             }
         }
     }
@@ -205,9 +237,114 @@ class BackendReadRepository(private val source: MailReadSource, private val cach
         }
     }
     private fun newest(mails: List<MailSummary>) = mails.sortedWith(compareByDescending<MailSummary> { it.receivedAt }.thenByDescending { it.id.value.element.value })
-    override suspend fun setUnread(account: AccountId, ids: List<MailId>, unread: Boolean) = unsupported()
-    override suspend fun move(account: AccountId, ids: List<MailId>, target: FolderId) = unsupported()
-    override suspend fun setLabels(account: AccountId, ids: List<MailId>, labels: List<LabelId>) = unsupported()
+    override suspend fun currentFolders(account: AccountId, ids: List<MailId>): Outcome<Map<MailId, FolderId>> = io {
+        source.currentFolders(account, ids.distinct())
+    }
+    override suspend fun setUnread(account: AccountId, ids: List<MailId>, unread: Boolean): Outcome<Unit> = io {
+        if (ids.isEmpty()) return@io Outcome.Success(Unit)
+        when (val result = source.setUnread(account, ids.distinct(), unread)) {
+            is Outcome.Failed -> result
+            is Outcome.Success -> {
+                val state = this.account(account)
+                val selected = ids.toSet()
+                state.summaries.replaceAll { id, mail -> if (id in selected) mail.copy(unread = unread) else mail }
+                state.messages.replaceAll { id, mail -> if (id in selected) mail.copy(unread = unread) else mail }
+                publish(state)
+                result
+            }
+        }
+    }
+    override suspend fun move(account: AccountId, ids: List<MailId>, target: FolderId): Outcome<Unit> = io {
+        if (ids.isEmpty()) return@io Outcome.Success(Unit)
+        when (val result = source.move(account, ids.distinct(), target)) {
+            is Outcome.Failed -> result
+            is Outcome.Success -> {
+                val state = this.account(account)
+                val selected = ids.toSet()
+                state.pages.forEach { (folder, flow) ->
+                    if (folder != target) flow.value = flow.value.copy(mails = flow.value.mails.filterNot { it.id in selected })
+                }
+                state.conversations.values.forEach { flow ->
+                    val previous = flow.value
+                    if (previous is Outcome.Success && previous.value.messages.any { it.id in selected }) {
+                        val kind = if (previous.value.messages.all { it.id in selected }) {
+                            state.mailbox.value.folders.singleOrNull { it.id == target }?.kind
+                        } else null
+                        flow.value = Outcome.Success(previous.value.copy(folderKind = kind))
+                    }
+                }
+                // A cached destination can show known messages immediately, including an undo.
+                state.pages[target]?.let { flow ->
+                    flow.value = flow.value.copy(mails = newest((flow.value.mails + selected.mapNotNull { state.summaries[it] }).distinctBy { it.id }))
+                }
+                result
+            }
+        }
+    }
+    override suspend fun setLabels(account: AccountId, ids: List<MailId>, labels: List<LabelId>): Outcome<Unit> = io {
+        if (ids.isEmpty()) return@io Outcome.Success(Unit)
+        val mailbox = when (val result = source.mailbox(account)) {
+            is Outcome.Failed -> return@io result
+            is Outcome.Success -> result.value
+        }
+        if (labels.distinct().size > 5) return@io Outcome.Failed(Failure.Protocol(400))
+        val desired = labels.distinct().map { id -> mailbox.labels.singleOrNull { it.id == id }
+            ?: return@io Outcome.Failed(Failure.Protocol(400)) }
+        when (val result = source.setLabels(account, ids.distinct(), labels.distinct())) {
+            is Outcome.Failed -> result
+            is Outcome.Success -> {
+                val state = this.account(account)
+                val selected = ids.toSet()
+                state.summaries.replaceAll { id, mail -> if (id in selected) mail.copy(labels = desired) else mail }
+                publish(state)
+                result
+            }
+        }
+    }
+    override suspend fun delete(account: AccountId, ids: List<MailId>): Outcome<Unit> = io {
+        if (ids.isEmpty()) return@io Outcome.Success(Unit)
+        val locations = when (val result = source.currentFolders(account, ids.distinct())) {
+            is Outcome.Failed -> return@io result
+            is Outcome.Success -> result.value
+        }
+        val mailbox = when (val result = source.mailbox(account)) {
+            is Outcome.Failed -> return@io result
+            is Outcome.Success -> result.value
+        }
+        if (ids.any { id -> mailbox.folders.none { it.id == locations[id] && it.kind in setOf(FolderKind.Trash, FolderKind.Spam) } }) {
+            return@io Outcome.Failed(Failure.Protocol(409))
+        }
+        when (val result = source.delete(account, ids.distinct())) {
+            is Outcome.Failed -> result
+            is Outcome.Success -> {
+                val state = this.account(account)
+                ids.forEach { id ->
+                    state.messages.remove(id)
+                    state.summaries.remove(id)
+                    state.rawBodies.remove(id)
+                    state.consent.remove(id)
+                }
+                state.pages.values.forEach { flow -> flow.value = flow.value.copy(mails = flow.value.mails.filterNot { it.id in ids }) }
+                state.conversations.values.forEach { flow ->
+                    val previous = flow.value
+                    if (previous is Outcome.Success) flow.value = Outcome.Success(previous.value.copy(messages = previous.value.messages.filterNot { it.id in ids }))
+                }
+                publish(state)
+                result
+            }
+        }
+    }
+    private fun publish(state: AccountCache) {
+        state.pages.values.forEach { flow ->
+            flow.value = flow.value.copy(mails = flow.value.mails.map { state.summaries[it.id] ?: it })
+        }
+        state.conversations.values.forEach { flow ->
+            val previous = flow.value
+            if (previous is Outcome.Success) flow.value = Outcome.Success(previous.value.copy(
+                messages = previous.value.messages.map { state.messages[it.id] ?: it },
+                labels = previous.value.messages.flatMap { state.summaries[it.id]?.labels.orEmpty() }.distinctBy { it.id }))
+        }
+    }
     override suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<DraftId> = unsupported()
     override suspend fun sendDraft(account: AccountId, id: DraftId) = unsupported()
     override fun search(account: AccountId, query: String): Flow<Outcome<List<MailSummary>>> = flowOf(unsupported())

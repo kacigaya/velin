@@ -304,3 +304,93 @@ mod velin_aggregate_id_tests {
         assert_ne!(first.as_str(), second.as_str());
     }
 }
+
+// src/applications/common/api/worker/facades/lazy/MailFacade.ts:598-675,1430-1437.
+// Each export sends one batch. The caller groups by mailbag and limits batches to 50.
+#[uniffi::export]
+impl MailFacade {
+    pub async fn velin_move(&self, mails: Vec<IdTupleGenerated>, target: IdTupleGenerated) -> Result<(), ApiCallError> {
+        use crate::entities::generated::tutanota::MoveMailData;
+        use crate::services::generated::tutanota::MoveMailService;
+        velin_action_batch(&mails)?;
+        AssertUnwindSafe(async {
+            self.service_executor.post::<MoveMailService>(MoveMailData {
+                _format: 0, mails, targetFolder: target, excludeMailSet: None, moveReason: None,
+            }, Default::default()).await?;
+            Ok(())
+        }).catch_unwind().await.unwrap_or_else(|_| Err(ApiCallError::internal("Mail move failed".into())))
+    }
+
+    pub async fn velin_labels(&self, mails: Vec<IdTupleGenerated>, added: Vec<IdTupleGenerated>, removed: Vec<IdTupleGenerated>) -> Result<(), ApiCallError> {
+        use crate::entities::generated::tutanota::ApplyLabelServicePostIn;
+        use crate::services::generated::tutanota::ApplyLabelService;
+        velin_action_batch(&mails)?;
+        AssertUnwindSafe(async {
+            self.service_executor.post::<ApplyLabelService>(ApplyLabelServicePostIn {
+                _format: 0, mails, addedLabels: added, removedLabels: removed,
+            }, Default::default()).await?;
+            Ok(())
+        }).catch_unwind().await.unwrap_or_else(|_| Err(ApiCallError::internal("Mail labels failed".into())))
+    }
+
+    pub async fn velin_delete(&self, mails: Vec<IdTupleGenerated>, folder: IdTupleGenerated) -> Result<(), ApiCallError> {
+        use crate::entities::generated::tutanota::DeleteMailData;
+        use crate::services::generated::tutanota::MailService;
+        velin_action_batch(&mails)?;
+        AssertUnwindSafe(async {
+            let set: MailSet = self.crypto_entity_client.load(&folder).await?;
+            if !set._errors.is_empty() || !matches!(set.folderType, 3 | 5) {
+                return Err(ApiCallError::internal("Permanent delete requires Trash or Spam".into()));
+            }
+            for id in &mails {
+                let mail: Mail = self.crypto_entity_client.load(id).await?;
+                if !mail._errors.is_empty() || !mail.sets.contains(&folder) {
+                    return Err(ApiCallError::internal("Mail is outside delete folder".into()));
+                }
+            }
+            self.service_executor.delete::<MailService>(DeleteMailData {
+                _format: 0, mails, folder: Some(folder),
+            }, Default::default()).await?;
+            Ok(())
+        }).catch_unwind().await.unwrap_or_else(|_| Err(ApiCallError::internal("Mail delete failed".into())))
+    }
+}
+
+fn velin_action_batch(mails: &[IdTupleGenerated]) -> Result<(), ApiCallError> {
+    if mails.is_empty() || mails.len() > MAX_MAIL_UPDATE_LIMIT || mails.iter().any(|id| id.list_id != mails[0].list_id) {
+        return Err(ApiCallError::internal("Invalid mail action batch".into()));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod velin_action_tests {
+    use super::*;
+    use crate::entities::generated::tutanota::{ApplyLabelServicePostIn, DeleteMailData, MoveMailData};
+    fn id(list: &str, element: &str) -> IdTupleGenerated { IdTupleGenerated::new(list.to_owned().into(), element.to_owned().into()) }
+    #[test]
+    fn velin_batch_limits_and_mailbags() {
+        assert!(velin_action_batch(&[]).is_err());
+        assert!(velin_action_batch(&vec![id("a", "m"); 50]).is_ok());
+        assert!(velin_action_batch(&vec![id("a", "m"); 51]).is_err());
+        assert!(velin_action_batch(&[id("a", "m"), id("b", "m")]).is_err());
+    }
+    #[test]
+    fn velin_action_numeric_payloads() {
+        let mails = vec![id("bag", "mail")];
+        let target = id("sets", "target");
+        let moved = serde_json::to_value(MoveMailData { _format: 0, mails: mails.clone(), targetFolder: target.clone(), excludeMailSet: None, moveReason: None }).unwrap();
+        assert_eq!(moved["446"], 0);
+        assert_eq!(moved["447"]["element_id"], "target");
+        assert_eq!(moved["448"][0]["list_id"], "bag");
+        assert!(moved["1644"].is_null());
+        assert!(moved["1714"].is_null());
+        let labels = serde_json::to_value(ApplyLabelServicePostIn { _format: 0, mails: mails.clone(), addedLabels: vec![target.clone()], removedLabels: vec![] }).unwrap();
+        assert_eq!(labels["1506"][0]["element_id"], "mail");
+        assert_eq!(labels["1507"][0]["element_id"], "target");
+        assert_eq!(labels["1508"], serde_json::json!([]));
+        let deleted = serde_json::to_value(DeleteMailData { _format: 0, mails, folder: Some(target) }).unwrap();
+        assert_eq!(deleted["421"][0]["element_id"], "mail");
+        assert_eq!(deleted["724"]["element_id"], "target");
+    }
+}
