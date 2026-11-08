@@ -8,6 +8,7 @@ import app.velin.feature.mail.FakeMailRepo
 import app.velin.feature.mail.FakeMailbox
 import app.velin.feature.mail.folder
 import app.velin.feature.mail.summary
+import app.velin.feature.mail.model.toUi
 import app.velin.feature.mail.testAccount
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -76,7 +77,9 @@ class MailboxViewModelTest {
 
     @Test
     fun restoreFromArchiveMovesToInbox() = runTest {
+        repo.pages[archive.id] = MutableStateFlow(MailPage(listOf(summary("m1")), null))
         val vm = viewModel()
+        vm.selectFolder("folders/archive")
         vm.onEvent(MailboxEvent.RestoreToInbox(setOf("mails/m1")))
         assertEquals(inbox.id, repo.moves.single().second)
     }
@@ -90,6 +93,33 @@ class MailboxViewModelTest {
         assertEquals(setOf("mails/m1"), vm.state.value.selectedIds)
         vm.onEvent(MailboxEvent.Trash(vm.state.value.selectedIds))
         assertTrue(vm.state.value.selectedIds.isEmpty())
+    }
+
+    @Test
+    fun undoMovesMailsBackToTheirFolder() = runTest {
+        val vm = viewModel()
+        vm.onEvent(MailboxEvent.Trash(setOf("mails/m1")))
+        assertEquals(MailboxEffect.Moved(1, trash.toUi()), vm.effects.first())
+        vm.undoLastMove()
+        assertEquals(listOf(trash.id, inbox.id), repo.moves.map { it.second })
+        vm.undoLastMove() // Only once.
+        assertEquals(2, repo.moves.size)
+    }
+
+    @Test
+    fun failedMoveOffersNoUndo() = runTest {
+        repo.moveResult = Outcome.Failed(Failure.Offline)
+        val vm = viewModel()
+        vm.onEvent(MailboxEvent.Archive(setOf("mails/m1")))
+        vm.undoLastMove()
+        assertEquals(1, repo.moves.size)
+    }
+
+    @Test
+    fun moveTargetsExcludeTheCurrentFolderAndScheduled() = runTest {
+        mailbox.folders.value = mailbox.folders.value + folder("scheduled", FolderKind.Scheduled)
+        val vm = viewModel()
+        assertEquals(listOf("folders/archive", "folders/trash"), vm.moveTargets().map { it.id })
     }
 
     @Test

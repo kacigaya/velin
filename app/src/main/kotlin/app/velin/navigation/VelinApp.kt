@@ -2,7 +2,9 @@ package app.velin.navigation
 
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.navigation3.ListDetailSceneStrategy
 import androidx.compose.material3.adaptive.navigation3.rememberListDetailSceneStrategy
@@ -10,6 +12,8 @@ import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
@@ -34,6 +38,9 @@ import app.velin.core.domain.MailboxRepository
 import app.velin.feature.auth.SignInScreen
 import app.velin.feature.auth.SignInViewModel
 import app.velin.feature.mail.mailbox.FolderPane
+import app.velin.feature.mail.mailbox.MoveToSheet
+import app.velin.feature.mail.mailbox.folderName
+import app.velin.feature.mail.R as MailR
 import app.velin.feature.mail.mailbox.MailboxEffect
 import app.velin.feature.mail.mailbox.MailboxScreen
 import app.velin.feature.mail.mailbox.MailboxViewModel
@@ -85,17 +92,41 @@ private fun MailApp(account: Account, auth: AuthRepository, mailbox: MailboxRepo
     val notAvailable = stringResource(R.string.not_available_yet)
     val actionFailed = stringResource(R.string.action_failed)
 
+    val undoLabel = stringResource(MailR.string.action_undo)
+    var moveRequest by remember { mutableStateOf<Set<String>?>(null) }
+
     LaunchedEffect(mailboxViewModel) {
         mailboxViewModel.effects.collect { effect ->
+            // Snackbars run in their own coroutine; awaiting one here would stall navigation.
             when (effect) {
                 is MailboxEffect.OpenConversation -> backStack.showDetail(ConversationRoute(effect.conversationId))
                 MailboxEffect.OpenFolders -> drawerState.open()
-                is MailboxEffect.ActionFailed -> snackbar.showSnackbar(actionFailed)
-                // Composer, search, account switching and pickers land with their milestones.
+                is MailboxEffect.PickFolder -> moveRequest = effect.mailIds
+                is MailboxEffect.Moved -> scope.launch {
+                    val resources = context.resources
+                    val text = resources.getQuantityString(
+                        MailR.plurals.moved_to_folder, effect.count, effect.count, folderName(resources, effect.target),
+                    )
+                    val result = snackbar.showSnackbar(text, actionLabel = undoLabel, duration = SnackbarDuration.Long)
+                    if (result == SnackbarResult.ActionPerformed) mailboxViewModel.undoLastMove()
+                }
+                is MailboxEffect.ActionFailed -> scope.launch { snackbar.showSnackbar(actionFailed) }
+                // Composer, search, account switching and labels land with their milestones.
                 MailboxEffect.OpenComposer, MailboxEffect.OpenAccount, is MailboxEffect.OpenSearch,
-                is MailboxEffect.PickFolder, is MailboxEffect.PickLabels -> snackbar.showSnackbar(notAvailable)
+                is MailboxEffect.PickLabels -> scope.launch { snackbar.showSnackbar(notAvailable) }
             }
         }
+    }
+
+    moveRequest?.let { ids ->
+        MoveToSheet(
+            folders = mailboxViewModel.moveTargets(),
+            onPick = { folder ->
+                moveRequest = null
+                mailboxViewModel.moveToFolder(ids, folder.id)
+            },
+            onDismiss = { moveRequest = null },
+        )
     }
 
     val folderPaneState by mailboxViewModel.folderPane.collectAsStateWithLifecycle()
@@ -146,15 +177,27 @@ private fun MailApp(account: Account, auth: AuthRepository, mailbox: MailboxRepo
                         ConversationViewModel(account, route.conversationId, mailbox, mail)
                     }
                     val state by viewModel.state.collectAsStateWithLifecycle()
+                    var pickingFolder by remember { mutableStateOf(false) }
                     LaunchedEffect(viewModel) {
                         viewModel.effects.collect { effect ->
                             when (effect) {
                                 ConversationEffect.Close -> backStack.remove(route)
+                                ConversationEffect.PickFolder -> pickingFolder = true
                                 is ConversationEffect.OpenLink -> openLink(context, effect.uri)
-                                is ConversationEffect.ActionFailed -> snackbar.showSnackbar(actionFailed)
-                                else -> snackbar.showSnackbar(notAvailable)
+                                is ConversationEffect.ActionFailed -> scope.launch { snackbar.showSnackbar(actionFailed) }
+                                else -> scope.launch { snackbar.showSnackbar(notAvailable) }
                             }
                         }
+                    }
+                    if (pickingFolder) {
+                        MoveToSheet(
+                            folders = viewModel.moveTargets(),
+                            onPick = { folder ->
+                                pickingFolder = false
+                                viewModel.moveToFolder(folder.id)
+                            },
+                            onDismiss = { pickingFolder = false },
+                        )
                     }
                     ConversationScreen(
                         state = state,

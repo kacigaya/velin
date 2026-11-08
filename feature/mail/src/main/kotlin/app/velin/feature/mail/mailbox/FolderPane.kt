@@ -1,5 +1,7 @@
 package app.velin.feature.mail.mailbox
 
+import android.content.res.Resources
+import androidx.compose.ui.platform.LocalContext
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -181,13 +183,16 @@ internal fun folderIcon(kind: FolderKind, filled: Boolean = false): Int = when (
 
 /** System folders use localized names; Tuta stores them with fixed server-side names. */
 @Composable
-internal fun folderName(folder: FolderUi): String = when (folder.kind) {
-    FolderKind.Inbox -> stringResource(R.string.folder_inbox)
-    FolderKind.Drafts -> stringResource(R.string.folder_drafts)
-    FolderKind.Sent -> stringResource(R.string.folder_sent)
-    FolderKind.Scheduled -> stringResource(R.string.folder_scheduled)
-    FolderKind.Archive -> stringResource(R.string.folder_archive)
-    FolderKind.Spam -> stringResource(R.string.folder_spam)
-    FolderKind.Trash -> stringResource(R.string.folder_trash)
+internal fun folderName(folder: FolderUi): String = folderName(LocalContext.current.resources, folder)
+
+/** Same as the composable version, for code outside composition such as snackbar handlers. */
+fun folderName(resources: Resources, folder: FolderUi): String = when (folder.kind) {
+    FolderKind.Inbox -> resources.getString(R.string.folder_inbox)
+    FolderKind.Drafts -> resources.getString(R.string.folder_drafts)
+    FolderKind.Sent -> resources.getString(R.string.folder_sent)
+    FolderKind.Scheduled -> resources.getString(R.string.folder_scheduled)
+    FolderKind.Archive -> resources.getString(R.string.folder_archive)
+    FolderKind.Spam -> resources.getString(R.string.folder_spam)
+    FolderKind.Trash -> resources.getString(R.string.folder_trash)
     FolderKind.Custom -> folder.name
 }

@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.velin.core.domain.Account
 import app.velin.core.domain.Failure
+import app.velin.core.domain.Folder
 import app.velin.core.domain.FolderId
 import app.velin.core.domain.FolderKind as DomainFolderKind
 import app.velin.core.domain.MailId
@@ -13,6 +14,7 @@ import app.velin.core.domain.MailboxRepository
 import app.velin.core.domain.Outcome
 import app.velin.core.domain.SyncState
 import app.velin.feature.mail.model.AccountUi
+import app.velin.feature.mail.model.FolderUi
 import app.velin.feature.mail.model.entityIdOf
 import app.velin.feature.mail.model.toUi
 import app.velin.feature.mail.model.toUiId
@@ -47,6 +49,8 @@ sealed interface MailboxEffect {
     data class PickFolder(val mailIds: Set<String>) : MailboxEffect
     data class PickLabels(val mailIds: Set<String>) : MailboxEffect
     data class ActionFailed(val failure: Failure) : MailboxEffect
+    /** Mails left the current folder; the host offers [MailboxViewModel.undoLastMove]. */
+    data class Moved(val count: Int, val target: FolderUi) : MailboxEffect
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -158,12 +162,51 @@ class MailboxViewModel(
     }
 
     /** Moves to a folder chosen in a picker. */
-    fun moveToFolder(mailIds: Set<String>, folderUiId: String) =
-        act(mailIds) { mail.move(account.id, it, FolderId(entityIdOf(folderUiId))) }
+    fun moveToFolder(mailIds: Set<String>, folderUiId: String) {
+        val target = folders.value.firstOrNull { it.id.value.toUiId() == folderUiId } ?: return
+        moveMails(mailIds, target)
+    }
+
+    /**
+     * Folders a move can target: every folder except the one the mails are in and the read-only
+     * Scheduled folder (upstream MailUtils.ts READ_ONLY_SYSTEM_FOLDERS).
+     */
+    fun moveTargets(): List<FolderUi> {
+        val current = state.value.folder?.id
+        return folders.value
+            .filter { it.kind != DomainFolderKind.Scheduled }
+            .sortedWith(compareBy({ it.kind == DomainFolderKind.Custom }, { it.kind.ordinal }))
+            .map { it.toUi() }
+            .filter { it.id != current }
+    }
+
+    /** Moves the mails of the last successful move back to the folder they came from. */
+    fun undoLastMove() {
+        val (ids, source) = lastMove ?: return
+        lastMove = null
+        viewModelScope.launch { report(mail.move(account.id, ids, source)) }
+    }
+
+    private var lastMove: Pair<List<MailId>, FolderId>? = null
 
     private fun moveTo(mailIds: Set<String>, kind: DomainFolderKind) {
         val target = folders.value.firstOrNull { it.kind == kind } ?: return
-        act(mailIds) { mail.move(account.id, it, target.id) }
+        moveMails(mailIds, target)
+    }
+
+    private fun moveMails(mailIds: Set<String>, target: Folder) {
+        val source = state.value.folder?.let { FolderId(entityIdOf(it.id)) } ?: return
+        if (mailIds.isEmpty() || source == target.id) return
+        val ids = mailIds.map { MailId(entityIdOf(it)) }
+        selection.value = persistentSetOf()
+        viewModelScope.launch {
+            val outcome = mail.move(account.id, ids, target.id)
+            report(outcome)
+            if (outcome is Outcome.Success) {
+                lastMove = ids to source
+                effectChannel.trySend(MailboxEffect.Moved(ids.size, target.toUi()))
+            }
+        }
     }
 
     private fun act(mailIds: Set<String>, action: suspend (List<MailId>) -> Outcome<Unit>) {

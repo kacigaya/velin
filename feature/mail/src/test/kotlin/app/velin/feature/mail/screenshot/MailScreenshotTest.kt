@@ -26,6 +26,10 @@ import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onRoot
 import com.github.takahirom.roborazzi.captureRoboImage
+import com.github.takahirom.roborazzi.captureScreenRoboImage
+import app.velin.feature.mail.mailbox.LabelSheet
+import app.velin.feature.mail.mailbox.MoveToSheet
+import app.velin.feature.mail.mailbox.labelChoices
 import org.junit.Rule
 import kotlinx.collections.immutable.persistentSetOf
 import org.junit.Test
@@ -124,7 +128,37 @@ class MailScreenshotTest {
             onEvent = {},
         )
     }
-}
 
+    // Sheets draw in their own window, so capture the whole screen, not the root node.
+    private fun captureScreen(name: String, content: @Composable () -> Unit) {
+        var dark by mutableStateOf(false)
+        compose.mainClock.autoAdvance = false
+        compose.setContent { VelinTheme(darkTheme = dark, dynamicColor = false, content = content) }
+        for (theme in listOf("light", "dark")) {
+            dark = theme == "dark"
+            Snapshot.sendApplyNotifications()
+            compose.mainClock.advanceTimeBy(SETTLE_MS)
+            captureScreenRoboImage("build/outputs/roborazzi/${name}_$theme.png")
+        }
+    }
+
+    @Test
+    fun moveSheet() = captureScreen("move_sheet") {
+        MoveToSheet(
+            folders = SampleMail.systemFolders.drop(1) + SampleMail.customFolders,
+            onPick = {},
+            onDismiss = {},
+        )
+    }
+
+    @Test
+    fun labelSheet() = captureScreen("label_sheet") {
+        LabelSheet(
+            choices = labelChoices(SampleMail.labels, listOf(setOf("l1", "l2"), setOf("l1"))),
+            onApply = { _, _ -> },
+            onDismiss = {},
+        )
+    }
+}
 
 private const val SETTLE_MS = 1_000L

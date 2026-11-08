@@ -11,8 +11,10 @@ import app.velin.core.domain.MailId
 import app.velin.core.domain.MailRepository
 import app.velin.core.domain.MailboxRepository
 import app.velin.core.domain.Outcome
+import app.velin.feature.mail.model.FolderUi
 import app.velin.feature.mail.model.entityIdOf
 import app.velin.feature.mail.model.toUi
+import app.velin.feature.mail.model.toUiId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -102,6 +104,22 @@ class ConversationViewModel(
             mail.inlineImage(account.id, AttachmentId(entityIdOf(attachmentUiId)))
         }
         (outcome as? Outcome.Success)?.value?.let { InlineImageData(it.bytes, it.mimeType) }
+    }
+
+    /** Folders a move can target: all except the one shown from and the read-only Scheduled folder. */
+    fun moveTargets(): List<FolderUi> {
+        val shownIn = (state.value as? ConversationUiState.Loaded)?.conversation?.folderKind
+        return folders.value
+            .filter { it.kind != FolderKind.Scheduled }
+            .sortedWith(compareBy({ it.kind == FolderKind.Custom }, { it.kind.ordinal }))
+            .filter { it.kind == FolderKind.Custom || it.kind.toUi() != shownIn }
+            .map { it.toUi() }
+    }
+
+    /** Moves every message of the conversation to a folder chosen in a picker, then closes. */
+    fun moveToFolder(folderUiId: String) {
+        val target = folders.value.firstOrNull { it.id.value.toUiId() == folderUiId } ?: return
+        act(close = true) { ids -> mail.move(account.id, ids, target.id) }
     }
 
     private fun moveAll(kind: FolderKind, close: Boolean) {

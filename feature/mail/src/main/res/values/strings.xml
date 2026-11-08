@@ -84,6 +84,20 @@
     <string name="composer_external_password_info">Recipients without a Tuta address open this mail with a password. Share it with them another way, not by mail.</string>
     <string name="composer_password_for">Password for %1$s</string>
 
+    <!-- Pickers and undo -->
+    <string name="picker_move_title">Move to</string>
+    <string name="picker_labels_title">Labels</string>
+    <string name="picker_labels_empty">You have no labels yet. Create them in the Tuta web app.</string>
+    <plurals name="moved_to_folder">
+        <item quantity="one">%1$d mail moved to %2$s</item>
+        <item quantity="other">%1$d mails moved to %2$s</item>
+    </plurals>
+    <string name="delete_forever_title">Delete permanently?</string>
+    <plurals name="delete_forever_body">
+        <item quantity="one">This mail will be deleted for good. You cannot undo this.</item>
+        <item quantity="other">These %1$d mails will be deleted for good. You cannot undo this.</item>
+    </plurals>
+
     <!-- Actions -->
     <string name="action_archive">Archive</string>
     <string name="action_trash">Move to trash</string>
@@ -104,5 +118,7 @@
     <string name="action_retry">Retry</string>
     <string name="action_select">Select</string>
     <string name="action_show">Show</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_apply">Apply</string>
     <string name="action_cancel_send">Cancel send</string>
 </resources>
