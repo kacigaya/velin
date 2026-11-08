@@ -16,7 +16,8 @@ runs:
     - name: Install Android SDK packages
       shell: bash
       run: |
-        yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
+        # `yes` always ends with a broken pipe; under pipefail that must not fail the step.
+        (yes || true) | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null
         "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.0" "build-tools;36.0.0" > /dev/null
         echo "sdk.dir=$ANDROID_HOME" > local.properties
 
