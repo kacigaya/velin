@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Velin</string>
+    <string name="no_mail_selected">No mail selected</string>
+    <string name="not_available_yet">This is not available yet.</string>
+    <string name="action_failed">That did not work. Try again.</string>
 </resources>
