@@ -5,6 +5,8 @@
 
     <style name="Theme.Velin.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <!-- The envelope is light; without the brand tile it would vanish on a light splash. -->
+        <item name="windowSplashScreenIconBackgroundColor">@color/ic_launcher_background</item>
         <item name="postSplashScreenTheme">@style/Theme.Velin</item>
     </style>
 </resources>

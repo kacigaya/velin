@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Themed-icon layer. The system tints one color, so the flap edge is a groove cut out of the
+     envelope (even-odd, clipped to the envelope). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Scaled so the envelope corners stay inside the 66dp adaptive-icon safe zone. -->
+    <group
+        android:pivotX="54"
+        android:pivotY="55"
+        android:scaleX="0.78"
+        android:scaleY="0.78">
+        <clip-path android:pathData="M30,32 L78,32 Q87,32 87,41 L87,69 Q87,78 78,78 L30,78 Q21,78 21,69 L21,41 Q21,32 30,32 Z" />
+        <path
+            android:fillColor="#FF000000"
+            android:fillType="evenOdd"
+            android:pathData="M30,32 L78,32 Q87,32 87,41 L87,69 Q87,78 78,78 L30,78 Q21,78 21,69 L21,41 Q21,32 30,32 Z M17,29 L54,63.5 L91,29 L91,34.5 L54,69 L17,34.5 Z" />
+    </group>
+</vector>
