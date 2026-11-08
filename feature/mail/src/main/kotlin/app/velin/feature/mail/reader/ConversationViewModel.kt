@@ -3,6 +3,7 @@ package app.velin.feature.mail.reader
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.velin.core.domain.Account
+import app.velin.core.domain.AttachmentId
 import app.velin.core.domain.ConversationId
 import app.velin.core.domain.Failure
 import app.velin.core.domain.FolderKind
@@ -12,6 +13,7 @@ import app.velin.core.domain.MailboxRepository
 import app.velin.core.domain.Outcome
 import app.velin.feature.mail.model.entityIdOf
 import app.velin.feature.mail.model.toUi
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,6 +24,8 @@ import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 
 sealed interface ConversationEffect {
     data object Close : ConversationEffect
@@ -71,14 +75,29 @@ class ConversationViewModel(
             is ConversationEvent.EditDraft -> effectChannel.trySend(ConversationEffect.EditDraft(event.messageId))
             is ConversationEvent.OpenLink -> effectChannel.trySend(ConversationEffect.OpenLink(event.uri))
             is ConversationEvent.OpenAttachment -> effectChannel.trySend(ConversationEffect.OpenAttachment(event.attachment.id))
-            // Allowing remote content is per message and per view, never persisted here.
-            is ConversationEvent.ShowRemoteContent -> remoteAllowed.update { it + event.messageId }
+            // Per message and per view. The data layer re-sends the body with remote images kept.
+            is ConversationEvent.ShowRemoteContent -> viewModelScope.launch {
+                val outcome = mail.allowExternalContent(account.id, MailId(entityIdOf(event.messageId)))
+                if (outcome is Outcome.Success) remoteAllowed.update { it + event.messageId }
+                report(outcome)
+            }
             is ConversationEvent.RetryBody -> viewModelScope.launch {
                 report(mail.load(account.id, MailId(entityIdOf(event.messageId))))
             }
             // Cancelling a scheduled send needs a domain operation that M6 adds.
             is ConversationEvent.CancelScheduledSend -> effectChannel.trySend(ConversationEffect.ActionFailed(Failure.Unsupported))
         }
+    }
+
+    /**
+     * Blocking: the WebView calls this on its own background thread. Bounded so a slow
+     * download cannot hold that thread forever.
+     */
+    fun loadAttachmentImage(attachmentUiId: String): InlineImageData? = runBlocking(Dispatchers.IO) {
+        val outcome = withTimeoutOrNull(INLINE_IMAGE_TIMEOUT_MS) {
+            mail.inlineImage(account.id, AttachmentId(entityIdOf(attachmentUiId)))
+        }
+        (outcome as? Outcome.Success)?.value?.let { InlineImageData(it.bytes, it.mimeType) }
     }
 
     private fun moveAll(kind: FolderKind, close: Boolean) {
@@ -102,5 +121,6 @@ class ConversationViewModel(
 
     private companion object {
         const val STOP_TIMEOUT_MS = 5_000L
+        const val INLINE_IMAGE_TIMEOUT_MS = 15_000L
     }
 }

@@ -15,14 +15,15 @@ class MailDocumentTest {
     fun blocksRemoteContentByDefault() {
         val policy = csp(allowRemote = false)
         assertTrue(policy.startsWith("default-src 'none'"))
-        assertTrue("img-src data:;" in policy)
-        assertFalse("https:" in policy)
+        assertTrue("img-src data: https://velin.invalid;" in policy)
+        // The bare "https:" source would allow every remote image.
+        assertFalse("https:" in policy.split(' ', ';'))
     }
 
     @Test
     fun allowsOnlyHttpsImagesWhenUserAllows() {
         val policy = csp(allowRemote = true)
-        assertTrue("img-src data: https:;" in policy)
+        assertTrue("img-src data: https://velin.invalid https:;" in policy)
         assertFalse("script-src" in policy)
     }
 

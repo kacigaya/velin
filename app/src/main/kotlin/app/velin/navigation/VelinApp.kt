@@ -156,7 +156,11 @@ private fun MailApp(account: Account, auth: AuthRepository, mailbox: MailboxRepo
                             }
                         }
                     }
-                    ConversationScreen(state = state, onEvent = viewModel::onEvent)
+                    ConversationScreen(
+                        state = state,
+                        onEvent = viewModel::onEvent,
+                        loadAttachmentImage = viewModel::loadAttachmentImage,
+                    )
                 }
                 entry<SettingsRoute> {
                     StatusMessage(icon = VelinIcons.Settings, title = stringResource(R.string.not_available_yet))
