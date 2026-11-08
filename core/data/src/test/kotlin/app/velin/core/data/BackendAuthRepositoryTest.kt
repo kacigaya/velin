@@ -253,7 +253,12 @@ class BackendAuthRepositoryTest {
             store.save(SavedCredentials("mail@example.invalid", "user", token, byteArrayOf(1, 2)))
             assertFalse(bytes.contentEquals(path.readBytes()))
             path.writeBytes(bytes.apply { this[lastIndex] = (this[lastIndex].toInt() xor 1).toByte() })
-            assertThrows(Exception::class.java) { reopened.all() }
+            assertThrows(javax.crypto.AEADBadTagException::class.java) { reopened.all() }
+            assertTrue(reopened.all().isEmpty())
+            reopened.save(SavedCredentials("new@example.invalid", "new", token, byteArrayOf(3)))
+            assertEquals("new", reopened.all().single().user)
+            reopened.remove("new")
+            assertTrue(reopened.all().isEmpty())
         } finally { path.delete() }
     }
 }
