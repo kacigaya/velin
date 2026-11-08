@@ -106,14 +106,14 @@ private object FakeGraph : AppGraph {
         override suspend fun removeSavedAccount(account: AccountId): Outcome<Unit> = Outcome.Success(Unit)
         override suspend fun signOut(account: AccountId): Outcome<Unit> = Outcome.Success(Unit)
     }
-    override val mailbox = object : MailboxRepository {
+    override val mailbox: MailboxRepository = object : MailboxRepository {
         override fun folders(account: AccountId): Flow<List<Folder>> = flowOf(folders)
         override fun labels(account: AccountId): Flow<List<Label>> = flowOf(emptyList())
         override fun senders(account: AccountId): Flow<List<SenderAlias>> = flowOf(emptyList())
         override fun syncState(account: AccountId): Flow<SyncState> = flowOf(SyncState.Idle)
         override suspend fun sync(account: AccountId): Outcome<Unit> = Outcome.Success(Unit)
     }
-    override val mail = object : MailRepository {
+    override val mail: MailRepository = object : MailRepository {
         override fun messages(account: AccountId, folder: FolderId): Flow<MailPage> = flowOf(
             MailPage(
                 listOf(

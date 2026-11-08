@@ -14,6 +14,9 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
+        // The Tuta SDK is built for these ABIs only. JNA ships more; without this filter
+        // 32-bit devices could install the app and then fail to load the SDK.
+        ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
     }
 
     buildTypes {
@@ -42,6 +45,7 @@ android {
 dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":core:domain"))
+    implementation(project(":core:data"))
     implementation(project(":feature:auth"))
     implementation(project(":feature:mail"))
 

@@ -45,16 +45,23 @@ import kotlinx.coroutines.launch
 /** Backend entry points. :app builds the real graph; tests can pass fakes. */
 interface AppGraph {
     val auth: AuthRepository
-    val mailbox: MailboxRepository
-    val mail: MailRepository
+    /** Null until the mail backend exists (milestone M3). */
+    val mailbox: MailboxRepository?
+    val mail: MailRepository?
 }
 
 @Composable
 fun VelinApp(graph: AppGraph) {
     val authState by graph.auth.state.collectAsStateWithLifecycle(initialValue = null)
+    val mailbox = graph.mailbox
+    val mail = graph.mail
     when (val state = authState) {
         null -> Unit // First emission is immediate; nothing to draw before it.
-        is AuthState.Active -> MailApp(graph, state.account)
+        is AuthState.Active -> if (mailbox != null && mail != null) {
+            MailApp(state.account, graph.auth, mailbox, mail)
+        } else {
+            SignedInWithoutMail(state.account, graph.auth)
+        }
         else -> {
             val viewModel = viewModel { SignInViewModel(graph.auth) }
             val uiState by viewModel.state.collectAsStateWithLifecycle()
@@ -65,9 +72,9 @@ fun VelinApp(graph: AppGraph) {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3AdaptiveApi::class)
 @Composable
-private fun MailApp(graph: AppGraph, account: Account) {
+private fun MailApp(account: Account, auth: AuthRepository, mailbox: MailboxRepository, mail: MailRepository) {
     val mailboxViewModel = viewModel(key = "mailbox-${account.id.value.value}") {
-        MailboxViewModel(account, graph.mailbox, graph.mail)
+        MailboxViewModel(account, mailbox, mail)
     }
     val backStack = rememberNavBackStack(MailboxRoute)
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -136,7 +143,7 @@ private fun MailApp(graph: AppGraph, account: Account) {
                 }
                 entry<ConversationRoute>(metadata = ListDetailSceneStrategy.detailPane()) { route ->
                     val viewModel = viewModel(key = route.conversationId) {
-                        ConversationViewModel(account, route.conversationId, graph.mailbox, graph.mail)
+                        ConversationViewModel(account, route.conversationId, mailbox, mail)
                     }
                     val state by viewModel.state.collectAsStateWithLifecycle()
                     LaunchedEffect(viewModel) {
@@ -157,6 +164,19 @@ private fun MailApp(graph: AppGraph, account: Account) {
             },
         )
     }
+}
+
+/** Interim screen after sign-in while the mail backend is missing; it still allows sign-out. */
+@Composable
+private fun SignedInWithoutMail(account: Account, auth: AuthRepository) {
+    val scope = rememberCoroutineScope()
+    StatusMessage(
+        icon = VelinIcons.Mail,
+        title = stringResource(R.string.signed_in_as, account.address.address),
+        body = stringResource(R.string.mail_not_available_yet),
+        actionLabel = stringResource(R.string.sign_out),
+        onAction = { scope.launch { auth.signOut(account.id) } },
+    )
 }
 
 /** Keeps one conversation on the stack: opening another replaces it instead of stacking up. */

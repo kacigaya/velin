@@ -3,5 +3,8 @@
     <string name="app_name">Velin</string>
     <string name="no_mail_selected">No mail selected</string>
     <string name="not_available_yet">This is not available yet.</string>
+    <string name="signed_in_as">Signed in as %1$s</string>
+    <string name="mail_not_available_yet">Velin cannot show mail yet. Mail loading comes in the next version.</string>
+    <string name="sign_out">Sign out</string>
     <string name="action_failed">That did not work. Try again.</string>
 </resources>
