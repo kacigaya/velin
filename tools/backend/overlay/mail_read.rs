@@ -78,7 +78,7 @@ impl MailFacade {
                 let details = mail.mailDetails.as_ref().ok_or_else(|| ApiCallError::internal("Missing mail details".into()))?;
                 Some(self.service_executor.post::<BlobAccessTokenService>(BlobAccessTokenPostIn {
                     _format: 0, archiveDataType: None, write: None,
-                    read: Some(BlobReadData { _id: None, archiveId: details.list_id.clone(), instanceListId: None, instanceIds: vec![] }),
+                    read: Some(BlobReadData { _id: Some(velin_aggregate_id()), archiveId: details.list_id.clone(), instanceListId: None, instanceIds: vec![] }),
                 }, Default::default()).await?.blobAccessInfo)
             };
             self.crypto_entity_client.velin_details(mail, access).await
@@ -108,8 +108,8 @@ impl MailFacade {
             };
             let access = self.service_executor.post::<BlobAccessTokenService>(BlobAccessTokenPostIn {
                 _format: 0, archiveDataType: Some(1), write: None,
-                read: Some(BlobReadData { _id: None, archiveId: blob.archiveId.clone(), instanceListId: Some(id.list_id),
-                    instanceIds: vec![InstanceId { _id: None, instanceId: Some(id.element_id) }] }),
+                read: Some(BlobReadData { _id: Some(velin_aggregate_id()), archiveId: blob.archiveId.clone(), instanceListId: Some(id.list_id),
+                    instanceIds: vec![InstanceId { _id: Some(velin_aggregate_id()), instanceId: Some(id.element_id) }] }),
             }, Default::default()).await?.blobAccessInfo;
             self.crypto_entity_client.velin_file_content(file, access).await
         }).catch_unwind().await.unwrap_or_else(|_| Err(ApiCallError::internal("Attachment read failed".into())))
@@ -281,5 +281,26 @@ mod velin_details_tests {
             .returning(|_, _| Ok(create_test_entity::<MailDetails>()));
         let facade = MailFacade::new(Arc::new(client), Arc::new(MockUserFacade::default()), Arc::new(MockResolvingServiceExecutor::default()));
         assert!(facade.velin_details(IdTupleGenerated::new("mails".to_owned().into(), "one".to_owned().into())).await.is_ok());
+    }
+}
+
+/// Request aggregates need a random 4-byte base64url id, like upstream entity_facade.rs:578 and
+/// blob_access_token_facade.rs:56. `None` fails serialization before the request is sent.
+fn velin_aggregate_id() -> crate::CustomId {
+    use base64::Engine;
+    let bytes = crypto_primitives::randomizer_facade::RandomizerFacade::from_core(rand_core::OsRng)
+        .generate_random_array::<4>();
+    crate::CustomId(base64::prelude::BASE64_URL_SAFE_NO_PAD.encode(bytes))
+}
+
+#[cfg(test)]
+mod velin_aggregate_id_tests {
+    #[test]
+    fn aggregate_ids_are_random_base64url_of_four_bytes() {
+        let first = super::velin_aggregate_id();
+        let second = super::velin_aggregate_id();
+        assert_eq!(first.as_str().len(), 6);
+        assert!(first.as_str().chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_'));
+        assert_ne!(first.as_str(), second.as_str());
     }
 }
