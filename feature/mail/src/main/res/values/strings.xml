@@ -37,6 +37,31 @@
         <item quantity="other">%1$d mails in conversation</item>
     </plurals>
 
+    <!-- Reader -->
+    <string name="reader_loading">Loading conversation</string>
+    <string name="reader_not_found">This mail is no longer available.</string>
+    <string name="reader_expanded">Expanded</string>
+    <string name="reader_collapsed">Collapsed</string>
+    <string name="reader_body_failed">Could not load this mail.</string>
+    <string name="reader_edit_draft">Edit draft</string>
+    <string name="reader_show_details">Show details</string>
+    <string name="reader_hide_details">Hide details</string>
+    <string name="reader_to_line">To %1$s</string>
+    <string name="reader_from">From:</string>
+    <string name="reader_to">To:</string>
+    <string name="reader_cc">Cc:</string>
+    <string name="reader_bcc">Bcc:</string>
+    <string name="reader_reply_to">Reply to:</string>
+    <string name="reader_not_confidential">Not end-to-end encrypted</string>
+
+    <!-- Banners -->
+    <string name="banner_phishing">This mail may be phishing. Do not open links or attachments unless you trust the sender.</string>
+    <string name="banner_auth_failed">The sender could not be verified. This mail may be forged.</string>
+    <string name="banner_auth_uncertain">The sender could not be fully verified.</string>
+    <string name="banner_deprecated_key">The sender used an old encryption key.</string>
+    <string name="banner_remote_blocked">Remote images and content are blocked to protect your privacy.</string>
+    <string name="banner_scheduled">Scheduled to send %1$s</string>
+
     <!-- Actions -->
     <string name="action_archive">Archive</string>
     <string name="action_trash">Move to trash</string>
@@ -56,4 +81,6 @@
     <string name="action_undo">Undo</string>
     <string name="action_retry">Retry</string>
     <string name="action_select">Select</string>
+    <string name="action_show">Show</string>
+    <string name="action_cancel_send">Cancel send</string>
 </resources>
