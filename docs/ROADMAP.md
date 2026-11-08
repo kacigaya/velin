@@ -7,9 +7,9 @@ Each milestone is small and can be tested alone. A milestone is complete when it
 | # | Milestone | Owner | Status | Exit checks |
 |---|---|---|---|---|
 | M0 | Project scaffold, theme, UI screens with sample data | UI | done | Debug APK builds. Unit and screenshot tests pass in light and dark. |
-| M1 | Native core: Rust SDK AAR builds for arm64 and x86_64, `:core:sdk` adapter, REST transport with `cv`/`v` headers | Backend | planned | AAR builds from a pinned upstream commit with checksums. Adapter unit tests pass. |
-| M2 | Sign-in: salt, Argon2id and bcrypt KDF, session creation, TOTP, Keystore credential storage, session resume | Backend, then UI wiring | planned | Upstream KDF test vectors pass. Live sign-in with a test account. |
-| M3 | Read path: folders, mail list paging, decryption, mail body, HTML sanitizer, attachment download | Backend, then UI wiring | planned | Live list and body load. Sanitizer tests pass. |
+| M1 | Native core: Rust SDK AAR builds for arm64 and x86_64, `:core:sdk` adapter, REST transport with `cv`/`v` headers | Backend | done | AAR builds from a pinned upstream commit with checksums. Adapter unit tests pass. |
+| M2 | Sign-in: salt, Argon2id and bcrypt KDF, session creation, TOTP, Keystore credential storage, session resume | Backend, then UI wiring | done, live check pending | Upstream KDF test vectors pass. Live sign-in with a test account. |
+| M3 | Read path: folders, mail list paging, decryption, mail body, HTML sanitizer, attachment download | Backend, then UI wiring | in progress | Live list and body load. Sanitizer tests pass. |
 | M4 | Sync and offline: event bus WebSocket, Room with SQLCipher, durable cursors | Backend | planned | Offline cold start shows saved mail. Missed events replay after reconnect. |
 | M5 | Mail actions: read state, move, archive, trash, labels, spam report | Backend, then UI wiring | planned | Actions reflect on the server and in a second client. |
 | M6 | Compose and send: drafts, attachment upload, internal confidential, external non-confidential, scheduled send | Backend, then UI wiring | planned | Mail arrives at a Tuta and a non-Tuta address. Drafts survive process death. |
@@ -21,10 +21,12 @@ Each milestone is small and can be tested alone. A milestone is complete when it
 
 1. **No test account.** M2 and later need a Tuta account for live checks. Velin will not call Tuta services without one that the project owner provides.
 2. **Rust SDK gaps.** `create_session` is not production ready. bcrypt key derivation panics. The mail bucket-key path has no sender authentication. External confidential mail is unimplemented in Rust. Velin must fix or port these before it claims authenticated reading or external confidential sending.
-3. **Native build on aarch64.** The NDK host tools are x86_64 only. Options: an x86_64 build machine, or host clang with NDK sysroots (unverified).
+3. **Native build on aarch64.** Solved: host clang and lld build the SDK against NDK sysroots (`tools/backend/build-sdk.sh`). The APK ships arm64-v8a and x86_64 only.
 4. **Security keys (WebAuthn/U2F).** Upstream uses a browser callback bound to its own app. Server acceptance of Velin's package is unverified. Hardware-key-only accounts can be blocked.
 5. **Client version enforcement.** The server rejects old clients with HTTP 474. The policy for a third-party client is unverified. Velin must track upstream versions (see research §7).
-6. **Rich-text editing.** Compose has no rich-text editor. The composer body is plain text in v1.
+6. **Rust dependency advisories.** 13 pinned crates have advisories. `rsa 0.9.8` (RUSTSEC-2023-0071, timing side channel) has no fixed version. Upstream ships the same pin. See `docs/backend/dependency-advisories.json`.
+7. **jsoup approval.** The mail HTML sanitizer uses jsoup. It waits for owner approval.
+8. **Rich-text editing.** Compose has no rich-text editor. The composer body is plain text in v1.
 
 ## Feature parity checklist
 
@@ -32,10 +34,10 @@ Source status comes from research §6. "UI" shows the Velin screen state.
 
 | Feature | Backend status | UI |
 |---|---|---|
-| Password sign-in | Port from TS | done (sample data) |
-| TOTP and other-session approval | Port from TS | done (sample data) |
+| Password sign-in | Done, live check pending | done, wired |
+| TOTP and other-session approval | Done, live check pending | done, wired |
 | Security key sign-in | Blocked | entry point shows "not supported" |
-| Session resume, saved accounts | SDK + Android storage | done (sample data) |
+| Session resume, saved accounts | Done (Keystore AES-GCM) | done, wired |
 | Multi-account | Port from TS | planned |
 | Folders and labels list | Port from TS | done (sample data) |
 | Mail list, paging, unread state | Port from TS | done (sample data) |
