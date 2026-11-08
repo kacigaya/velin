@@ -8,8 +8,8 @@ Each milestone is small and can be tested alone. A milestone is complete when it
 |---|---|---|---|---|
 | M0 | Project scaffold, theme, UI screens with sample data | UI | done | Debug APK builds. Unit and screenshot tests pass in light and dark. |
 | M1 | Native core: Rust SDK AAR builds for arm64 and x86_64, `:core:sdk` adapter, REST transport with `cv`/`v` headers | Backend | done | AAR builds from a pinned upstream commit with checksums. Adapter unit tests pass. |
-| M2 | Sign-in: salt, Argon2id and bcrypt KDF, session creation, TOTP, Keystore credential storage, session resume | Backend, then UI wiring | done, live check pending | Upstream KDF test vectors pass. Live sign-in with a test account. |
-| M3 | Read path: folders, mail list paging, decryption, mail body, HTML sanitizer, attachment download | Backend, then UI wiring | in progress: pipeline, sanitizer and UI done; SDK read source (M3b) pending | Live list and body load. Sanitizer tests pass. |
+| M2 | Sign-in: salt, Argon2id and bcrypt KDF, session creation, TOTP, Keystore credential storage, session resume | Backend, then UI wiring | done, verified live 2026-11-08 | Upstream KDF test vectors pass. Live sign-in with a test account. |
+| M3 | Read path: folders, mail list paging, decryption, mail body, HTML sanitizer, attachment download | Backend, then UI wiring | in progress: folders, labels and inbox paging verified live 2026-11-08; bodies, conversations, attachments pending | Live list and body load. Sanitizer tests pass. |
 | M4 | Sync and offline: event bus WebSocket, Room with SQLCipher, durable cursors | Backend | planned | Offline cold start shows saved mail. Missed events replay after reconnect. |
 | M5 | Mail actions: read state, move, archive, trash, labels, spam report | Backend, then UI wiring | planned | Actions reflect on the server and in a second client. |
 | M6 | Compose and send: drafts, attachment upload, internal confidential, external non-confidential, scheduled send | Backend, then UI wiring | planned | Mail arrives at a Tuta and a non-Tuta address. Drafts survive process death. |
@@ -19,7 +19,7 @@ Each milestone is small and can be tested alone. A milestone is complete when it
 
 ## Blockers and risks
 
-1. **No test account.** M2 and later need a Tuta account for live checks. Velin will not call Tuta services without one that the project owner provides.
+1. **Live checks.** The owner provided a test account. Sign-in, session revoke, folders, labels and inbox paging work against production. Pin Velin to a published Tuta release, never master: master can be ahead of the deployed models and the server then rejects requests with HTTP 400.
 2. **Rust SDK gaps.** `create_session` is not production ready. bcrypt key derivation panics. The mail bucket-key path has no sender authentication. External confidential mail is unimplemented in Rust. Velin must fix or port these before it claims authenticated reading or external confidential sending.
 3. **Native build on aarch64.** Solved: host clang and lld build the SDK against NDK sysroots (`tools/backend/build-sdk.sh`). The APK ships arm64-v8a and x86_64 only.
 4. **Security keys (WebAuthn/U2F).** Upstream uses a browser callback bound to its own app. Server acceptance of Velin's package is unverified. Hardware-key-only accounts can be blocked.
@@ -34,13 +34,13 @@ Source status comes from research §6. "UI" shows the Velin screen state.
 
 | Feature | Backend status | UI |
 |---|---|---|
-| Password sign-in | Done, live check pending | done, wired |
+| Password sign-in | Done, verified live | done, wired |
 | TOTP and other-session approval | Done, live check pending | done, wired |
 | Security key sign-in | Blocked | entry point shows "not supported" |
 | Session resume, saved accounts | Done (Keystore AES-GCM) | done, wired |
 | Multi-account | Port from TS | planned |
-| Folders and labels list | Port from TS | done (sample data) |
-| Mail list, paging, unread state | Port from TS | done (sample data) |
+| Folders and labels list | Done, verified live (unread counts need the event bus) | done, wired |
+| Mail list, paging, unread state | Done, verified live | done, wired |
 | Conversation view | Port from TS | done (sample data) |
 | Mail body and attachments | Port from TS | done (sample data) |
 | Remote content blocking | Sanitizer and consent done | done, wired |
