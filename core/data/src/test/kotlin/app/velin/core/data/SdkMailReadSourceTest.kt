@@ -36,6 +36,12 @@ class SdkMailReadSourceTest {
         override suspend fun move(ids: List<ReadId>, target: ReadFolder) { moves += ids to target }
         override suspend fun applyLabels(ids: List<ReadId>, added: List<ReadId>, removed: List<ReadId>) { labelsChanged += Triple(ids, added, removed) }
         override suspend fun delete(ids: List<ReadId>, folder: ReadId) { deleted += ids to folder }
+        var aliases = emptyList<ReadAddress>()
+        var senderFailure: SdkFailure? = null
+        override suspend fun senders(): List<ReadAddress> {
+            senderFailure?.let { throw SdkException(it) }
+            return aliases
+        }
         var sets = emptyList<ReadFolder>()
         var rows = emptyList<ReadEntry>()
         var requested: Pair<String, String?>? = null
@@ -71,6 +77,17 @@ class SdkMailReadSourceTest {
         assertEquals(FolderId(inbox.id.domain()), result.value.folders[1].parent)
         assertEquals(3, result.value.folders[0].unreadCount)
         assertEquals("Work", result.value.labels.single().name)
+    }
+    @Test fun senderAliasesKeepServerAddressAndName() = runBlocking {
+        val reader = Reader().apply {
+            sets = listOf(inbox)
+            aliases = listOf(ReadAddress("primary@example.invalid", "Primary"), ReadAddress("alias@example.invalid", "Alias"))
+        }
+        val snapshot = source(reader).mailbox(account) as Outcome.Success
+        assertEquals(reader.aliases.map { SenderAlias(Address(it.address, it.name), true) }, snapshot.value.senders)
+        reader.senderFailure = SdkFailure.InvalidKey
+        assertEquals(Outcome.Failed(Failure.Decryption), source(reader).mailbox(account))
+        assertEquals(Outcome.Failed(Failure.Unauthorized), source(reader, false).mailbox(account))
     }
     @Test fun customCursorUsesEntryNotMailId() = runBlocking {
         val reader = Reader().apply {

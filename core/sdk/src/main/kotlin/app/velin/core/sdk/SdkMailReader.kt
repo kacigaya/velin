@@ -26,6 +26,7 @@ interface SdkMailReader {
     suspend fun move(ids: List<ReadId>, target: ReadFolder): Unit = throw SdkException(SdkFailure.Protocol)
     suspend fun applyLabels(ids: List<ReadId>, added: List<ReadId>, removed: List<ReadId>): Unit = throw SdkException(SdkFailure.Protocol)
     suspend fun delete(ids: List<ReadId>, folder: ReadId): Unit = throw SdkException(SdkFailure.Protocol)
+    suspend fun senders(): List<ReadAddress> = throw SdkException(SdkFailure.Protocol)
     suspend fun folders(): List<ReadFolder>
     suspend fun unread(folder: ReadFolder): Long
     suspend fun entries(list: String, cursor: String?): List<ReadEntry>
@@ -64,6 +65,9 @@ internal class NativeMailReader(private val facade: MailFacade) : SdkMailReader,
         val bytes = facade.velinAttachmentContent(IdTupleGenerated(parent.list, parent.element), IdTupleGenerated(id.list, id.element))
         require(bytes.size.toLong() == metadata.size)
         ReadAttachmentContent(metadata, bytes)
+    }
+    override suspend fun senders(): List<ReadAddress> = api {
+        facade.velinSenders().map { ReadAddress(it.address, it.name) }
     }
     override suspend fun folders(): List<ReadFolder> = api {
         facade.velinFolders().map { folder ->

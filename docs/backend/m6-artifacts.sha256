@@ -1,0 +1,3 @@
+93c7c1b297cf8b1b6c5410d20c7e2950afaf58f0ec5cc51290c4d5c48458331d  jniLibs/arm64-v8a/libtutasdk.so
+6da8d306b72dae45c7cee03da92f8ea6f2a54f1e9f4516f9efaf089446fd7034  jniLibs/x86_64/libtutasdk.so
+e29756f7feb4d072e6fa2ae00da4f4529350d042626e0ebcfcb254c74ba60473  host/libtutasdk.so

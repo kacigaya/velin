@@ -13,6 +13,7 @@ mkdir -p "$out/source" "$out/artifacts"
 git -C "$reference" archive "$ref" | tar -x -C "$out/source"
 python3 "$root/tools/backend/check-pin.py" "$out/source"
 cat "$root/tools/backend/overlay/mail_read.rs" >> "$out/source/tuta-sdk/rust/sdk/src/mail_facade.rs"
+cat "$root/tools/backend/overlay/mail_compose.rs" >> "$out/source/tuta-sdk/rust/sdk/src/mail_facade.rs"
 python3 "$root/tools/backend/overlay/guard-crypto.py" "$out/source"
 python3 "$root/tools/backend/overlay/read-source.py" "$out/source"
 if [[ ! -f "$out/ndk.zip" ]]; then
