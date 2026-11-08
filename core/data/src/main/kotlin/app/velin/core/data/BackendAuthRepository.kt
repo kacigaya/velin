@@ -99,13 +99,13 @@ internal class BackendAuthRepository(
                         true
                     }
                 }
-                if (!current) service.cancel(c.token)
+                if (!current) discard(c.token)
                 else if (result.types.isEmpty()) activate(ticket, c)
             } catch (e: CancellationException) {
                 withContext(NonCancellable) { abandon(ticket, created?.token) }; throw e
             } catch (e: Exception) {
                 mutex.withLock { if (generation == ticket) { pending = null; credentialsError(authError(e)) } }
-                created?.let { runCatching { service.cancel(it.token) } }
+                created?.let { discard(it.token) }
             }
         } } finally { password.fill('\u0000') }
     }
@@ -187,7 +187,16 @@ internal class BackendAuthRepository(
     }
     private suspend fun abandon(ticket: Long, token: String?) {
         mutex.withLock { if (generation == ticket) { reset(); credentialsError(AuthError.Unknown) } }
-        token?.let { runCatching { service.cancel(it) } }
+        token?.let { discard(it) }
+    }
+    /**
+     * Ends a session that was created but will not be used. Cancelling the second factor only
+     * removes a session that still waits for it; a session without 2FA, or one that failed
+     * after activation, must be deleted explicitly or it stays open on the server.
+     */
+    private suspend fun discard(token: String) {
+        runCatching { service.cancel(token) }
+        runCatching { service.revoke(token) }
     }
     override suspend fun cancelSignIn() = withContext(Dispatchers.IO) {
         val (ticket, c) = mutex.withLock { val c = reset(); credentials(); generation to c }

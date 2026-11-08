@@ -95,6 +95,19 @@ class BackendAuthRepositoryTest {
             } finally { f.close() }
         }
     }
+    @Test fun failedActivationDeletesCreatedSession() = runBlocking {
+        val f = Fixture()
+        try {
+            f.loadError = IllegalStateException("native load failed")
+            f.login()
+            assertTrue(f.repo.state.value is AuthState.Credentials)
+            assertTrue(f.store.all().isEmpty())
+            val delete = f.requests.last()
+            assertEquals(RequestMethod.DELETE, delete.method)
+            assertEquals(token, delete.headers["accessToken"])
+            assertTrue(delete.url.contains("/rest/sys/Session/"))
+        } finally { f.close() }
+    }
     @Test fun totpRequiresPollingApproval() = runBlocking {
         val f = Fixture(listOf("1", "2"))
         try {
