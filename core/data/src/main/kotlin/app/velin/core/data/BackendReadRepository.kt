@@ -47,14 +47,20 @@ class BackendReadRepository(private val source: MailReadSource, private val cach
     override suspend fun sync(account: AccountId): Outcome<Unit> = io {
         val state = this.account(account)
         state.sync.value = SyncState.Syncing
-        when (val result = source.mailbox(account)) {
-            is Outcome.Failed -> { state.sync.value = SyncState.Failed(result.failure); result }
-            is Outcome.Success -> {
-                state.mailbox.value = result.value.copy(folders = folderTree(result.value.folders))
-                state.sync.value = SyncState.Idle
-                Outcome.Success(Unit)
+        try {
+            when (val result = source.mailbox(account)) {
+                is Outcome.Failed -> { state.sync.value = SyncState.Failed(result.failure); result }
+                is Outcome.Success -> {
+                    state.mailbox.value = result.value.copy(folders = folderTree(result.value.folders))
+                    state.sync.value = SyncState.Idle
+                    Outcome.Success(Unit)
+                }
             }
+        } finally {
+            if (state.sync.value == SyncState.Syncing) state.sync.value = SyncState.Idle
         }
+    }.also { result ->
+        if (result is Outcome.Failed) this.account(account).sync.value = SyncState.Failed(result.failure)
     }
     override fun messages(account: AccountId, folder: FolderId): Flow<MailPage> = flow {
         val state = this@BackendReadRepository.account(account)
@@ -109,25 +115,25 @@ class BackendReadRepository(private val source: MailReadSource, private val cach
         val conversation = mutex.withLock { state.conversations.getOrPut(id) { MutableStateFlow(Outcome.Failed(Failure.Offline)) } }
         mutex.withLock { state.viewers[id] = (state.viewers[id] ?: 0) + 1 }
         try {
-        io {
-            conversation.value = when (val result = source.conversation(account, id)) {
-                is Outcome.Failed -> result
-                is Outcome.Success -> {
-                    val summaries = result.value.filter { it.conversationId == id }.distinctBy { it.id }.sortedBy { it.receivedAt }
-                    val messages = mutableListOf<MailMessage>()
-                    var failure: Failure? = null
-                    for (summary in summaries) when (val loaded = loadMessage(account, summary.id)) {
-                        is Outcome.Failed -> { failure = loaded.failure; break }
-                        is Outcome.Success -> messages += loaded.value
+            io {
+                conversation.value = when (val result = source.conversation(account, id)) {
+                    is Outcome.Failed -> result
+                    is Outcome.Success -> {
+                        val summaries = result.value.filter { it.conversationId == id }.distinctBy { it.id }.sortedBy { it.receivedAt }
+                        val messages = mutableListOf<MailMessage>()
+                        var failure: Failure? = null
+                        for (summary in summaries) when (val loaded = loadMessage(account, summary.id)) {
+                            is Outcome.Failed -> { failure = loaded.failure; break }
+                            is Outcome.Success -> messages += loaded.value
+                        }
+                        failure?.let { Outcome.Failed(it) } ?: Outcome.Success(Conversation(id,
+                            messages.lastOrNull()?.subject.orEmpty(), summaries.flatMap { it.labels }.distinctBy { it.id }, null,
+                            messages.sortedBy { it.sentAt }))
                     }
-                    failure?.let { Outcome.Failed(it) } ?: Outcome.Success(Conversation(id,
-                        messages.lastOrNull()?.subject.orEmpty(), summaries.flatMap { it.labels }.distinctBy { it.id }, null,
-                        messages.sortedBy { it.sentAt }))
                 }
+                Outcome.Success(Unit)
             }
-            Outcome.Success(Unit)
-        }
-        emitAll(conversation)
+            emitAll(conversation)
         } finally {
             withContext(NonCancellable + Dispatchers.IO) {
                 mutex.withLock {
@@ -154,6 +160,11 @@ class BackendReadRepository(private val source: MailReadSource, private val cach
         val state = this.account(account)
         val message = state.messages[mailId] ?: return@io Outcome.Failed(Failure.Protocol(404))
         val raw = state.rawBodies[mailId] ?: return@io Outcome.Failed(Failure.Decryption)
+        val viewed = state.conversations.any { (id, flow) ->
+            val current = flow.value
+            (state.viewers[id] ?: 0) > 0 && current is Outcome.Success && current.value.messages.any { it.id == mailId }
+        }
+        if (!viewed) return@io Outcome.Failed(Failure.Protocol(409))
         state.consent += mailId
         val updated = message.copy(body = sanitized(message, raw, true))
         state.messages[mailId] = updated

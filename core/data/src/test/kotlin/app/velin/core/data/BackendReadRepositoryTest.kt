@@ -80,6 +80,11 @@ class BackendReadRepositoryTest {
             assertFalse((last.messages.first().body as BodyState.Loaded).externalContentBlocked)
             assertTrue((last.messages.last().body as BodyState.Loaded).externalContentBlocked)
             assertEquals(2, source.bodyCalls)
+            val reopened = repo.load(account, first.messages.first().id) as Outcome.Success
+            assertTrue((reopened.value.body as BodyState.Loaded).externalContentBlocked)
+            assertEquals(Outcome.Failed(Failure.Protocol(409)), repo.allowExternalContent(account, reopened.value.id))
+            repo.clear()
+            assertTrue(repo.folders(account).first().isEmpty())
         } finally { cache.deleteRecursively() }
     }
     @Test fun decryptionFailureIsNeverEmptyLoadedBody() = runBlocking {
