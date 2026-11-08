@@ -6,6 +6,7 @@ android {
 }
 dependencies {
     api(project(":core:domain"))
+    implementation(project(":core:html"))
     implementation(project(":core:network"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
     testImplementation(libs.junit)

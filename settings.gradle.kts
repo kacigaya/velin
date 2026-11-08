@@ -24,5 +24,5 @@ include(":feature:mail")
 include(":core:domain")
 include(":core:sdk")
 include(":core:network")
-
 include(":core:data")
+include(":core:html")
