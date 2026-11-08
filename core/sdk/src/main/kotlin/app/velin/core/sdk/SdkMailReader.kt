@@ -11,12 +11,15 @@ data class ReadSummary(val id: ReadId, val conversationEntry: ReadId, val sender
     val senderName: String, val subject: String, val receivedMillis: Long, val unread: Boolean,
     val hasAttachments: Boolean, val confidential: Boolean, val replyType: Long, val sets: List<ReadId>)
 
+data class ReadAttachment(val id: ReadId, val name: String, val mimeType: String, val size: Long, val cid: String?)
+data class ReadAttachmentContent(val metadata: ReadAttachment, val bytes: ByteArray)
+
 data class ReadAddress(val address: String, val name: String)
 data class ReadMessage(val id: ReadId, val sender: ReadAddress, val to: List<ReadAddress>,
     val cc: List<ReadAddress>, val bcc: List<ReadAddress>, val replyTo: List<ReadAddress>,
     val subject: String, val sentMillis: Long, val confidential: Boolean, val unread: Boolean,
     val draft: Boolean, val phishing: Long, val encryptionAuth: Long?, val body: String,
-    val scheduledMillis: Long?, val mailAuthStatus: Long = -1)
+    val scheduledMillis: Long?, val mailAuthStatus: Long = -1, val attachments: List<ReadAttachment> = emptyList())
 
 interface SdkMailReader {
     suspend fun folders(): List<ReadFolder>
@@ -24,11 +27,27 @@ interface SdkMailReader {
     suspend fun entries(list: String, cursor: String?): List<ReadEntry>
     suspend fun summary(id: ReadId): ReadSummary
     suspend fun message(id: ReadId): ReadMessage = throw SdkException(SdkFailure.InvalidKey)
+    suspend fun attachment(id: ReadId): ReadAttachmentContent = throw SdkException(SdkFailure.AttachmentsUnsupported)
     suspend fun conversation(id: ReadId): List<ReadId> = throw SdkException(SdkFailure.Protocol)
 }
 
 internal class NativeMailReader(private val facade: MailFacade) : SdkMailReader, AutoCloseable {
-    override fun close() { facade.close() }
+    private val attachmentParents = LinkedHashMap<ReadId, ReadId>()
+    override fun close() { synchronized(attachmentParents) { attachmentParents.clear() }; facade.close() }
+    private fun TutanotaFile.metadata(): ReadAttachment {
+        if (errors.isNotEmpty() || size < 0) throw SdkException(SdkFailure.InvalidKey)
+        return ReadAttachment(requireNotNull(id).readId(), name, mimeType ?: "application/octet-stream", size, cid)
+    }
+    override suspend fun attachment(id: ReadId): ReadAttachmentContent = api {
+        val parent = synchronized(attachmentParents) { attachmentParents[id] }
+            ?: throw SdkException(SdkFailure.Protocol)
+        val file = facade.velinAttachment(IdTupleGenerated(parent.list, parent.element), IdTupleGenerated(id.list, id.element))
+        val metadata = file.metadata()
+        require(metadata.id == id && metadata.size <= 20 * 1024 * 1024)
+        val bytes = facade.velinAttachmentContent(IdTupleGenerated(parent.list, parent.element), IdTupleGenerated(id.list, id.element))
+        require(bytes.size.toLong() == metadata.size)
+        ReadAttachmentContent(metadata, bytes)
+    }
     override suspend fun folders(): List<ReadFolder> = api {
         facade.velinFolders().map { folder ->
             if (folder.errors.isNotEmpty()) throw SdkException(SdkFailure.InvalidKey)
@@ -63,8 +82,15 @@ internal class NativeMailReader(private val facade: MailFacade) : SdkMailReader,
             throw SdkException(SdkFailure.InvalidKey)
         }
         require(mail.id?.readId() == id)
-        // Attachment key providers and downloads are a separate slice. Never export fake metadata.
-        if (mail.attachments.isNotEmpty()) throw SdkException(SdkFailure.AttachmentsUnsupported)
+        require(mail.attachments.size <= 100)
+        val attachments = mail.attachments.map { fileId ->
+            facade.velinAttachment(IdTupleGenerated(id.list, id.element), fileId).metadata().also {
+                require(it.id == fileId.readId())
+            }
+        }
+        synchronized(attachmentParents) {
+            attachments.forEach { attachmentParents[it.id] = id }
+        }
         ReadMessage(id, ReadAddress(mail.sender.address, mail.sender.name),
             details.recipients.toRecipients.map { ReadAddress(it.address, it.name) },
             details.recipients.ccRecipients.map { ReadAddress(it.address, it.name) },
@@ -72,7 +98,7 @@ internal class NativeMailReader(private val facade: MailFacade) : SdkMailReader,
             details.replyTos.map { ReadAddress(it.address, it.name) }, mail.subject,
             details.sentDate.millis(), mail.confidential, mail.unread, mail.mailDetailsDraft != null,
             mail.phishingStatus, mail.encryptionAuthStatus,
-            details.body.compressedText ?: details.body.text ?: "", mail.sendAt?.millis(), details.authStatus)
+            details.body.compressedText ?: details.body.text ?: "", mail.sendAt?.millis(), details.authStatus, attachments)
     }
     private suspend fun <T> api(block: suspend () -> T): T = try { block() }
     catch (e: ApiCallException) { throw apiException(e) }

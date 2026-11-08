@@ -37,6 +37,8 @@ class SdkMailReadSourceTest {
             requested = list to cursor
             return rows
         }
+        var file: ReadAttachmentContent? = null
+        override suspend fun attachment(id: ReadId): ReadAttachmentContent = file ?: throw SdkException(SdkFailure.AttachmentsUnsupported)
         var loadedMessage: ReadMessage? = null
         var conversationMails: List<ReadId> = emptyList()
         override suspend fun message(id: ReadId): ReadMessage = loadedMessage ?: throw SdkException(SdkFailure.InvalidKey)
@@ -117,6 +119,23 @@ class SdkMailReadSourceTest {
         assertEquals(listOf("one", "two"), result.value.map { it.id.value.element.value })
         assertTrue(result.value.all { it.conversationId == id })
         assertEquals(Outcome.Failed(Failure.Unauthorized), source(reader, false).conversation(account, id))
+    }
+    @Test fun attachmentsPreserveMetadataAndDoNotBlockBody() = runBlocking {
+        val id = ReadId("mails", "one")
+        val file = ReadAttachment(ReadId("files", "one"), "image.png", "image/png", 3, "logo")
+        val reader = Reader().apply {
+            loadedMessage = readMessage(id).copy(attachments = listOf(file))
+            this.file = ReadAttachmentContent(file, byteArrayOf(1, 2, 3))
+        }
+        val source = source(reader)
+        val message = (source.message(account, MailId(id.domain())) as Outcome.Success).value
+        assertEquals("logo", message.attachments.single().contentId)
+        assertEquals(Outcome.Success("<p>Body</p>"), source.body(account, MailId(id.domain())))
+        val content = (source.attachment(account, AttachmentId(file.id.domain())) as Outcome.Success).value
+        assertArrayEquals(byteArrayOf(1, 2, 3), content.bytes)
+        assertEquals(Outcome.Failed(Failure.Unauthorized), source(reader, false).attachment(account, AttachmentId(file.id.domain())))
+        reader.file = ReadAttachmentContent(file.copy(size = 4), byteArrayOf(1, 2, 3))
+        assertTrue(source.attachment(account, AttachmentId(file.id.domain())) is Outcome.Failed)
     }
     private fun readMessage(id: ReadId) = ReadMessage(id, ReadAddress("from@example.invalid", "Sender"),
         emptyList(), emptyList(), emptyList(), emptyList(), "Subject", 1700000000000, true, true,

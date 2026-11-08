@@ -22,8 +22,8 @@ internal class SdkMailReadSource(private val sessions: SessionReadAccess) : Mail
     }
     /**
      * Upstream receives unread counts over the event bus (WebsocketCounterData, MailModel.ts:455-478),
-     * not from CounterService GET, which the server rejects with 400 for mail folders. Until the
-     * event bus exists (M4) the count is best effort, so one counter never blocks the folder list.
+     * not from CounterService GET, which the server rejects with 400 for mail folders.
+     * Counts remain best effort during connection setup and reconnect.
      */
     private suspend fun unreadOrZero(sdk: SdkMailReader, folder: ReadFolder): Int = try {
         sdk.unread(folder).takeIf { it in 0..Int.MAX_VALUE.toLong() }?.toInt() ?: 0
@@ -49,7 +49,7 @@ internal class SdkMailReadSource(private val sessions: SessionReadAccess) : Mail
         MailMessage(id, mail.sender.address(), mail.to.map { it.address() }, mail.cc.map { it.address() },
             mail.bcc.map { it.address() }, mail.replyTo.map { it.address() }, mail.subject,
             Instant.ofEpochMilli(mail.sentMillis), mail.confidential, mail.unread, mail.draft,
-            BodyState.Loading, emptyList(), MailAuthentication.Unknown,
+            BodyState.Loading, mail.attachments.map { it.domainAttachment() }, MailAuthentication.Unknown,
             when {
                 mail.phishing == 1L -> MailFinding.Phishing
                 mail.mailAuthStatus in listOf(1L, 3L, 4L) -> MailFinding.AuthenticationFailed
@@ -60,7 +60,11 @@ internal class SdkMailReadSource(private val sessions: SessionReadAccess) : Mail
     override suspend fun body(account: AccountId, id: MailId): Outcome<String> = read(account) { sdk ->
         sdk.message(id.value.readId()).also { require(it.id.domain() == id.value) }.body
     }
-    override suspend fun attachment(account: AccountId, id: AttachmentId): Outcome<AttachmentContent> = Outcome.Failed(Failure.Unsupported)
+    override suspend fun attachment(account: AccountId, id: AttachmentId): Outcome<AttachmentContent> = read(account) { sdk ->
+        val content = sdk.attachment(id.value.readId())
+        require(content.metadata.id.domain() == id.value && content.metadata.size == content.bytes.size.toLong())
+        AttachmentContent(content.metadata.domainAttachment(), content.bytes)
+    }
 
     private suspend fun <T : Any> read(account: AccountId, operation: suspend (SdkMailReader) -> T?): Outcome<T> =
         sessions.read(account) { sdk ->
@@ -102,3 +106,5 @@ internal fun summary(mail: ReadSummary, sets: List<ReadFolder>): MailSummary = M
 
 private fun EntityId.readId() = ReadId(list.value, element.value)
 private fun ReadAddress.address() = Address(address, name)
+
+private fun ReadAttachment.domainAttachment() = Attachment(AttachmentId(id.domain()), name, mimeType, size, cid)

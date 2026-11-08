@@ -8,7 +8,8 @@ text = path.read_text()
 text += '\n' + (overlay / 'entity_read.rs').read_text()
 needle = '\t\tpub fn get_type_model_provider()'
 assert text.count(needle) == 1
-text = text.replace(needle, '''        pub async fn velin_blob(&self, type_ref: &TypeRef, id: &crate::IdTupleGenerated,
+text = text.replace(needle, '''        pub async fn velin_file_blobs(&self, blobs: Vec<crate::entities::generated::sys::Blob>, access: crate::entities::generated::storage::BlobServerAccessInfo) -> Result<Vec<Vec<u8>>, ApiCallError>;
+        pub async fn velin_blob(&self, type_ref: &TypeRef, id: &crate::IdTupleGenerated,
             access: crate::entities::generated::storage::BlobServerAccessInfo) -> Result<ParsedEntity, ApiCallError>;
 ''' + needle)
 path.write_text(text)
@@ -16,7 +17,7 @@ path = root / 'crypto_entity_client.rs'
 text = path.read_text()
 needle = '\tpub fn serialize_entity<'
 assert text.count(needle) == 1
-path.write_text(text.replace(needle, (overlay / 'crypto_read.rs').read_text() + needle))
+path.write_text(text.replace(needle, (overlay / 'crypto_read.rs').read_text() + (overlay / 'attachment_read.rs').read_text() + needle) + '\n' + (overlay / 'read_tests.rs').read_text())
 
 path = root / 'bindings/rest_client.rs'
 text = path.read_text()

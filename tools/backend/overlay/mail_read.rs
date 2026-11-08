@@ -91,6 +91,30 @@ impl MailFacade {
             .catch_unwind().await.unwrap_or_else(|_| Err(ApiCallError::internal("Velin conversation read failed".into())))
     }
 
+    pub async fn velin_attachment(&self, mail: IdTupleGenerated, id: IdTupleGenerated) -> Result<crate::entities::generated::tutanota::TutanotaFile, ApiCallError> {
+        AssertUnwindSafe(self.crypto_entity_client.velin_file(mail, id)).catch_unwind().await
+            .unwrap_or_else(|_| Err(ApiCallError::internal("Attachment read failed".into())))
+    }
+    pub async fn velin_attachment_content(&self, mail: IdTupleGenerated, id: IdTupleGenerated) -> Result<Vec<u8>, ApiCallError> {
+        use crate::entities::generated::storage::{BlobAccessTokenPostIn, BlobReadData, InstanceId};
+        use crate::services::generated::storage::BlobAccessTokenService;
+        AssertUnwindSafe(async {
+            let file = self.crypto_entity_client.velin_file(mail, id.clone()).await?;
+            if file.size < 0 || file.size > 20 * 1024 * 1024 || file.blobs.len() > 100 {
+                return Err(ApiCallError::internal("Attachment exceeds limit".into()));
+            }
+            let Some(blob) = file.blobs.first() else {
+                return if file.size == 0 { Ok(vec![]) } else { Err(ApiCallError::internal("Missing file blobs".into())) };
+            };
+            let access = self.service_executor.post::<BlobAccessTokenService>(BlobAccessTokenPostIn {
+                _format: 0, archiveDataType: Some(1), write: None,
+                read: Some(BlobReadData { _id: None, archiveId: blob.archiveId.clone(), instanceListId: Some(id.list_id),
+                    instanceIds: vec![InstanceId { _id: None, instanceId: Some(id.element_id) }] }),
+            }, Default::default()).await?.blobAccessInfo;
+            self.crypto_entity_client.velin_file_content(file, access).await
+        }).catch_unwind().await.unwrap_or_else(|_| Err(ApiCallError::internal("Attachment read failed".into())))
+    }
+
     pub async fn velin_mail(&self, id: IdTupleGenerated) -> Result<Mail, ApiCallError> {
         AssertUnwindSafe(self.crypto_entity_client.load(&id))
             .catch_unwind()
