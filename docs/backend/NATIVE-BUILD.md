@@ -19,5 +19,13 @@ Output is in `core/sdk/build/native/artifacts`. It includes JNI libraries, inter
 The SDK adapter keeps generated records internal. JNA 5.18.0 is required by upstream UniFFI's Kotlin generator. Coroutines support its async callbacks. The transport and Argon2id adapter use upstream exports. Mail reads add the
 Velin-owned overlay in `tools/backend/overlay`. The build applies it only to
 the exported copy. Gradle checks overlay hashes against the built artifacts.
+See [M3c mail reads](M3C-DETAILS.md) for key providers, download limits,
+and counter transport behavior.
 
 The pinned Rust dependency graph has known advisories. See `dependency-advisories.json` for exact packages, OSV IDs, aliases, severities when supplied, and fixed ranges. Release requires dependency remediation and a new compatibility check. The fixed reference is retained for this implementation task. A successful offline build does not prove those advisories harmless.
+
+## Read-path verification
+
+1. Run `tools/backend/test-read-overlay.sh` after the native build.
+2. Run `./gradlew testDebugUnitTest :core:domain:test :core:html:test assembleDebug --console=plain`.
+3. Use the live checks in [M3C-DETAILS.md](M3C-DETAILS.md). Offline tests do not establish server compatibility.

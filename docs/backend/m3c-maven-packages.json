@@ -1,0 +1,74 @@
+{
+  "packages": [
+    {
+      "ecosystem": "Maven",
+      "name": "androidx.annotation:annotation",
+      "version": "1.10.0"
+    },
+    {
+      "ecosystem": "Maven",
+      "name": "androidx.annotation:annotation-jvm",
+      "version": "1.10.0"
+    },
+    {
+      "ecosystem": "Maven",
+      "name": "androidx.startup:startup-runtime",
+      "version": "1.2.0"
+    },
+    {
+      "ecosystem": "Maven",
+      "name": "androidx.tracing:tracing",
+      "version": "1.0.0"
+    },
+    {
+      "ecosystem": "Maven",
+      "name": "com.squareup.okhttp3:okhttp",
+      "version": "5.5.1"
+    },
+    {
+      "ecosystem": "Maven",
+      "name": "com.squareup.okhttp3:okhttp-android",
+      "version": "5.5.1"
+    },
+    {
+      "ecosystem": "Maven",
+      "name": "com.squareup.okio:okio",
+      "version": "3.18.1"
+    },
+    {
+      "ecosystem": "Maven",
+      "name": "com.squareup.okio:okio-jvm",
+      "version": "3.18.1"
+    },
+    {
+      "ecosystem": "Maven",
+      "name": "net.java.dev.jna:jna",
+      "version": "5.18.0"
+    },
+    {
+      "ecosystem": "Maven",
+      "name": "org.jetbrains.kotlin:kotlin-stdlib",
+      "version": "2.4.21"
+    },
+    {
+      "ecosystem": "Maven",
+      "name": "org.jetbrains.kotlinx:kotlinx-coroutines-bom",
+      "version": "1.11.0"
+    },
+    {
+      "ecosystem": "Maven",
+      "name": "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+      "version": "1.11.0"
+    },
+    {
+      "ecosystem": "Maven",
+      "name": "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm",
+      "version": "1.11.0"
+    },
+    {
+      "ecosystem": "Maven",
+      "name": "org.jetbrains:annotations",
+      "version": "23.0.0"
+    }
+  ]
+}

@@ -1,5 +1,7 @@
 # M3b read-source notes
 
+Historical status. See [M3c details](M3C-DETAILS.md) for the current partial body and conversation implementation.
+
 M3b is incomplete. The completed slice adds SDK-backed folders and mail-list paging. Received bodies remain the next priority. Do not mark M3 complete.
 
 No live Tuta request was sent. No UI, app, feature, design-system, or HTML source changed. The reference checkout remains read-only.
