@@ -65,4 +65,18 @@ class MailHtmlSanitizerTest {
         assertEquals("", sanitizer.sanitize("").html)
         assertEquals("hello<blockquote>test</blockquote>", sanitizer.sanitize("hello<blockquote>test</blockquote>").html)
     }
+    @Test fun preservesPresentationWithoutCssLoadsOrOverlays() {
+        val result = sanitizer.sanitize("""<p style="color:red;font-size:16px;text-align:center;position:fixed;top:0;background-image:url(https://track.test);width:expression(evil());font-family:var(--evil)">text</p>""")
+        assertEquals("color:red;font-size:16px;text-align:center", Jsoup.parseBodyFragment(result.html).selectFirst("p")!!.attr("style"))
+        assertTrue(result.externalContentBlocked)
+        for (css in listOf("background:u\\72l(https://track.test)", "background:URL(https://track.test)", "color:e/**/xpression(evil())", "position:absolute", "background:image-set('https://track.test' 1x)", "color:@import 'https://track.test'")) {
+            assertFalse(sanitizer.sanitize("<p style=\"$css\">x</p>").html.contains("style="))
+        }
+    }
+    @Test fun allowsRasterDataImagesOnly() {
+        val result = sanitizer.sanitize("<img src='data:image/png;base64,iVBORw0KGgo='>")
+        assertTrue(result.html.contains("data:image/png"))
+        assertFalse(result.externalContentPresent)
+        assertFalse(sanitizer.sanitize("<img src='data:image/svg+xml;base64,PHN2Zz4='>").html.contains("src="))
+    }
 }
