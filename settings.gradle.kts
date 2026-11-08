@@ -20,3 +20,7 @@ include(":app")
 include(":core:designsystem")
 include(":feature:auth")
 include(":feature:mail")
+
+include(":core:domain")
+include(":core:sdk")
+include(":core:network")
