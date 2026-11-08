@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Envelope whose flap forms the "V" of Velin. Kept inside the 66dp adaptive-icon safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M37,37h34a7,7 0,0 1,7 7v20a7,7 0,0 1,-7 7h-34a7,7 0,0 1,-7 -7v-20a7,7 0,0 1,7 -7z"
+        android:strokeWidth="5"
+        android:strokeColor="#1B3466"
+        android:strokeLineJoin="round" />
+    <path
+        android:pathData="M36,44L54,58L72,44"
+        android:strokeWidth="5"
+        android:strokeColor="#1B3466"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>
