@@ -11,10 +11,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collect
 
 /** Create once per application process. Call close only when the backend is no longer used. */
-class VelinBackend(context: Context, readSource: MailReadSource = UnavailableMailReadSource) {
-    private val reads = BackendReadRepository(readSource, File(context.applicationContext.cacheDir, "mail-attachments"))
-    val mailbox: app.velin.core.domain.MailboxRepository = reads
-    val mail: app.velin.core.domain.MailRepository = reads
+class VelinBackend(context: Context, readSource: MailReadSource? = null) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val baseUrl = "https://app.tuta.com"
     private val transport = HttpTransport(URI(baseUrl))
@@ -24,9 +21,12 @@ class VelinBackend(context: Context, readSource: MailReadSource = UnavailableMai
         val engine = SdkEngine(baseUrl, transport, PrivateSdkContentStore())
         try {
             val session = engine.resume(SessionCredentials.internalAccount(c.login, c.user, c.token, c.encryptedKey))
-            AutoCloseable { session.close(); engine.close() }
+            ActiveSdkSession(session, engine)
         } catch (e: Throwable) { engine.close(); throw e }
     }, scope)
+    private val reads = BackendReadRepository(readSource ?: SdkMailReadSource(repository), File(context.applicationContext.cacheDir, "mail-attachments"))
+    val mailbox: app.velin.core.domain.MailboxRepository = reads
+    val mail: app.velin.core.domain.MailRepository = reads
     val auth: AuthRepository = repository
     init {
         scope.launch { repository.initialize() }

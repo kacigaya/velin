@@ -22,7 +22,7 @@ internal class BackendAuthRepository(
     private val scope: CoroutineScope,
     private val derive: (CharArray, ByteArray, KdfAlgorithm) -> ByteArray = KeyDerivation::derive,
     private val pollDelay: suspend () -> Unit = { delay(1_000) },
-) : AuthRepository {
+) : AuthRepository, SessionReadAccess {
     private val mutableState = MutableStateFlow<AuthState>(AuthState.Credentials(emptyList(), busy = true))
     override val state: StateFlow<AuthState> = mutableState.asStateFlow()
     private val mutex = Mutex()
@@ -32,6 +32,13 @@ internal class BackendAuthRepository(
     private var resuming: AccountId? = null
     private var polling: Job? = null
     private var session: AutoCloseable? = null
+
+    override suspend fun <T> read(account: AccountId, operation: suspend (SdkMailReader) -> Outcome<T>): Outcome<T> = mutex.withLock {
+        val active = mutableState.value as? AuthState.Active
+        val loaded = session as? ActiveSdkSession
+        if (active?.account?.id != account || loaded == null) Outcome.Failed(Failure.Unauthorized)
+        else operation(loaded.session.mail)
+    }
 
     suspend fun initialize() = withContext(Dispatchers.IO) {
         mutex.withLock {
@@ -256,4 +263,8 @@ internal fun authError(e: Exception, code: Boolean = false): AuthError = when (e
         else -> AuthError.Unknown
     }
     else -> AuthError.Unknown
+}
+
+internal class ActiveSdkSession(val session: SdkSession, private val engine: SdkEngine) : AutoCloseable {
+    override fun close() { try { session.close() } finally { engine.close() } }
 }

@@ -22,32 +22,44 @@ dependencies {
     testImplementation(libs.junit)
     testRuntimeOnly("net.java.dev.jna:jna:5.18.0@jar")
 }
+val checkUpstreamPin = tasks.register<Exec>("checkUpstreamPin") {
+    commandLine("python3", rootProject.file("tools/backend/check-pin.py"), file("build/native/source"))
+}
 val checkNativeArtifacts = tasks.register("checkNativeArtifacts") {
     val directory = layout.projectDirectory.dir("build/native/artifacts").asFile
+    val repositoryDirectory = rootProject.layout.projectDirectory.asFile
+    val pinnedCommit = Regex(""""commit":\s*"([^"]+)"""")
+        .find(providers.fileContents(rootProject.layout.projectDirectory.file("tools/backend/upstream.json")).asText.get())!!.groupValues[1]
+    dependsOn(checkUpstreamPin)
     doLast {
+        check(directory.resolve("UPSTREAM_COMMIT").readText().trim() == pinnedCommit)
         val manifest = directory.resolve("SHA256SUMS")
         check(manifest.isFile) {
             "Run tools/backend/build-sdk.sh before building :core:sdk"
         }
-        manifest.forEachLine { line ->
-            val (hash, path) = line.split("  ", limit = 2)
-            val artifact = directory.resolve(path)
-            check(artifact.canonicalPath.startsWith(directory.canonicalPath + File.separator))
-            val digest = MessageDigest.getInstance("SHA-256")
-            artifact.inputStream().use { stream ->
-                val buffer = ByteArray(8192)
-                while (true) {
-                    val count = stream.read(buffer)
-                    if (count < 0) break
-                    digest.update(buffer, 0, count)
+        for ((base, checksums) in listOf(directory to manifest,
+            repositoryDirectory to directory.resolve("OVERLAY-SHA256"))) {
+            checksums.forEachLine { line ->
+                val (hash, path) = line.split("  ", limit = 2)
+                val artifact = base.resolve(path)
+                check(artifact.canonicalPath.startsWith(base.canonicalPath + File.separator))
+                val digest = MessageDigest.getInstance("SHA-256")
+                artifact.inputStream().use { stream ->
+                    val buffer = ByteArray(8192)
+                    while (true) {
+                        val count = stream.read(buffer)
+                        if (count < 0) break
+                        digest.update(buffer, 0, count)
+                    }
                 }
+                check(digest.digest().joinToString("") { "%02x".format(it) } == hash) { "SDK checksum mismatch: $path" }
             }
-            check(digest.digest().joinToString("") { "%02x".format(it) } == hash) { "SDK checksum mismatch: $path" }
         }
     }
 }
 tasks.named("preBuild") { dependsOn(checkNativeArtifacts) }
 
 tasks.withType<Test>().configureEach {
+    systemProperty("velin.upstream.source", file("build/native/source").absolutePath)
     systemProperty("jna.library.path", file("build/native/artifacts/host").absolutePath)
 }

@@ -2,15 +2,23 @@
 set -euo pipefail
 root=$(cd "$(dirname "$0")/../.." && pwd)
 out="$root/core/sdk/build/native"
-ref=adccedea76c7049c78c9404332afda50f84bb05a
+ref=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["commit"])' "$root/tools/backend/upstream.json")
+tag=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["tag"])' "$root/tools/backend/upstream.json")
+reference=${TUTA_REFERENCE:-/home/ubuntu/src/tutanota}
+[[ $(git -C "$reference" rev-parse "$tag^{commit}") == "$ref" ]] || { echo 'Release tag does not match pin' >&2; exit 1; }
 [[ $(rustc --version) == "rustc 1.97.1 "* ]] || { echo 'Rust 1.97.1 required' >&2; exit 1; }
+rm -rf "$out/source" "$out/artifacts"
 mkdir -p "$out/source" "$out/artifacts"
 # Export tracked source only. Never modify the reference checkout.
-git -C "${TUTA_REFERENCE:-/home/ubuntu/src/tutanota}" archive "$ref" | tar -x -C "$out/source"
+git -C "$reference" archive "$ref" | tar -x -C "$out/source"
+python3 "$root/tools/backend/check-pin.py" "$out/source"
+cat "$root/tools/backend/overlay/mail_read.rs" >> "$out/source/tuta-sdk/rust/sdk/src/mail_facade.rs"
+python3 "$root/tools/backend/overlay/guard-crypto.py" "$out/source"
 if [[ ! -f "$out/ndk.zip" ]]; then
   curl -fL --retry 3 https://dl.google.com/android/repository/android-ndk-r29-linux.zip -o "$out/ndk.zip"
 fi
-printf '%s  %s\n' 87e2bb7e9be5d6a1c6cdf5ec40dd4e0c6d07c30b "$out/ndk.zip" | sha1sum -c -
+ndk_sha256=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["ndkSha256"])' "$root/tools/backend/upstream.json")
+printf '%s  %s\n' "$ndk_sha256" "$out/ndk.zip" | sha256sum -c -
 if [[ ! -d "$out/android-ndk-r29" ]]; then
   unzip -q "$out/ndk.zip" 'android-ndk-r29/toolchains/llvm/prebuilt/linux-x86_64/sysroot/*' -d "$out"
 fi
@@ -47,6 +55,7 @@ mkdir -p "$out/artifacts/notices"
 cp LICENSE.txt "$out/artifacts/notices/TUTA-LICENSE.txt"
 printf '%s\n' "$ref" > "$out/artifacts/UPSTREAM_COMMIT"
 (cd "$out" && sha256sum ndk.zip source/Cargo.lock source/tuta-sdk/rust/sdk/uniffi.toml) > "$out/artifacts/INPUTS-SHA256"
+(cd "$root" && sha256sum tools/backend/overlay/* tools/backend/build-sdk.sh) > "$out/artifacts/OVERLAY-SHA256"
 rustc --version > "$out/artifacts/TOOLCHAIN"
 clang --version >> "$out/artifacts/TOOLCHAIN"
 (cd "$out/artifacts" && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)

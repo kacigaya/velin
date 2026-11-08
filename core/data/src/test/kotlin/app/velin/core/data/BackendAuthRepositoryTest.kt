@@ -83,7 +83,7 @@ class BackendAuthRepositoryTest {
                 val query = JSONObject(URLDecoder.decode(salt.url.substringAfter("?_body="), "UTF-8"))
                 assertEquals("a@example.invalid", query.getString("419"))
                 val request = f.requests[1]
-                assertEquals(mapOf("v" to "158", "cv" to "366.261105.0", "cp" to "2", "Accept" to "application/json", "Content-Type" to "application/json"), request.headers)
+                assertEquals(mapOf("v" to "157", "cv" to "366.261105.0", "cp" to "2", "Accept" to "application/json", "Content-Type" to "application/json"), request.headers)
                 val body = JSONObject(String(request.body!!))
                 assertEquals("0", body.getString("1212"))
                 assertEquals("a@example.invalid", body.getString("1213"))

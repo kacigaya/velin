@@ -26,6 +26,8 @@ class SdkTransportTest {
         Unit
     }
     @Test fun mapsTypedSdkApiFailures() {
+        assertEquals(SdkFailure.SecureExternalUnsupported,
+            mapApiFailure(ApiCallException.VelinSecureExternalUnsupported()))
         assertEquals(SdkFailure.InvalidSoftwareVersion,
             mapApiFailure(ApiCallException.ServerResponseException(HttpError.InvalidSoftwareVersionError)))
         assertEquals(SdkFailure.Network,

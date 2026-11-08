@@ -18,7 +18,7 @@ class SessionCredentials internal constructor(internal val login: String, intern
     }
 }
 enum class SdkFailure { InvalidAccessToken, InvalidPassphrase, InvalidKey, Network, Tls,
-    InvalidSoftwareVersion, TooManyAttempts, Protocol, Internal }
+    InvalidSoftwareVersion, TooManyAttempts, Protocol, Internal, SecureExternalUnsupported }
 class SdkException(val failure: SdkFailure) : Exception(failure.name)
 
 /** Resumes existing internal accounts only. New session orchestration belongs to M2. */
@@ -44,7 +44,9 @@ class SdkEngine(baseUrl: String, transport: BinaryTransport, store: SdkContentSt
 }
 
 class SdkSession internal constructor(private val delegate: LoggedInSdk) : AutoCloseable {
-    override fun close() { delegate.close() }
+    private val reader = NativeMailReader(delegate.mailFacade())
+    val mail: SdkMailReader get() = reader
+    override fun close() { try { reader.close() } finally { delegate.close() } }
 }
 
 internal fun mapApiFailure(error: ApiCallException): SdkFailure = when (error) {
@@ -59,5 +61,6 @@ internal fun mapApiFailure(error: ApiCallException): SdkFailure = when (error) {
         HttpError.NotAuthenticatedError, HttpError.SessionExpiredError -> SdkFailure.InvalidAccessToken
         else -> SdkFailure.Protocol
     }
+    is ApiCallException.VelinSecureExternalUnsupported -> SdkFailure.SecureExternalUnsupported
     is ApiCallException.InternalSdkException -> SdkFailure.Internal
 }

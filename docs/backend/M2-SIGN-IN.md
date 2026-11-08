@@ -1,5 +1,10 @@
 # M2 backend handoff
 
+Historical handoff. The active release pin and version rules are in
+[RELEASE-PIN.md](RELEASE-PIN.md). Current SDK read support is in
+[M3B-READ-SOURCE.md](M3B-READ-SOURCE.md). Old master citations below describe
+the earlier implementation only.
+
 M2 sign-in is implemented and tested offline. The roadmap's live sign-in exit check remains open. No live Tuta request was sent.
 
 ## Commits
