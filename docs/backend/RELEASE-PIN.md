@@ -33,9 +33,9 @@ In particular, a bad second-factor code must retain its own error state.
    against the release. Keep crypto checks fail closed.
 6. Run `tools/backend/build-sdk.sh`. It builds both Android ABIs and host code.
 7. Run the offline tests and Rust tests. Record artifact checksums.
-8. Ask the authorized UI engineer to check sign-in and reads on a device.
+8. Check sign-in and reads on a device.
 
-Earlier backend handoffs cite the old master pin as historical evidence.
+Earlier backend notes cite the old master pin as historical evidence.
 They do not describe the current production pin. This document supersedes
 those version and build instructions. jsoup is owner-approved.
 
@@ -97,11 +97,10 @@ The release-only build passed for arm64-v8a, x86_64, and the host library.
 `repin-artifacts.sha256` records that build before the M3b overlay.
 The negative model-drift check failed as expected.
 
-`ANDROID_HOME=/home/ubuntu/android-sdk ./gradlew testDebugUnitTest :core:domain:test :core:html:test assembleDebug --console=plain`
+`./gradlew testDebugUnitTest :core:domain:test :core:html:test assembleDebug --console=plain`
 passed (293 tasks). The first attempt had no SDK path; the command above
 fixed that environment error. Native tests ran through the host library.
 UniFFI could not find optional ktlint; binding generation completed.
 
-Review ran locally because this is an implementation subtask with no child
-agents. `git diff --check` and Bash syntax checks passed. Device and live
+Review ran locally. `git diff --check` and Bash syntax checks passed. Device and live
 protocol acceptance remain UNVERIFIED. No live Tuta API request was sent.

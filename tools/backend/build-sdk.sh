@@ -4,7 +4,7 @@ root=$(cd "$(dirname "$0")/../.." && pwd)
 out="$root/core/sdk/build/native"
 ref=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["commit"])' "$root/tools/backend/upstream.json")
 tag=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["tag"])' "$root/tools/backend/upstream.json")
-reference=${TUTA_REFERENCE:-/home/ubuntu/src/tutanota}
+reference=${TUTA_REFERENCE:?Set TUTA_REFERENCE to a tutanota checkout that has the pinned release tag}
 [[ $(git -C "$reference" rev-parse "$tag^{commit}") == "$ref" ]] || { echo 'Release tag does not match pin' >&2; exit 1; }
 [[ $(rustc --version) == "rustc 1.97.1 "* ]] || { echo 'Rust 1.97.1 required' >&2; exit 1; }
 rm -rf "$out/source" "$out/artifacts"

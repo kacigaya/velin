@@ -1,6 +1,6 @@
-# M2 backend handoff
+# M2 sign-in notes
 
-Historical handoff. The active release pin and version rules are in
+Historical notes. The active release pin and version rules are in
 [RELEASE-PIN.md](RELEASE-PIN.md). Current SDK read support is in
 [M3B-READ-SOURCE.md](M3B-READ-SOURCE.md). Old master citations below describe
 the earlier implementation only.
@@ -45,16 +45,16 @@ The SDK content store is private memory per SDK instance. It validates names and
 
 ## Verified
 
-1. `./gradlew testDebugUnitTest :core:domain:test assembleDebug` passed. An intermediate repeat hit a Gradle test-output file collision while overlapping checks used the same worktree. The final check ran alone.
+1. `./gradlew testDebugUnitTest :core:domain:test assembleDebug` passed. An intermediate repeat hit a Gradle test-output file collision while overlapping checks used the same checkout. The final check ran alone.
 2. All 12 repository tests pass. They use only injected transports with reserved example URLs. They cover both KDF selections; credential, challenge, and active transitions; TOTP request fields; approval polling; cancel DELETE; stale creation responses; cancelled TOTP retries; removal during resume; expiry; local removal; logout; password cleanup; unknown KDF rejection; and HTTP 400, 401, 429, 474, and 500.
 3. Credential tests use Robolectric's file API and a JVM AES key in place of AndroidKeyStore. They verify storage reopen, encrypted fields, fresh IVs, and tamper rejection.
 4. Session key wrapping matches six upstream vectors, covering 128-bit and 256-bit passphrase keys under AES-256 access keys. Existing bcrypt and native Argon2id vectors also pass.
-5. Reviewed all added source and tests locally. No delegated reviewer was used because this task is an implementation subtask. `git diff --check` passed.
+5. Reviewed all added source and tests locally. `git diff --check` passed.
 6. The six resolved public Maven artifacts in the data runtime graph have no OSV findings. See `m2-maven-advisories.json`.
 
 ## Source evidence
 
-All upstream paths are relative to `/home/ubuntu/src/tutanota`, commit `adccedea76c7049c78c9404332afda50f84bb05a`. Ports and vectors retain GPLv3 compatibility with Velin.
+All upstream paths are relative to a local Tuta checkout (`TUTA_REFERENCE`), commit `adccedea76c7049c78c9404332afda50f84bb05a`. Ports and vectors retain GPLv3 compatibility with Velin.
 
 | Behavior | Upstream source |
 |---|---|

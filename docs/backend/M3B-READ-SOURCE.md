@@ -1,4 +1,4 @@
-# M3b backend handoff
+# M3b read-source notes
 
 M3b is incomplete. The completed slice adds SDK-backed folders and mail-list paging. Received bodies remain the next priority. Do not mark M3 complete.
 
@@ -23,7 +23,7 @@ Pages contain at most 50 source entries. The source cursor is the last MailSetEn
 
 ## Source evidence
 
-All upstream paths below refer to `332e57461cdc4fe4a4ad9bdc8555f56df02931c0` under `/home/ubuntu/src/tutanota`.
+All upstream paths below refer to `332e57461cdc4fe4a4ad9bdc8555f56df02931c0` under a local Tuta checkout (`TUTA_REFERENCE`).
 
 | Behavior | Source |
 | --- | --- |
@@ -59,7 +59,7 @@ No production dependency was added. jsoup remains confined to `:core:html`; owne
 
 ## UNVERIFIED
 
-Live authentication, mailbox access, counter acceptance, cursor acceptance, and real-mail decryption remain unverified. This implementation run used no account. The UI engineer owns live checks. Android native loading, Keystore behavior, and device execution remain unverified. Offline tests do not establish live interoperability.
+Live authentication, mailbox access, counter acceptance, cursor acceptance, and real-mail decryption remain unverified. This implementation used no account; live checks are tracked in the roadmap. Android native loading, Keystore behavior, and device execution remain unverified. Offline tests do not establish live interoperability.
 
 ## Verification
 
@@ -67,14 +67,14 @@ The release build passed for arm64-v8a, x86_64, and host. The final artifact
 hashes are in `m3b-artifacts.sha256`. The release-only hashes remain in
 `repin-artifacts.sha256`.
 
-`ANDROID_HOME=/home/ubuntu/android-sdk ./gradlew testDebugUnitTest :core:domain:test :core:html:test assembleDebug --console=plain`
+`./gradlew testDebugUnitTest :core:domain:test :core:html:test assembleDebug --console=plain`
 passed after the overlay (293 tasks). The source tests cover folders,
 parents, labels, counters, custom entry cursors, page endings, missing
 sessions, unknown kinds, and secure-external failure mapping. SDK tests check
 the new FFI error mapping. Existing auth and HTML tests pass.
 
 Local review covered all changed and new files. `git diff --check`, pin
-verification, and Bash syntax checks passed. No child reviewer was used.
+verification, and Bash syntax checks passed.
 The reference checkout HEAD remains `adccedea76c7049c78c9404332afda50f84bb05a`.
 Only exported release source was changed.
 
