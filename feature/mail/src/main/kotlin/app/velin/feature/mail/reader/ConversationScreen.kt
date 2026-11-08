@@ -118,6 +118,8 @@ fun ConversationScreen(
     onEvent: (ConversationEvent) -> Unit,
     modifier: Modifier = Modifier,
     showBack: Boolean = true,
+    /** Loads inline image bytes by attachment id. Called off the main thread. */
+    loadAttachmentImage: (attachmentId: String) -> InlineImageData? = { null },
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val toolbarScrollBehavior = FloatingToolbarDefaults.exitAlwaysScrollBehavior(exitDirection = FloatingToolbarExitDirection.Bottom)
@@ -148,7 +150,7 @@ fun ConversationScreen(
                     title = stringResource(R.string.reader_not_found),
                 )
                 is ConversationUiState.Loaded -> {
-                    MessageList(state, onEvent)
+                    MessageList(state, onEvent, loadAttachmentImage)
                     val latest = state.conversation.messages.lastOrNull { !it.isDraft }
                     if (latest != null) {
                         ReplyToolbar(
@@ -190,7 +192,11 @@ private fun ConversationActions(conversation: ConversationUi, onEvent: (Conversa
 }
 
 @Composable
-private fun MessageList(state: ConversationUiState.Loaded, onEvent: (ConversationEvent) -> Unit) {
+private fun MessageList(
+    state: ConversationUiState.Loaded,
+    onEvent: (ConversationEvent) -> Unit,
+    loadAttachmentImage: (String) -> InlineImageData?,
+) {
     val conversation = state.conversation
     val listState = rememberLazyListState()
     val lastId = conversation.messages.lastOrNull()?.id
@@ -208,6 +214,7 @@ private fun MessageList(state: ConversationUiState.Loaded, onEvent: (Conversatio
                 initiallyExpanded = message.id == lastId || message.unread || message.isDraft,
                 remoteContentAllowed = message.id in state.remoteContentAllowed,
                 onEvent = onEvent,
+                loadAttachmentImage = loadAttachmentImage,
                 modifier = Modifier
                     .widthIn(max = READING_WIDTH)
                     .padding(horizontal = 16.dp, vertical = 4.dp),
@@ -247,6 +254,7 @@ private fun MessageCard(
     initiallyExpanded: Boolean,
     remoteContentAllowed: Boolean,
     onEvent: (ConversationEvent) -> Unit,
+    loadAttachmentImage: (String) -> InlineImageData?,
     modifier: Modifier = Modifier,
 ) {
     var expanded by rememberSaveable(message.id) { mutableStateOf(initiallyExpanded) }
@@ -289,6 +297,8 @@ private fun MessageCard(
                             html = body.html,
                             allowRemoteContent = remoteContentAllowed,
                             onLinkClick = { onEvent(ConversationEvent.OpenLink(it)) },
+                            // Unknown placeholders resolve to nothing: never guess an attachment.
+                            loadInlineImage = { url -> body.inlineImages[url]?.let(loadAttachmentImage) },
                         )
                     }
                     if (message.attachments.isNotEmpty()) {

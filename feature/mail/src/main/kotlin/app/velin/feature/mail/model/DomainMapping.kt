@@ -101,7 +101,7 @@ internal fun MailMessage.toUi(): MessageUi {
         isDraft = isDraft,
         body = when (val state = body) {
             BodyState.Loading -> BodyUi.Loading
-            is BodyState.Loaded -> BodyUi.Loaded(state.html)
+            is BodyState.Loaded -> BodyUi.Loaded(state.html, state.inlineImages.mapValues { it.value.value.toUiId() })
             is BodyState.Failed -> BodyUi.Failed
         },
         attachments = attachments

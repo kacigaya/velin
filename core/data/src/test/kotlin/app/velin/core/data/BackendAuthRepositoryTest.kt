@@ -253,7 +253,25 @@ class BackendAuthRepositoryTest {
             store.save(SavedCredentials("mail@example.invalid", "user", token, byteArrayOf(1, 2)))
             assertFalse(bytes.contentEquals(path.readBytes()))
             path.writeBytes(bytes.apply { this[lastIndex] = (this[lastIndex].toInt() xor 1).toByte() })
-            assertThrows(Exception::class.java) { reopened.all() }
+            assertThrows(javax.crypto.AEADBadTagException::class.java) { reopened.all() }
+            assertTrue(reopened.all().isEmpty())
+            reopened.save(SavedCredentials("new@example.invalid", "new", token, byteArrayOf(3)))
+            assertEquals("new", reopened.all().single().user)
+            reopened.remove("new")
+            assertTrue(reopened.all().isEmpty())
+        } finally { path.delete() }
+    }
+    @Test fun lostKeyDoesNotBlockNewSaveOrRemove() {
+        val original = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
+        val replacement = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
+        val path = java.io.File.createTempFile("lost-key", ".bin").apply { delete() }
+        try {
+            EncryptedCredentialStore(path) { original }.save(SavedCredentials("old@example.invalid", "old", token, byteArrayOf(1)))
+            val restored = EncryptedCredentialStore(path) { replacement }
+            restored.save(SavedCredentials("new@example.invalid", "new", token, byteArrayOf(2)))
+            assertEquals("new", restored.all().single().user)
+            restored.remove("new")
+            assertTrue(restored.all().isEmpty())
         } finally { path.delete() }
     }
 }

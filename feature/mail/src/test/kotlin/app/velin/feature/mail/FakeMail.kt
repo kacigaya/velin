@@ -68,6 +68,13 @@ internal class FakeMailRepo : MailRepository {
     val pages = mutableMapOf<FolderId, MutableStateFlow<MailPage>>()
     val moves = mutableListOf<Pair<List<MailId>, FolderId>>()
     var moveResult: Outcome<Unit> = Outcome.Success(Unit)
+    val consents = mutableListOf<MailId>()
+    var inline: Outcome<app.velin.core.domain.InlineImage> = Outcome.Failed(app.velin.core.domain.Failure.Unsupported)
+    override suspend fun allowExternalContent(account: AccountId, mailId: MailId): Outcome<Unit> {
+        consents += mailId
+        return Outcome.Success(Unit)
+    }
+    override suspend fun inlineImage(account: AccountId, id: AttachmentId): Outcome<app.velin.core.domain.InlineImage> = inline
     val conversation = MutableStateFlow<Outcome<Conversation>>(Outcome.Failed(app.velin.core.domain.Failure.Offline))
 
     override fun messages(account: AccountId, folder: FolderId): Flow<MailPage> =

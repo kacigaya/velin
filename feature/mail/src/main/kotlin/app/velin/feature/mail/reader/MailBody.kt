@@ -26,6 +26,8 @@ import java.io.ByteArrayInputStream
  * - JavaScript, file and content access are off.
  * - A Content-Security-Policy blocks every remote load unless [allowRemoteContent] is true.
  *   Request interception enforces the same rule as a second layer.
+ * - Inline (cid:) images use placeholder URLs on [INLINE_IMAGE_HOST]. They are always answered
+ *   locally through [loadInlineImage] and never reach the network.
  * - Navigation never happens in place; links go to [onLinkClick].
  * Sanitizing the HTML stays the data layer's job. This view only limits what clean HTML can do.
  */
@@ -34,6 +36,7 @@ fun MailBody(
     html: String,
     allowRemoteContent: Boolean,
     onLinkClick: (Uri) -> Unit,
+    loadInlineImage: InlineImageLoader,
     modifier: Modifier = Modifier,
 ) {
     val textColor = MaterialTheme.colorScheme.onSurface
@@ -41,6 +44,7 @@ fun MailBody(
     val dark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     val currentOnLinkClick = rememberUpdatedState(onLinkClick)
     val currentAllowRemote = rememberUpdatedState(allowRemoteContent)
+    val currentLoader = rememberUpdatedState(loadInlineImage)
     val document = mailDocument(html, textColor, linkColor, allowRemoteContent)
 
     AndroidView(
@@ -72,17 +76,23 @@ fun MailBody(
                         return true
                     }
 
+                    // Runs on a WebView background thread, so the loader may block.
                     override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
-                        val scheme = request.url.scheme?.lowercase()
+                        val url = request.url
+                        val scheme = url.scheme?.lowercase()
+                        if (scheme == "https" && url.host == INLINE_IMAGE_HOST) {
+                            val image = currentLoader.value.load(url.toString()) ?: return emptyResponse()
+                            return WebResourceResponse(image.mimeType, null, ByteArrayInputStream(image.bytes))
+                        }
                         val remote = scheme == "http" || scheme == "https"
                         return if (remote && currentAllowRemote.value) null else emptyResponse()
                     }
                 }
             }
         },
+        // No blockNetworkLoads: it can stop the inline placeholder requests before interception.
+        // The CSP and shouldInterceptRequest above keep remote loads blocked.
         update = { webView ->
-            webView.settings.blockNetworkImage = !allowRemoteContent
-            webView.settings.blockNetworkLoads = !allowRemoteContent
             if (webView.tag != document) {
                 webView.tag = document
                 // Null base URL: relative URLs resolve to about:blank, never to a real origin.
@@ -93,10 +103,21 @@ fun MailBody(
     )
 }
 
+/** Data layer placeholder host for inline images (docs/backend/M3-READ-PATH.md). */
+internal const val INLINE_IMAGE_HOST = "velin.invalid"
+
+data class InlineImageData(val bytes: ByteArray, val mimeType: String)
+
+/** Resolves an inline placeholder URL. Called off the main thread; may block; null hides the image. */
+fun interface InlineImageLoader {
+    fun load(url: String): InlineImageData?
+}
+
 private fun emptyResponse() = WebResourceResponse("text/plain", "utf-8", ByteArrayInputStream(ByteArray(0)))
 
 internal fun mailDocument(html: String, text: Color, link: Color, allowRemoteContent: Boolean): String {
-    val imageSources = if (allowRemoteContent) "data: https:" else "data:"
+    val inline = "https://$INLINE_IMAGE_HOST"
+    val imageSources = if (allowRemoteContent) "data: $inline https:" else "data: $inline"
     val csp = "default-src 'none'; img-src $imageSources; style-src 'unsafe-inline'; font-src data:; media-src 'none'; frame-src 'none'; form-action 'none'"
     return buildString {
         append("<!DOCTYPE html><html><head><meta charset=\"utf-8\">")

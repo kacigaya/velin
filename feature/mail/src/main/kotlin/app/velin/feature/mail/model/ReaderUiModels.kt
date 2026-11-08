@@ -19,7 +19,8 @@ data class AttachmentUi(
 /** Body state. [html] must already be sanitized by the data layer; the view never cleans it. */
 sealed interface BodyUi {
     data object Loading : BodyUi
-    data class Loaded(val html: String) : BodyUi
+    /** [inlineImages] maps placeholder URLs in [html] to attachment ids. */
+    data class Loaded(val html: String, val inlineImages: Map<String, String> = emptyMap()) : BodyUi
     data object Failed : BodyUi
 }
 

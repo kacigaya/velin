@@ -26,7 +26,13 @@ internal class EncryptedCredentialStore(file: File, private val key: () -> Secre
             require(it.channel.size() <= 1024 * 1024)
             it.readBytes()
         }
-        val plaintext = CredentialCipher.decrypt(key(), encrypted)
+        val plaintext = try { CredentialCipher.decrypt(key(), encrypted) }
+        catch (e: javax.crypto.AEADBadTagException) {
+            // Lost restore keys and modified ciphertext cannot recover any account.
+            // Delete only after authenticated decryption fails. Report this read once.
+            file.delete()
+            throw e
+        }
         try {
             return DataInputStream(ByteArrayInputStream(plaintext)).use { input ->
                 val count = input.readInt()
@@ -42,8 +48,10 @@ internal class EncryptedCredentialStore(file: File, private val key: () -> Secre
             }
         } finally { plaintext.fill(0) }
     }
-    @Synchronized override fun save(credentials: SavedCredentials) = write(all().filter { it.user != credentials.user } + credentials)
-    @Synchronized override fun remove(user: String) = write(all().filter { it.user != user })
+    @Synchronized override fun save(credentials: SavedCredentials) = write(forWrite().filter { it.user != credentials.user } + credentials)
+    @Synchronized override fun remove(user: String) = write(forWrite().filter { it.user != user })
+    private fun forWrite(): List<SavedCredentials> = try { all() }
+        catch (_: javax.crypto.AEADBadTagException) { emptyList() }
     private fun write(accounts: List<SavedCredentials>) {
         require(accounts.size <= 100)
         val buffer = object : ByteArrayOutputStream() {
