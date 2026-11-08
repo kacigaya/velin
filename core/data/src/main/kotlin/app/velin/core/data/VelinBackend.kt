@@ -3,6 +3,7 @@ package app.velin.core.data
 import android.content.Context
 import app.velin.core.domain.AuthRepository
 import app.velin.core.network.HttpTransport
+import app.velin.core.network.CounterEvents
 import app.velin.core.sdk.*
 import java.io.File
 import java.io.FileNotFoundException
@@ -21,7 +22,10 @@ class VelinBackend(context: Context, readSource: MailReadSource? = null) {
         val engine = SdkEngine(baseUrl, transport, PrivateSdkContentStore())
         try {
             val session = engine.resume(SessionCredentials.internalAccount(c.login, c.user, c.token, c.encryptedKey))
-            ActiveSdkSession(session, engine)
+            val counters = CounterEvents(URI(baseUrl), c.user, c.token)
+            val counterJob = watchCounters(c.user, counters)
+            counters.start()
+            ActiveSdkSession(session, engine, counters, counterJob)
         } catch (e: Throwable) { engine.close(); throw e }
     }, scope)
     private val reads = BackendReadRepository(readSource ?: SdkMailReadSource(repository), File(context.applicationContext.cacheDir, "mail-attachments"))
@@ -37,6 +41,12 @@ class VelinBackend(context: Context, readSource: MailReadSource? = null) {
                 if (next != active) reads.clear()
                 active = next
             }
+        }
+    }
+    private fun watchCounters(user: String, counters: CounterEvents): Job = scope.launch {
+        counters.changes.collect {
+            val account = app.velin.core.domain.AccountId(app.velin.core.domain.ElementId(user))
+            if ((repository.state.value as? app.velin.core.domain.AuthState.Active)?.account?.id == account) reads.sync(account)
         }
     }
     suspend fun close() {
