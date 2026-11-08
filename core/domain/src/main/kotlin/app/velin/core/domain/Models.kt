@@ -68,7 +68,7 @@ sealed interface Failure {
     data object Decryption : Failure
     data object InvalidSoftwareVersion : Failure
     data object Unsupported : Failure
-    data class Protocol(val status: Int) : Failure
+    data class Protocol(val status: Int, val diagnostic: String? = null) : Failure
 }
 sealed interface Outcome<out T> {
     data class Success<T>(val value: T) : Outcome<T>

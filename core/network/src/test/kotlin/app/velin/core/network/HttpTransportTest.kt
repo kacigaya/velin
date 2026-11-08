@@ -61,4 +61,17 @@ class HttpTransportTest {
         assertTrue(connection.closed)
         Unit
     }
+    @Test fun trustedBlobOriginRequiresTlsAndStillDisablesRedirects() = runBlocking {
+        val connection = FakeConnection(200, byteArrayOf(1))
+        val transport = HttpTransport(URI("https://invalid.example"), 1024) { connection }
+        val request = BinaryRequest("https://blob.example/rest", RequestMethod.GET, emptyMap(), null, true)
+        assertEquals(200, transport.request(request).status)
+        assertFalse(connection.instanceFollowRedirects)
+        for (url in listOf("http://blob.example/rest", "https://user@blob.example/rest", "https://blob.example/rest#fragment")) {
+            try { transport.request(request.copy(url = url)); fail() }
+            catch (e: TransportException) { assertEquals(TransportFailure.InvalidUrl, e.failure) }
+        }
+        Unit
+    }
+
 }

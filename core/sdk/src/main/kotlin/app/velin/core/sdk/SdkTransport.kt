@@ -4,7 +4,7 @@ import de.tutao.tutasdk.*
 
 enum class RequestMethod { GET, POST, PUT, DELETE }
 data class BinaryRequest(val url: String, val method: RequestMethod,
-    val headers: Map<String, String>, val body: ByteArray?)
+    val headers: Map<String, String>, val body: ByteArray?, val trustedBlobServer: Boolean = false)
 data class BinaryResponse(val status: Int, val headers: Map<String, String>, val body: ByteArray?)
 enum class TransportFailure { Network, InvalidUrl, Tls, InvalidRequest, InvalidResponse }
 class TransportException(val failure: TransportFailure) : Exception(failure.name)
@@ -13,9 +13,13 @@ fun interface BinaryTransport {
 }
 
 internal class SdkRestClient(private val transport: BinaryTransport) : RestClient {
-    override suspend fun requestBinary(url: String, method: HttpMethod, options: RestClientOptions): RestResponse {
+    override suspend fun velinBlobBinary(url: String, method: HttpMethod, options: RestClientOptions): RestResponse =
+        request(url, method, options, true)
+    override suspend fun requestBinary(url: String, method: HttpMethod, options: RestClientOptions): RestResponse =
+        request(url, method, options, false)
+    private suspend fun request(url: String, method: HttpMethod, options: RestClientOptions, blob: Boolean): RestResponse {
         val response = try {
-            transport.request(BinaryRequest(url, RequestMethod.valueOf(method.name), options.headers, options.body))
+            transport.request(BinaryRequest(url, RequestMethod.valueOf(method.name), options.headers, options.body, blob))
         } catch (e: TransportException) {
             throw when (e.failure) {
                 TransportFailure.Network -> RestClientException.NetworkException()
