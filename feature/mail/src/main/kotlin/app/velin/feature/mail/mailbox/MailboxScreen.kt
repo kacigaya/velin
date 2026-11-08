@@ -367,12 +367,13 @@ private fun SelectionTopBar(state: MailboxUiState, onEvent: (MailboxEvent) -> Un
                     Icon(painterResource(VelinIcons.MarkUnread), stringResource(R.string.action_mark_unread))
                 }
             }
-            IconButton(onClick = { onEvent(MailboxEvent.Move(ids)) }) {
-                Icon(painterResource(VelinIcons.Move), stringResource(R.string.action_move))
-            }
-            IconButton(onClick = { onEvent(MailboxEvent.Label(ids)) }) {
-                Icon(painterResource(VelinIcons.Label), stringResource(R.string.action_label))
-            }
+            OverflowMenu(
+                listOf(
+                    OverflowAction(stringResource(R.string.action_move), VelinIcons.Move) { onEvent(MailboxEvent.Move(ids)) },
+                    OverflowAction(stringResource(R.string.action_label), VelinIcons.Label) { onEvent(MailboxEvent.Label(ids)) },
+                    OverflowAction(stringResource(R.string.action_report_spam), VelinIcons.Report) { onEvent(MailboxEvent.ReportSpam(ids)) },
+                ),
+            )
         },
         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     )

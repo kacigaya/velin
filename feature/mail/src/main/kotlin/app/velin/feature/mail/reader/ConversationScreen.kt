@@ -64,6 +64,8 @@ import app.velin.core.designsystem.component.StatusMessage
 import app.velin.core.designsystem.icon.VelinIcons
 import app.velin.feature.mail.R
 import app.velin.feature.mail.mailbox.LabelChip
+import app.velin.feature.mail.mailbox.OverflowAction
+import app.velin.feature.mail.mailbox.OverflowMenu
 import app.velin.feature.mail.mailbox.formatListDate
 import app.velin.feature.mail.model.AttachmentUi
 import app.velin.feature.mail.model.BodyUi
@@ -178,12 +180,13 @@ private fun ConversationActions(conversation: ConversationUi, onEvent: (Conversa
     IconButton(onClick = { onEvent(ConversationEvent.MarkUnread) }) {
         Icon(painterResource(VelinIcons.MarkUnread), stringResource(R.string.action_mark_unread))
     }
-    IconButton(onClick = { onEvent(ConversationEvent.Move) }) {
-        Icon(painterResource(VelinIcons.Move), stringResource(R.string.action_move))
-    }
-    IconButton(onClick = { onEvent(ConversationEvent.Label) }) {
-        Icon(painterResource(VelinIcons.Label), stringResource(R.string.action_label))
-    }
+    OverflowMenu(
+        listOf(
+            OverflowAction(stringResource(R.string.action_move), VelinIcons.Move) { onEvent(ConversationEvent.Move) },
+            OverflowAction(stringResource(R.string.action_label), VelinIcons.Label) { onEvent(ConversationEvent.Label) },
+            OverflowAction(stringResource(R.string.action_report_spam), VelinIcons.Report) { onEvent(ConversationEvent.ReportSpam) },
+        ),
+    )
 }
 
 @Composable
