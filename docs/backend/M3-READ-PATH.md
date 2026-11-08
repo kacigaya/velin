@@ -1,5 +1,10 @@
 # M3 read-path handoff
 
+Historical handoff. The active release pin and version rules are in
+[RELEASE-PIN.md](RELEASE-PIN.md). Current SDK read support is in
+[M3B-READ-SOURCE.md](M3B-READ-SOURCE.md). Old master citations below describe
+the earlier implementation only.
+
 M3 is incomplete. This branch supplies an offline read pipeline, domain contracts, sanitizer changes, and credential recovery. It does not supply a production Tuta read adapter. Do not mark the roadmap milestone complete or replace the app's sample mailbox with the default backend yet.
 
 No live Tuta request was sent. No push or merge was performed. The reference checkout was not changed. No app, feature, or design-system source was changed.

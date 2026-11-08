@@ -12,6 +12,8 @@ mkdir -p "$out/source" "$out/artifacts"
 # Export tracked source only. Never modify the reference checkout.
 git -C "$reference" archive "$ref" | tar -x -C "$out/source"
 python3 "$root/tools/backend/check-pin.py" "$out/source"
+cat "$root/tools/backend/overlay/mail_read.rs" >> "$out/source/tuta-sdk/rust/sdk/src/mail_facade.rs"
+python3 "$root/tools/backend/overlay/guard-crypto.py" "$out/source"
 if [[ ! -f "$out/ndk.zip" ]]; then
   curl -fL --retry 3 https://dl.google.com/android/repository/android-ndk-r29-linux.zip -o "$out/ndk.zip"
 fi
@@ -53,6 +55,7 @@ mkdir -p "$out/artifacts/notices"
 cp LICENSE.txt "$out/artifacts/notices/TUTA-LICENSE.txt"
 printf '%s\n' "$ref" > "$out/artifacts/UPSTREAM_COMMIT"
 (cd "$out" && sha256sum ndk.zip source/Cargo.lock source/tuta-sdk/rust/sdk/uniffi.toml) > "$out/artifacts/INPUTS-SHA256"
+(cd "$root" && sha256sum tools/backend/overlay/* tools/backend/build-sdk.sh) > "$out/artifacts/OVERLAY-SHA256"
 rustc --version > "$out/artifacts/TOOLCHAIN"
 clang --version >> "$out/artifacts/TOOLCHAIN"
 (cd "$out/artifacts" && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)

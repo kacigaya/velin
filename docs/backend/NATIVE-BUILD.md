@@ -15,6 +15,8 @@ Only the NDK sysroot and target runtime archives are extracted. ARM-native clang
 
 Output is in `core/sdk/build/native/artifacts`. It includes JNI libraries, internal Kotlin bindings, license, tool versions, reference commit, and `SHA256SUMS`. Gradle verifies that manifest before building. Native binaries and bindings stay in ignored build output. A clean checkout must run the script first. Reproducible here means pinned inputs and repeatable commands; byte-identical output across host toolchain versions is not claimed.
 
-The SDK adapter keeps generated records internal. JNA 5.18.0 is required by upstream UniFFI's Kotlin generator. Coroutines support its async callbacks. No extra UniFFI export or upstream patch is needed for the current transport and Argon2id adapter.
+The SDK adapter keeps generated records internal. JNA 5.18.0 is required by upstream UniFFI's Kotlin generator. Coroutines support its async callbacks. The transport and Argon2id adapter use upstream exports. Mail reads add the
+Velin-owned overlay in `tools/backend/overlay`. The build applies it only to
+the exported copy. Gradle checks overlay hashes against the built artifacts.
 
 The pinned Rust dependency graph has known advisories. See `dependency-advisories.json` for exact packages, OSV IDs, aliases, severities when supplied, and fixed ranges. Release requires dependency remediation and a new compatibility check. The fixed reference is retained for this implementation task. A successful offline build does not prove those advisories harmless.
