@@ -6,7 +6,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.velin.core.designsystem.theme.VelinTheme
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import app.velin.feature.mail.composer.ComposerRecipientUi
+import app.velin.feature.mail.composer.ComposerScreen
+import app.velin.feature.mail.composer.ComposerUiState
 import app.velin.feature.mail.mailbox.FolderPane
+import app.velin.feature.mail.model.AttachmentUi
+import app.velin.feature.mail.model.RecipientUi
+import kotlinx.collections.immutable.persistentListOf
 import app.velin.feature.mail.mailbox.FolderPaneState
 import app.velin.feature.mail.mailbox.MailboxScreen
 import app.velin.feature.mail.mailbox.MailboxUiState
@@ -97,6 +104,27 @@ class MailScreenshotTest {
     fun conversation() = capture("conversation") {
         ConversationScreen(state = ConversationUiState.Loaded(SampleMail.conversation), onEvent = {})
     }
+
+    @Test
+    fun composer() = capture("composer") {
+        ComposerScreen(
+            state = ComposerUiState(
+                senders = persistentListOf("alex@tuta.com", "alex@tutanota.de"),
+                sender = "alex@tuta.com",
+                to = persistentListOf(
+                    ComposerRecipientUi(RecipientUi("Lena Fischer", "lena@tuta.com"), external = false),
+                    ComposerRecipientUi(RecipientUi("", "friend@example.com"), external = true),
+                ),
+                attachments = persistentListOf(AttachmentUi("a1", "itinerary.pdf", "application/pdf", 182_000)),
+                confidential = true,
+                canSend = true,
+            ),
+            subject = rememberTextFieldState("Trip plans"),
+            body = rememberTextFieldState("Hi both,\n\nHere is the plan for Saturday."),
+            onEvent = {},
+        )
+    }
 }
+
 
 private const val SETTLE_MS = 1_000L
