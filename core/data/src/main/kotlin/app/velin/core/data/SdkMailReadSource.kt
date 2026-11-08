@@ -9,7 +9,7 @@ internal interface SessionReadAccess {
     suspend fun <T> read(account: AccountId, operation: suspend (SdkMailReader) -> Outcome<T>): Outcome<T>
 }
 
-/** Read-only adapter. Bodies and files fail closed until their key providers exist. */
+/** Read-only adapter. Sender authentication remains unverified. */
 internal class SdkMailReadSource(private val sessions: SessionReadAccess) : MailReadSource {
     override suspend fun mailbox(account: AccountId): Outcome<MailboxSnapshot> = read(account) { sdk ->
         val sets = sdk.folders()
@@ -22,8 +22,8 @@ internal class SdkMailReadSource(private val sessions: SessionReadAccess) : Mail
     }
     /**
      * Upstream receives unread counts over the event bus (WebsocketCounterData, MailModel.ts:455-478),
-     * not from CounterService GET, which the server rejects with 400 for mail folders. Until the
-     * event bus exists (M4) the count is best effort, so one counter never blocks the folder list.
+     * not from CounterService GET, which the server rejects with 400 for mail folders.
+     * Counts remain best effort during connection setup and reconnect.
      */
     private suspend fun unreadOrZero(sdk: SdkMailReader, folder: ReadFolder): Int = try {
         sdk.unread(folder).takeIf { it in 0..Int.MAX_VALUE.toLong() }?.toInt() ?: 0
@@ -38,22 +38,45 @@ internal class SdkMailReadSource(private val sessions: SessionReadAccess) : Mail
         val summaries = entries.map { entry -> summary(sdk.summary(entry.mail), sets) }
         MailPage(summaries, if (entries.size == 50) PageCursor(ElementId(entries.last().cursor)) else null)
     }
-    override suspend fun conversation(account: AccountId, id: ConversationId): Outcome<List<MailSummary>> = Outcome.Failed(Failure.Unsupported)
-    override suspend fun message(account: AccountId, id: MailId): Outcome<MailMessage> = Outcome.Failed(Failure.Unsupported)
-    override suspend fun body(account: AccountId, id: MailId): Outcome<String> = Outcome.Failed(Failure.Decryption)
-    override suspend fun attachment(account: AccountId, id: AttachmentId): Outcome<AttachmentContent> = Outcome.Failed(Failure.Unsupported)
+    override suspend fun conversation(account: AccountId, id: ConversationId): Outcome<List<MailSummary>> = read(account) { sdk ->
+        val sets = sdk.folders()
+        sdk.conversation(id.value.readId()).map { summary(sdk.summary(it), sets).copy(conversationId = id) }
+            .distinctBy { it.id }.sortedBy { it.receivedAt }
+    }
+    override suspend fun message(account: AccountId, id: MailId): Outcome<MailMessage> = read(account) { sdk ->
+        val mail = sdk.message(id.value.readId())
+        require(mail.id.domain() == id.value)
+        MailMessage(id, mail.sender.address(), mail.to.map { it.address() }, mail.cc.map { it.address() },
+            mail.bcc.map { it.address() }, mail.replyTo.map { it.address() }, mail.subject,
+            Instant.ofEpochMilli(mail.sentMillis), mail.confidential, mail.unread, mail.draft,
+            BodyState.Loading, mail.attachments.map { it.domainAttachment() }, MailAuthentication.Unknown,
+            when {
+                mail.phishing == 1L -> MailFinding.Phishing
+                mail.mailAuthStatus in listOf(1L, 3L, 4L) -> MailFinding.AuthenticationFailed
+                mail.encryptionAuth == 5L -> MailFinding.DeprecatedSenderKey
+                else -> MailFinding.AuthenticationUncertain
+            }, mail.scheduledMillis?.let(Instant::ofEpochMilli))
+    }
+    override suspend fun body(account: AccountId, id: MailId): Outcome<String> = read(account) { sdk ->
+        sdk.message(id.value.readId()).also { require(it.id.domain() == id.value) }.body
+    }
+    override suspend fun attachment(account: AccountId, id: AttachmentId): Outcome<AttachmentContent> = read(account) { sdk ->
+        val content = sdk.attachment(id.value.readId())
+        require(content.metadata.id.domain() == id.value && content.metadata.size == content.bytes.size.toLong())
+        AttachmentContent(content.metadata.domainAttachment(), content.bytes)
+    }
 
     private suspend fun <T : Any> read(account: AccountId, operation: suspend (SdkMailReader) -> T?): Outcome<T> =
         sessions.read(account) { sdk ->
             try { operation(sdk)?.let { Outcome.Success(it) } ?: Outcome.Failed(Failure.Protocol(404)) }
             catch (e: CancellationException) { throw e }
             catch (e: SdkException) { Outcome.Failed(when (e.failure) {
-                SdkFailure.SecureExternalUnsupported -> Failure.Unsupported
+                SdkFailure.SecureExternalUnsupported, SdkFailure.AttachmentsUnsupported -> Failure.Unsupported
                 SdkFailure.Network -> Failure.Offline
                 SdkFailure.InvalidAccessToken -> Failure.Unauthorized
                 SdkFailure.InvalidSoftwareVersion -> Failure.InvalidSoftwareVersion
                 SdkFailure.InvalidKey -> Failure.Decryption
-                else -> Failure.Protocol(502)
+                else -> Failure.Protocol(502, e.diagnostic)
             }) }
             catch (_: IllegalArgumentException) { Outcome.Failed(Failure.Protocol(502)) }
             catch (_: IllegalStateException) { Outcome.Failed(Failure.Protocol(502)) }
@@ -80,3 +103,8 @@ internal fun summary(mail: ReadSummary, sets: List<ReadFolder>): MailSummary = M
         0L -> ReplyType.None; 1L -> ReplyType.Replied; 2L -> ReplyType.Forwarded; 3L -> ReplyType.RepliedAndForwarded
         else -> throw IllegalArgumentException("Unknown reply type")
     }, sets.filter { it.kind == 8L && it.id in mail.sets }.map { Label(LabelId(it.id.domain()), it.name, it.color) }, 1)
+
+private fun EntityId.readId() = ReadId(list.value, element.value)
+private fun ReadAddress.address() = Address(address, name)
+
+private fun ReadAttachment.domainAttachment() = Attachment(AttachmentId(id.domain()), name, mimeType, size, cid)

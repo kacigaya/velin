@@ -5,6 +5,7 @@ plugins { alias(libs.plugins.android.library) }
 android {
     namespace = "app.velin.core.sdk"
     compileSdk = 37
+    buildFeatures { buildConfig = true }
     defaultConfig {
         minSdk = 26
         consumerProguardFiles("consumer-rules.pro")

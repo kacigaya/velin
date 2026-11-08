@@ -37,7 +37,7 @@ internal class BackendAuthRepository(
         val active = mutableState.value as? AuthState.Active
         val loaded = session as? ActiveSdkSession
         if (active?.account?.id != account || loaded == null) Outcome.Failed(Failure.Unauthorized)
-        else operation(loaded.session.mail)
+        else operation(loaded.mail)
     }
 
     suspend fun initialize() = withContext(Dispatchers.IO) {
@@ -274,6 +274,15 @@ internal fun authError(e: Exception, code: Boolean = false): AuthError = when (e
     else -> AuthError.Unknown
 }
 
-internal class ActiveSdkSession(val session: SdkSession, private val engine: SdkEngine) : AutoCloseable {
-    override fun close() { try { session.close() } finally { engine.close() } }
+internal class ActiveSdkSession(val session: SdkSession, private val engine: SdkEngine,
+    private val counters: app.velin.core.network.CounterEvents? = null,
+    private val counterJob: Job? = null) : AutoCloseable {
+    val mail: SdkMailReader = object : SdkMailReader by session.mail {
+        override suspend fun unread(folder: ReadFolder): Long = counters?.unread(folder.ownerGroup, folder.id.element) ?: 0
+    }
+    override fun close() {
+        counterJob?.cancel()
+        counters?.close()
+        try { session.close() } finally { engine.close() }
+    }
 }

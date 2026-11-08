@@ -18,8 +18,25 @@ class SessionCredentials internal constructor(internal val login: String, intern
     }
 }
 enum class SdkFailure { InvalidAccessToken, InvalidPassphrase, InvalidKey, Network, Tls,
-    InvalidSoftwareVersion, TooManyAttempts, Protocol, Internal, SecureExternalUnsupported }
-class SdkException(val failure: SdkFailure) : Exception(failure.name)
+    InvalidSoftwareVersion, TooManyAttempts, Protocol, Internal, SecureExternalUnsupported, AttachmentsUnsupported }
+class SdkException(val failure: SdkFailure, val diagnostic: String? = null) : Exception(
+    listOfNotNull(failure.name, diagnostic).joinToString(": "))
+
+/** Only local type names and reviewed static messages can cross the debug boundary. */
+internal fun apiException(error: ApiCallException): SdkException = SdkException(mapApiFailure(error),
+    if (BuildConfig.DEBUG) apiDiagnostic(error) else null)
+
+internal fun apiDiagnostic(error: ApiCallException): String = when (error) {
+    is ApiCallException.RestClient -> "RestClientError." + error.source.javaClass.simpleName
+    is ApiCallException.ServerResponseException -> "HttpError." + error.source.javaClass.simpleName
+    is ApiCallException.VelinSecureExternalUnsupported -> "SecureExternalUnsupported"
+    is ApiCallException.InternalSdkException -> "InternalSdkError:" + when (error.errorMessage) {
+        "Missing mail details reference", "Invalid draft decryption", "Invalid received decryption",
+        "Missing or duplicate mail details", "Invalid blob response", "Invalid blob server scheme",
+        "Velin details read failed", "Velin conversation read failed" -> error.errorMessage
+        else -> "redacted"
+    }
+}
 
 /** Resumes existing internal accounts only. New session orchestration belongs to M2. */
 class SdkEngine(baseUrl: String, transport: BinaryTransport, store: SdkContentStore) : AutoCloseable {
@@ -39,7 +56,7 @@ class SdkEngine(baseUrl: String, transport: BinaryTransport, store: SdkContentSt
     } catch (_: LoginException.InvalidAccessToken) { throw SdkException(SdkFailure.InvalidAccessToken)
     } catch (_: LoginException.InvalidPassphrase) { throw SdkException(SdkFailure.InvalidPassphrase)
     } catch (_: LoginException.InvalidKey) { throw SdkException(SdkFailure.InvalidKey)
-    } catch (e: LoginException.ApiCall) { throw SdkException(mapApiFailure(e.source)) }
+    } catch (e: LoginException.ApiCall) { throw apiException(e.source) }
     override fun close() { sdk.close() }
 }
 

@@ -37,10 +37,16 @@ class SdkMailReadSourceTest {
             requested = list to cursor
             return rows
         }
+        var file: ReadAttachmentContent? = null
+        override suspend fun attachment(id: ReadId): ReadAttachmentContent = file ?: throw SdkException(SdkFailure.AttachmentsUnsupported)
+        var loadedMessage: ReadMessage? = null
+        var conversationMails: List<ReadId> = emptyList()
+        override suspend fun message(id: ReadId): ReadMessage = loadedMessage ?: throw SdkException(SdkFailure.InvalidKey)
+        override suspend fun conversation(id: ReadId): List<ReadId> = conversationMails
         override suspend fun summary(id: ReadId): ReadSummary {
             summaryFailure?.let { throw SdkException(it) }
             return ReadSummary(id, ReadId("conversations", id.element),
-            "sender@example.invalid", "Sender", "Subject", 1700000000000, true, false, true, 1,
+            "sender@example.invalid", "Sender", "Subject", if (id.element == "one") 1700000000000 else 1700000000001, true, false, true, 1,
             listOf(ReadId("folders", "label")))
         }
     }
@@ -92,6 +98,48 @@ class SdkMailReadSourceTest {
         assertEquals(Outcome.Failed(Failure.Unsupported),
             source(reader).page(account, FolderId(inbox.id.domain()), null))
     }
+    @Test fun receivedBodyAndFindingsKeepAuthenticationUnknown() = runBlocking {
+        val id = ReadId("mails", "one")
+        val reader = Reader().apply { loadedMessage = readMessage(id).copy(phishing = 1, encryptionAuth = 5) }
+        val source = source(reader)
+        val loaded = source.message(account, MailId(id.domain())) as Outcome.Success
+        assertEquals(MailAuthentication.Unknown, loaded.value.authentication)
+        assertEquals(MailFinding.Phishing, loaded.value.finding)
+        assertEquals(BodyState.Loading, loaded.value.body)
+        assertEquals(Outcome.Success("<p>Body</p>"), source.body(account, MailId(id.domain())))
+        reader.loadedMessage = readMessage(id).copy(phishing = 0, encryptionAuth = 5, draft = true)
+        val draft = (source.message(account, MailId(id.domain())) as Outcome.Success).value
+        assertTrue(draft.isDraft)
+        assertEquals(MailFinding.DeprecatedSenderKey, draft.finding)
+    }
+    @Test fun conversationUsesEntryListAndSortsMessages() = runBlocking {
+        val reader = Reader().apply { conversationMails = listOf(ReadId("mails", "two"), ReadId("mails", "one"), ReadId("mails", "one")) }
+        val id = ConversationId(ReadId("conversation", "entry").domain())
+        val result = source(reader).conversation(account, id) as Outcome.Success
+        assertEquals(listOf("one", "two"), result.value.map { it.id.value.element.value })
+        assertTrue(result.value.all { it.conversationId == id })
+        assertEquals(Outcome.Failed(Failure.Unauthorized), source(reader, false).conversation(account, id))
+    }
+    @Test fun attachmentsPreserveMetadataAndDoNotBlockBody() = runBlocking {
+        val id = ReadId("mails", "one")
+        val file = ReadAttachment(ReadId("files", "one"), "image.png", "image/png", 3, "logo")
+        val reader = Reader().apply {
+            loadedMessage = readMessage(id).copy(attachments = listOf(file))
+            this.file = ReadAttachmentContent(file, byteArrayOf(1, 2, 3))
+        }
+        val source = source(reader)
+        val message = (source.message(account, MailId(id.domain())) as Outcome.Success).value
+        assertEquals("logo", message.attachments.single().contentId)
+        assertEquals(Outcome.Success("<p>Body</p>"), source.body(account, MailId(id.domain())))
+        val content = (source.attachment(account, AttachmentId(file.id.domain())) as Outcome.Success).value
+        assertArrayEquals(byteArrayOf(1, 2, 3), content.bytes)
+        assertEquals(Outcome.Failed(Failure.Unauthorized), source(reader, false).attachment(account, AttachmentId(file.id.domain())))
+        reader.file = ReadAttachmentContent(file.copy(size = 4), byteArrayOf(1, 2, 3))
+        assertTrue(source.attachment(account, AttachmentId(file.id.domain())) is Outcome.Failed)
+    }
+    private fun readMessage(id: ReadId) = ReadMessage(id, ReadAddress("from@example.invalid", "Sender"),
+        emptyList(), emptyList(), emptyList(), emptyList(), "Subject", 1700000000000, true, true,
+        false, 0, null, "<p>Body</p>", null)
     @Test fun bodiesAndFilesRemainExplicitFailures() = runBlocking {
         val source = source(Reader())
         assertEquals(Outcome.Failed(Failure.Decryption), source.body(account, MailId(ReadId("m", "m").domain())))

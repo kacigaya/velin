@@ -68,6 +68,53 @@ impl MailFacade {
         .unwrap_or_else(|_| Err(ApiCallError::internal("Velin entry read failed".into())))
     }
 
+    pub async fn velin_details(&self, id: IdTupleGenerated) -> Result<crate::entities::generated::tutanota::MailDetails, ApiCallError> {
+        use crate::entities::generated::storage::{BlobAccessTokenPostIn, BlobReadData};
+        use crate::services::generated::storage::BlobAccessTokenService;
+        AssertUnwindSafe(async {
+            let mail: Mail = self.crypto_entity_client.load(&id).await?;
+            if !mail._errors.is_empty() { return Err(ApiCallError::internal("Mail decryption failed".into())); }
+            let access = if mail.mailDetailsDraft.is_some() { None } else {
+                let details = mail.mailDetails.as_ref().ok_or_else(|| ApiCallError::internal("Missing mail details".into()))?;
+                Some(self.service_executor.post::<BlobAccessTokenService>(BlobAccessTokenPostIn {
+                    _format: 0, archiveDataType: None, write: None,
+                    read: Some(BlobReadData { _id: None, archiveId: details.list_id.clone(), instanceListId: None, instanceIds: vec![] }),
+                }, Default::default()).await?.blobAccessInfo)
+            };
+            self.crypto_entity_client.velin_details(mail, access).await
+        }).catch_unwind().await.unwrap_or_else(|_| Err(ApiCallError::internal("Velin details read failed".into())))
+    }
+
+    // ConversationViewModel.ts:232 loads the entry list, not a linked chain.
+    pub async fn velin_conversation(&self, list: GeneratedId) -> Result<Vec<crate::entities::generated::tutanota::ConversationEntry>, ApiCallError> {
+        AssertUnwindSafe(self.crypto_entity_client.load_all(&list, ListLoadDirection::ASC))
+            .catch_unwind().await.unwrap_or_else(|_| Err(ApiCallError::internal("Velin conversation read failed".into())))
+    }
+
+    pub async fn velin_attachment(&self, mail: IdTupleGenerated, id: IdTupleGenerated) -> Result<crate::entities::generated::tutanota::TutanotaFile, ApiCallError> {
+        AssertUnwindSafe(self.crypto_entity_client.velin_file(mail, id)).catch_unwind().await
+            .unwrap_or_else(|_| Err(ApiCallError::internal("Attachment read failed".into())))
+    }
+    pub async fn velin_attachment_content(&self, mail: IdTupleGenerated, id: IdTupleGenerated) -> Result<Vec<u8>, ApiCallError> {
+        use crate::entities::generated::storage::{BlobAccessTokenPostIn, BlobReadData, InstanceId};
+        use crate::services::generated::storage::BlobAccessTokenService;
+        AssertUnwindSafe(async {
+            let file = self.crypto_entity_client.velin_file(mail, id.clone()).await?;
+            if file.size < 0 || file.size > 20 * 1024 * 1024 || file.blobs.len() > 100 {
+                return Err(ApiCallError::internal("Attachment exceeds limit".into()));
+            }
+            let Some(blob) = file.blobs.first() else {
+                return if file.size == 0 { Ok(vec![]) } else { Err(ApiCallError::internal("Missing file blobs".into())) };
+            };
+            let access = self.service_executor.post::<BlobAccessTokenService>(BlobAccessTokenPostIn {
+                _format: 0, archiveDataType: Some(1), write: None,
+                read: Some(BlobReadData { _id: None, archiveId: blob.archiveId.clone(), instanceListId: Some(id.list_id),
+                    instanceIds: vec![InstanceId { _id: None, instanceId: Some(id.element_id) }] }),
+            }, Default::default()).await?.blobAccessInfo;
+            self.crypto_entity_client.velin_file_content(file, access).await
+        }).catch_unwind().await.unwrap_or_else(|_| Err(ApiCallError::internal("Attachment read failed".into())))
+    }
+
     pub async fn velin_mail(&self, id: IdTupleGenerated) -> Result<Mail, ApiCallError> {
         AssertUnwindSafe(self.crypto_entity_client.load(&id))
             .catch_unwind()
@@ -188,5 +235,51 @@ mod velin_wire_tests {
         assert_eq!(folder.entries.as_str(), "entries");
         assert_eq!(folder.parentFolder.unwrap().element_id.as_str(), "parent");
         assert!(folder._errors.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod velin_details_tests {
+    use super::*;
+    use crate::crypto_entity_client::MockCryptoEntityClient;
+    use crate::entities::generated::storage::{BlobAccessTokenPostOut, BlobServerAccessInfo};
+    use crate::entities::generated::tutanota::MailDetails;
+    use crate::services::generated::storage::BlobAccessTokenService;
+    use crate::services::service_executor::MockResolvingServiceExecutor;
+    use crate::user_facade::MockUserFacade;
+    use crate::util::test_utils::create_test_entity;
+
+    #[tokio::test]
+    async fn velin_received_details_request_archive_read_token() {
+        let mut client = MockCryptoEntityClient::default();
+        client.expect_load::<Mail, IdTupleGenerated>().returning(|_| Ok(Mail {
+            mailDetails: Some(IdTupleGenerated::new("archive".to_owned().into(), "details".to_owned().into())),
+            mailDetailsDraft: None, _ownerEncSessionKey: Some(vec![1, 2, 3]),
+            _ownerKeyVersion: Some(7), ..create_test_entity()
+        }));
+        client.expect_velin_details().withf(|mail, access| {
+            mail._ownerEncSessionKey == Some(vec![1, 2, 3]) && mail._ownerKeyVersion == Some(7) && access.is_some()
+        }).returning(|_, _| Ok(create_test_entity::<MailDetails>()));
+        let mut executor = MockResolvingServiceExecutor::default();
+        executor.expect_post::<BlobAccessTokenService>().withf(|data, _| {
+            let read = data.read.as_ref().unwrap();
+            data.archiveDataType.is_none() && data.write.is_none() &&
+                read.archiveId.as_str() == "archive" && read.instanceListId.is_none() && read.instanceIds.is_empty()
+        }).returning(|_, _| Ok(BlobAccessTokenPostOut { _format: 0, blobAccessInfo: create_test_entity::<BlobServerAccessInfo>() }));
+        let facade = MailFacade::new(Arc::new(client), Arc::new(MockUserFacade::default()), Arc::new(executor));
+        assert!(facade.velin_details(IdTupleGenerated::new("mails".to_owned().into(), "one".to_owned().into())).await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn velin_draft_details_do_not_request_blob_token() {
+        let mut client = MockCryptoEntityClient::default();
+        client.expect_load::<Mail, IdTupleGenerated>().returning(|_| Ok(Mail {
+            mailDetailsDraft: Some(IdTupleGenerated::new("drafts".to_owned().into(), "details".to_owned().into())),
+            ..create_test_entity()
+        }));
+        client.expect_velin_details().withf(|_, access| access.is_none())
+            .returning(|_, _| Ok(create_test_entity::<MailDetails>()));
+        let facade = MailFacade::new(Arc::new(client), Arc::new(MockUserFacade::default()), Arc::new(MockResolvingServiceExecutor::default()));
+        assert!(facade.velin_details(IdTupleGenerated::new("mails".to_owned().into(), "one".to_owned().into())).await.is_ok());
     }
 }

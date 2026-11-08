@@ -33,7 +33,7 @@ class HttpTransport internal constructor(private val origin: URI, private val ma
         val uri = try { URI(request.url) } catch (_: Exception) {
             throw TransportException(TransportFailure.InvalidUrl)
         }
-        if (uri.scheme != "https" || uri.host != origin.host || uri.port != origin.port || uri.userInfo != null || uri.fragment != null) {
+        if (uri.scheme != "https" || uri.host == null || (uri.host != origin.host || uri.port != origin.port) && !request.trustedBlobServer || uri.userInfo != null || uri.fragment != null) {
             throw TransportException(TransportFailure.InvalidUrl)
         }
         if (request.headers.any { (k, v) -> !k.matches(Regex("[!#$%&'*+.^_`|~0-9A-Za-z-]+")) || v.any { it == '\r' || it == '\n' } }) {
