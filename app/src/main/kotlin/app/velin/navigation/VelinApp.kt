@@ -159,6 +159,8 @@ private fun MailApp(account: Account, auth: AuthRepository, mailbox: MailboxRepo
                     ConversationScreen(
                         state = state,
                         onEvent = viewModel::onEvent,
+                        // List and detail share the screen from the same 840dp breakpoint.
+                        showBack = !permanent,
                         loadAttachmentImage = viewModel::loadAttachmentImage,
                     )
                 }
