@@ -11,6 +11,6 @@ import app.velin.navigation.AppGraph
 class VelinApplication : Application(), AppGraph {
     private val backend by lazy { VelinBackend(this) }
     override val auth: AuthRepository get() = backend.auth
-    override val mailbox: MailboxRepository? = null
-    override val mail: MailRepository? = null
+    override val mailbox: MailboxRepository get() = backend.mailbox
+    override val mail: MailRepository get() = backend.mail
 }

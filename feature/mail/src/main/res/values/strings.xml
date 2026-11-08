@@ -40,6 +40,8 @@
     <!-- Reader -->
     <string name="reader_loading">Loading conversation</string>
     <string name="reader_not_found">This mail is no longer available.</string>
+    <string name="reader_unsupported">Velin cannot open mail yet. This comes in the next version.</string>
+    <string name="reader_failed">Could not load this conversation. Check your connection.</string>
     <string name="reader_expanded">Expanded</string>
     <string name="reader_collapsed">Collapsed</string>
     <string name="reader_body_failed">Could not load this mail.</string>

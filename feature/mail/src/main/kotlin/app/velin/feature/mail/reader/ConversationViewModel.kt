@@ -56,7 +56,11 @@ class ConversationViewModel(
     val state: StateFlow<ConversationUiState> = combine(mail.conversation(account.id, conversationId), remoteAllowed) { outcome, allowed ->
         when (outcome) {
             is Outcome.Success -> ConversationUiState.Loaded(outcome.value.toUi(), allowed)
-            is Outcome.Failed -> ConversationUiState.NotFound
+            is Outcome.Failed -> when (val failure = outcome.failure) {
+                Failure.Unsupported -> ConversationUiState.Unsupported
+                is Failure.Protocol -> if (failure.status == 404) ConversationUiState.NotFound else ConversationUiState.Failed
+                else -> ConversationUiState.Failed
+            }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), ConversationUiState.Loading)
 

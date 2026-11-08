@@ -81,6 +81,10 @@ import java.time.format.FormatStyle
 sealed interface ConversationUiState {
     data object Loading : ConversationUiState
     data object NotFound : ConversationUiState
+    /** The conversation exists but this Velin version cannot open it yet. */
+    data object Unsupported : ConversationUiState
+    /** Loading failed, for example offline; retrying can help. */
+    data object Failed : ConversationUiState
     data class Loaded(
         val conversation: ConversationUi,
         /** Messages whose remote content the user allowed for this view. */
@@ -148,6 +152,14 @@ fun ConversationScreen(
                 ConversationUiState.NotFound -> StatusMessage(
                     icon = VelinIcons.Mail,
                     title = stringResource(R.string.reader_not_found),
+                )
+                ConversationUiState.Unsupported -> StatusMessage(
+                    icon = VelinIcons.Mail,
+                    title = stringResource(R.string.reader_unsupported),
+                )
+                ConversationUiState.Failed -> StatusMessage(
+                    icon = VelinIcons.CloudOff,
+                    title = stringResource(R.string.reader_failed),
                 )
                 is ConversationUiState.Loaded -> {
                     MessageList(state, onEvent, loadAttachmentImage)
