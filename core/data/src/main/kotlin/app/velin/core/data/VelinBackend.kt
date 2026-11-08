@@ -8,9 +8,13 @@ import java.io.File
 import java.io.FileNotFoundException
 import java.net.URI
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.collect
 
 /** Create once per application process. Call close only when the backend is no longer used. */
-class VelinBackend(context: Context) {
+class VelinBackend(context: Context, readSource: MailReadSource = UnavailableMailReadSource) {
+    private val reads = BackendReadRepository(readSource, File(context.applicationContext.cacheDir, "mail-attachments"))
+    val mailbox: app.velin.core.domain.MailboxRepository = reads
+    val mail: app.velin.core.domain.MailRepository = reads
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val baseUrl = "https://app.tuta.com"
     private val transport = HttpTransport(URI(baseUrl))
@@ -24,10 +28,21 @@ class VelinBackend(context: Context) {
         } catch (e: Throwable) { engine.close(); throw e }
     }, scope)
     val auth: AuthRepository = repository
-    init { scope.launch { repository.initialize() } }
+    init {
+        scope.launch { repository.initialize() }
+        scope.launch {
+            var active: app.velin.core.domain.AccountId? = null
+            repository.state.collect { state ->
+                val next = (state as? app.velin.core.domain.AuthState.Active)?.account?.id
+                if (next != active) reads.clear()
+                active = next
+            }
+        }
+    }
     suspend fun close() {
         scope.cancel()
         repository.close()
+        reads.clear()
     }
 }
 

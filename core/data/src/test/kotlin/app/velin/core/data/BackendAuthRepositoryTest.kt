@@ -261,4 +261,17 @@ class BackendAuthRepositoryTest {
             assertTrue(reopened.all().isEmpty())
         } finally { path.delete() }
     }
+    @Test fun lostKeyDoesNotBlockNewSaveOrRemove() {
+        val original = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
+        val replacement = KeyGenerator.getInstance("AES").apply { init(256) }.generateKey()
+        val path = java.io.File.createTempFile("lost-key", ".bin").apply { delete() }
+        try {
+            EncryptedCredentialStore(path) { original }.save(SavedCredentials("old@example.invalid", "old", token, byteArrayOf(1)))
+            val restored = EncryptedCredentialStore(path) { replacement }
+            restored.save(SavedCredentials("new@example.invalid", "new", token, byteArrayOf(2)))
+            assertEquals("new", restored.all().single().user)
+            restored.remove("new")
+            assertTrue(restored.all().isEmpty())
+        } finally { path.delete() }
+    }
 }

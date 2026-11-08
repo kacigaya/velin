@@ -40,6 +40,8 @@ data class Attachment(val id: AttachmentId, val name: String, val mimeType: Stri
     val sizeBytes: Long, val contentId: String? = null) {
     init { require(sizeBytes >= 0) }
 }
+/** Raster attachment bytes. Maximum 10 MiB. SVG and MIME guesses are rejected. */
+data class InlineImage(val bytes: ByteArray, val mimeType: String)
 sealed interface BodyState {
     data object Loading : BodyState
     data class Loaded(val html: String, val externalContentPresent: Boolean,
