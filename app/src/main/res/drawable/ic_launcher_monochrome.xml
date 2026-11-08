@@ -9,13 +9,13 @@
     <!-- Scaled so the envelope corners stay inside the 66dp adaptive-icon safe zone. -->
     <group
         android:pivotX="54"
-        android:pivotY="55"
+        android:pivotY="54"
         android:scaleX="0.78"
         android:scaleY="0.78">
-        <clip-path android:pathData="M30,32 L78,32 Q87,32 87,41 L87,69 Q87,78 78,78 L30,78 Q21,78 21,69 L21,41 Q21,32 30,32 Z" />
+        <clip-path android:pathData="M29,31 L79,31 A8,8 0 0 1 87,39 L87,69 A8,8 0 0 1 79,77 L29,77 A8,8 0 0 1 21,69 L21,39 A8,8 0 0 1 29,31 Z" />
         <path
             android:fillColor="#FF000000"
             android:fillType="evenOdd"
-            android:pathData="M30,32 L78,32 Q87,32 87,41 L87,69 Q87,78 78,78 L30,78 Q21,78 21,69 L21,41 Q21,32 30,32 Z M17,29 L54,63.5 L91,29 L91,34.5 L54,69 L17,34.5 Z" />
+            android:pathData="M29,31 L79,31 A8,8 0 0 1 87,39 L87,69 A8,8 0 0 1 79,77 L29,77 A8,8 0 0 1 21,69 L21,39 A8,8 0 0 1 29,31 Z M17,28 L54,62.5 L91,28 L91,33.5 L54,68 L17,33.5 Z" />
     </group>
 </vector>

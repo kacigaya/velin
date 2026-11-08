@@ -9,26 +9,26 @@
     <!-- Scaled so the envelope corners stay inside the 66dp adaptive-icon safe zone. -->
     <group
         android:pivotX="54"
-        android:pivotY="55"
+        android:pivotY="54"
         android:scaleX="0.78"
         android:scaleY="0.78">
         <path
             android:fillColor="#FFD9E2FF"
-            android:pathData="M30,32 L78,32 Q87,32 87,41 L87,69 Q87,78 78,78 L30,78 Q21,78 21,69 L21,41 Q21,32 30,32 Z" />
+            android:pathData="M29,31 L79,31 A8,8 0 0 1 87,39 L87,69 A8,8 0 0 1 79,77 L29,77 A8,8 0 0 1 21,69 L21,39 A8,8 0 0 1 29,31 Z" />
         <group>
             <!-- The flap and folds share the envelope's rounded corners. -->
-            <clip-path android:pathData="M30,32 L78,32 Q87,32 87,41 L87,69 Q87,78 78,78 L30,78 Q21,78 21,69 L21,41 Q21,32 30,32 Z" />
+            <clip-path android:pathData="M29,31 L79,31 A8,8 0 0 1 87,39 L87,69 A8,8 0 0 1 79,77 L29,77 A8,8 0 0 1 21,69 L21,39 A8,8 0 0 1 29,31 Z" />
             <path
-                android:pathData="M21,78 L46,56 M87,78 L62,56"
+                android:pathData="M21,77 L54,51 M87,77 L54,51"
                 android:strokeColor="#FFAFC6FF"
                 android:strokeLineCap="round"
                 android:strokeWidth="2.5" />
             <path
                 android:fillColor="#FF5A72A8"
-                android:pathData="M21,32 L54,32 L54,63 Q51.5,63 49.4,61.2 Z" />
+                android:pathData="M20,31 L54,31 L54,62.5 C52.2,62.5 50.8,61.8 49.6,60.6 L20,31 Z" />
             <path
                 android:fillColor="#FF465D91"
-                android:pathData="M87,32 L54,32 L54,63 Q56.5,63 58.6,61.2 Z" />
+                android:pathData="M88,31 L53.7,31 L53.7,62.5 C55.6,62.5 57.1,61.8 58.4,60.6 L88,31 Z" />
         </group>
     </group>
 </vector>
