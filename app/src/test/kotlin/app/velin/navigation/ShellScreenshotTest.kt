@@ -58,9 +58,9 @@ class ShellScreenshotTest {
     @get:Rule
     val compose = createComposeRule()
 
-    private fun capture(name: String) {
+    private fun capture(name: String, graph: AppGraph = FakeGraph) {
         compose.mainClock.autoAdvance = false
-        compose.setContent { VelinTheme(darkTheme = false, dynamicColor = false) { VelinApp(FakeGraph) } }
+        compose.setContent { VelinTheme(darkTheme = false, dynamicColor = false) { VelinApp(graph) } }
         // View model coroutines run on the main looper, which Robolectric pauses.
         repeat(3) {
             shadowOf(Looper.getMainLooper()).idle()
@@ -76,6 +76,15 @@ class ShellScreenshotTest {
     @Test
     @Config(sdk = [35], qualifiers = "w1280dp-h800dp-mdpi")
     fun tablet() = capture("shell_tablet")
+
+    /** What a signed-in user sees until the mail backend exists. */
+    @Test
+    @Config(sdk = [35], qualifiers = "w411dp-h891dp-xxhdpi")
+    fun signedInWithoutMail() = capture("shell_signed_in_no_mail", object : AppGraph {
+        override val auth = FakeGraph.auth
+        override val mailbox: MailboxRepository? = null
+        override val mail: MailRepository? = null
+    })
 }
 
 private fun id(list: String, element: String) = EntityId(ListId(list), ElementId(element))
