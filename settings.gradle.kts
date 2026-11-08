@@ -18,4 +18,5 @@ rootProject.name = "velin"
 
 include(":app")
 include(":core:designsystem")
+include(":feature:auth")
 include(":feature:mail")

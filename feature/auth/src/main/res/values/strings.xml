@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="signin_title">Sign in</string>
+    <string name="signin_subtitle">Use your Tuta account.</string>
+    <string name="signin_address">Email address</string>
+    <string name="signin_password">Password</string>
+    <string name="signin_show_password">Show password</string>
+    <string name="signin_hide_password">Hide password</string>
+    <string name="signin_action">Sign in</string>
+    <string name="signin_busy">Signing in</string>
+    <string name="signin_remove_account">Remove %1$s from this device</string>
+    <string name="signin_other_account">Or sign in with another account</string>
+
+    <string name="signin_2fa_title">Two-step verification</string>
+    <string name="signin_2fa_subtitle">Confirm it is you to sign in to %1$s.</string>
+    <string name="signin_2fa_code">Authenticator code</string>
+    <string name="signin_2fa_verify">Verify</string>
+    <string name="signin_2fa_security_key">Use security key</string>
+    <string name="signin_2fa_other_session">You can also approve this sign-in from a device where you are already signed in.</string>
+    <string name="signin_2fa_cancel">Cancel</string>
+
+    <string name="signin_error_credentials">Wrong email address or password.</string>
+    <string name="signin_error_too_many">Too many attempts. Try again later.</string>
+    <string name="signin_error_offline">No connection. Check your network and try again.</string>
+    <string name="signin_error_code">Wrong code. Try again.</string>
+    <string name="signin_error_security_key">Security keys are not supported in Velin yet. Use another method.</string>
+    <string name="signin_error_unknown">Sign-in failed. Try again.</string>
+</resources>
