@@ -9,7 +9,7 @@ Each milestone is small and can be tested alone. A milestone is complete when it
 | M0 | Project scaffold, theme, UI screens with sample data | UI | done | Debug APK builds. Unit and screenshot tests pass in light and dark. |
 | M1 | Native core: Rust SDK AAR builds for arm64 and x86_64, `:core:sdk` adapter, REST transport with `cv`/`v` headers | Backend | done | AAR builds from a pinned upstream commit with checksums. Adapter unit tests pass. |
 | M2 | Sign-in: salt, Argon2id and bcrypt KDF, session creation, TOTP, Keystore credential storage, session resume | Backend, then UI wiring | done, live check pending | Upstream KDF test vectors pass. Live sign-in with a test account. |
-| M3 | Read path: folders, mail list paging, decryption, mail body, HTML sanitizer, attachment download | Backend, then UI wiring | in progress | Live list and body load. Sanitizer tests pass. |
+| M3 | Read path: folders, mail list paging, decryption, mail body, HTML sanitizer, attachment download | Backend, then UI wiring | in progress: pipeline, sanitizer and UI done; SDK read source (M3b) pending | Live list and body load. Sanitizer tests pass. |
 | M4 | Sync and offline: event bus WebSocket, Room with SQLCipher, durable cursors | Backend | planned | Offline cold start shows saved mail. Missed events replay after reconnect. |
 | M5 | Mail actions: read state, move, archive, trash, labels, spam report | Backend, then UI wiring | planned | Actions reflect on the server and in a second client. |
 | M6 | Compose and send: drafts, attachment upload, internal confidential, external non-confidential, scheduled send | Backend, then UI wiring | planned | Mail arrives at a Tuta and a non-Tuta address. Drafts survive process death. |
@@ -25,7 +25,7 @@ Each milestone is small and can be tested alone. A milestone is complete when it
 4. **Security keys (WebAuthn/U2F).** Upstream uses a browser callback bound to its own app. Server acceptance of Velin's package is unverified. Hardware-key-only accounts can be blocked.
 5. **Client version enforcement.** The server rejects old clients with HTTP 474. The policy for a third-party client is unverified. Velin must track upstream versions (see research §7).
 6. **Rust dependency advisories.** 13 pinned crates have advisories. `rsa 0.9.8` (RUSTSEC-2023-0071, timing side channel) has no fixed version. Upstream ships the same pin. See `docs/backend/dependency-advisories.json`.
-7. **jsoup approval.** The mail HTML sanitizer uses jsoup. It waits for owner approval.
+7. **jsoup.** Approved by the owner on 2026-11-08 for the mail HTML sanitizer. It stays inside `:core:html`.
 8. **Rich-text editing.** Compose has no rich-text editor. The composer body is plain text in v1.
 
 ## Feature parity checklist
@@ -43,7 +43,7 @@ Source status comes from research §6. "UI" shows the Velin screen state.
 | Mail list, paging, unread state | Port from TS | done (sample data) |
 | Conversation view | Port from TS | done (sample data) |
 | Mail body and attachments | Port from TS | done (sample data) |
-| Remote content blocking | UI + sanitizer | done (sample data) |
+| Remote content blocking | Sanitizer and consent done | done, wired |
 | Phishing and authentication banners | Data from server and TS logic | done (sample data) |
 | Read state, archive, trash | SDK | done (sample data) |
 | Move, labels, spam report | Port from TS | entry points done |
