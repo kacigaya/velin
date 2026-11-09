@@ -61,7 +61,8 @@ internal class FakeMailbox(folders: List<Folder>) : MailboxRepository {
     val sync = MutableStateFlow<SyncState>(SyncState.Idle)
     override fun folders(account: AccountId): Flow<List<Folder>> = folders
     override fun labels(account: AccountId): Flow<List<Label>> = flowOf(emptyList())
-    override fun senders(account: AccountId): Flow<List<SenderAlias>> = flowOf(emptyList())
+    val senderList = MutableStateFlow(listOf(SenderAlias(Address("alex@tuta.com", "Alex"), enabled = true)))
+    override fun senders(account: AccountId): Flow<List<SenderAlias>> = senderList
     override fun syncState(account: AccountId): Flow<SyncState> = sync
     var syncs = 0
     override suspend fun sync(account: AccountId): Outcome<Unit> { syncs++; return Outcome.Success(Unit) }
@@ -100,8 +101,16 @@ internal class FakeMailRepo : MailRepository {
         deletes += ids
         return Outcome.Success(Unit)
     }
-    override suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<DraftId> = Outcome.Failed(app.velin.core.domain.Failure.Unsupported)
-    override suspend fun sendDraft(account: AccountId, id: DraftId): Outcome<Unit> = Outcome.Success(Unit)
+    val savedDrafts = mutableListOf<Draft>()
+    val sentDrafts = mutableListOf<DraftId>()
+    override suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<DraftId> {
+        savedDrafts += draft
+        return Outcome.Success(draft.id ?: DraftId(MailId(eid("drafts", "d${savedDrafts.size}"))))
+    }
+    override suspend fun sendDraft(account: AccountId, id: DraftId): Outcome<Unit> {
+        sentDrafts += id
+        return Outcome.Success(Unit)
+    }
     override suspend fun downloadAttachment(account: AccountId, id: AttachmentId): Outcome<File> = Outcome.Failed(app.velin.core.domain.Failure.Unsupported)
     override fun search(account: AccountId, query: String): Flow<Outcome<List<MailSummary>>> = flowOf(Outcome.Success(emptyList()))
     override fun suggestRecipients(account: AccountId, query: String): Flow<List<Recipient>> = flowOf(emptyList())
