@@ -16,6 +16,7 @@ cat "$root/tools/backend/overlay/mail_read.rs" >> "$out/source/tuta-sdk/rust/sdk
 cat "$root/tools/backend/overlay/mail_compose.rs" >> "$out/source/tuta-sdk/rust/sdk/src/mail_facade.rs"
 python3 "$root/tools/backend/overlay/guard-crypto.py" "$out/source"
 python3 "$root/tools/backend/overlay/read-source.py" "$out/source"
+python3 "$root/tools/backend/overlay/compose-source.py" "$out/source"
 if [[ ! -f "$out/ndk.zip" ]]; then
   curl -fL --retry 3 https://dl.google.com/android/repository/android-ndk-r29-linux.zip -o "$out/ndk.zip"
 fi
