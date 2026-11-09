@@ -345,7 +345,22 @@ class BackendReadRepository(private val source: MailReadSource, private val cach
                 labels = previous.value.messages.flatMap { state.summaries[it.id]?.labels.orEmpty() }.distinctBy { it.id }))
         }
     }
-    override suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<DraftId> = unsupported()
+    override suspend fun loadDraft(account: AccountId, id: MailId): Outcome<Draft> = io { source.loadDraft(account, id) }
+    override suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<DraftId> = io {
+        when (val saved = source.saveDraft(account, draft)) {
+            is Outcome.Failed -> saved
+            is Outcome.Success -> {
+                val id = saved.value.value
+                val state = this.account(account)
+                state.messages.remove(id)
+                state.rawBodies.remove(id)
+                state.summaries.remove(id)
+                // Reload known pages and open conversations on the next sync.
+                state.pages.values.forEach { flow -> flow.value = flow.value.copy(mails = flow.value.mails.filterNot { it.id == id }) }
+                saved
+            }
+        }
+    }
     override suspend fun sendDraft(account: AccountId, id: DraftId) = unsupported()
     override fun search(account: AccountId, query: String): Flow<Outcome<List<MailSummary>>> = flowOf(unsupported())
     override fun suggestRecipients(account: AccountId, query: String): Flow<List<Recipient>> = flowOf(emptyList())

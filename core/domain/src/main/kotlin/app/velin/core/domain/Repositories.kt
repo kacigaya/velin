@@ -35,6 +35,7 @@ interface MailRepository {
     suspend fun currentFolders(account: AccountId, ids: List<MailId>): Outcome<Map<MailId, FolderId>> = Outcome.Failed(Failure.Unsupported)
     /** Permanent deletion is restricted to mails currently in Trash or Spam. */
     suspend fun delete(account: AccountId, ids: List<MailId>): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)
+    suspend fun loadDraft(account: AccountId, id: MailId): Outcome<Draft> = Outcome.Failed(Failure.Unsupported)
     suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<DraftId>
     suspend fun sendDraft(account: AccountId, id: DraftId): Outcome<Unit>
     suspend fun downloadAttachment(account: AccountId, id: AttachmentId): Outcome<java.io.File>

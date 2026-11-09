@@ -61,6 +61,8 @@ val checkNativeArtifacts = tasks.register("checkNativeArtifacts") {
 tasks.named("preBuild") { dependsOn(checkNativeArtifacts) }
 
 tasks.withType<Test>().configureEach {
+    inputs.file(file("build/native/artifacts/host/libtutasdk.so"))
+        .withPropertyName("nativeHostLibrary").withPathSensitivity(PathSensitivity.NONE)
     systemProperty("velin.upstream.source", file("build/native/source").absolutePath)
     systemProperty("jna.library.path", file("build/native/artifacts/host").absolutePath)
 }

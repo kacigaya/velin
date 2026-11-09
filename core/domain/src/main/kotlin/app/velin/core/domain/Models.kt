@@ -60,7 +60,8 @@ data class Conversation(val id: ConversationId, val subject: String, val labels:
     val folderKind: FolderKind?, val messages: List<MailMessage>)
 data class Draft(val id: DraftId?, val sender: SenderAlias, val to: List<Recipient>,
     val cc: List<Recipient>, val bcc: List<Recipient>, val subject: String, val plainText: String,
-    val confidential: Boolean, val attachments: List<Attachment>, val scheduledSendAt: Instant?)
+    val confidential: Boolean, val attachments: List<Attachment>, val scheduledSendAt: Instant?,
+    val htmlBody: String? = null)
 data class MailPage(val mails: List<MailSummary>, val next: PageCursor?)
 sealed interface Failure {
     data object Offline : Failure

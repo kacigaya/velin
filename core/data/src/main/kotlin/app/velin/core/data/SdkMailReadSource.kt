@@ -2,6 +2,7 @@ package app.velin.core.data
 
 import app.velin.core.domain.*
 import app.velin.core.sdk.*
+import app.velin.core.html.DraftHtml
 import java.time.Instant
 import kotlinx.coroutines.CancellationException
 
@@ -11,6 +12,29 @@ internal interface SessionReadAccess {
 
 /** Session adapter. Sender authentication remains unverified. */
 internal class SdkMailReadSource(private val sessions: SessionReadAccess) : MailReadSource {
+    override suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<DraftId> = read(account) { sdk ->
+        if (draft.scheduledSendAt != null) throw SdkException(SdkFailure.DraftUnsupported)
+        require(draft.sender.enabled && (draft.to + draft.cc + draft.bcc).none { it.invalid })
+        val html = draft.htmlBody?.takeIf { DraftHtml.toPlainText(it) == draft.plainText }
+            ?: DraftHtml.fromPlainText(draft.plainText)
+        val existingId = draft.id?.value?.value?.readId()
+        val input = WriteDraft(existingId, ReadAddress(draft.sender.address.address, draft.sender.address.name),
+            draft.to.map { ReadAddress(it.address.address, it.address.name) }, draft.cc.map { ReadAddress(it.address.address, it.address.name) },
+            draft.bcc.map { ReadAddress(it.address.address, it.address.name) }, draft.subject, html, draft.confidential,
+            draft.attachments.map { it.id.value.readId() })
+        val id = sdk.saveDraft(input)
+        require(existingId == null || id == existingId)
+        DraftId(MailId(id.domain()))
+    }
+    override suspend fun loadDraft(account: AccountId, id: MailId): Outcome<Draft> = read(account) { sdk ->
+        val mail = sdk.loadDraft(id.value.readId())
+        require(mail.id.domain() == id.value && mail.draft)
+        val sender = sdk.senders().singleOrNull { it.address == mail.sender.address }
+        Draft(DraftId(id), SenderAlias(mail.sender.address(), enabled = sender != null),
+            mail.to.map { Recipient(it.address(), RecipientType.Unknown) }, mail.cc.map { Recipient(it.address(), RecipientType.Unknown) },
+            mail.bcc.map { Recipient(it.address(), RecipientType.Unknown) }, mail.subject, DraftHtml.toPlainText(mail.body),
+            mail.confidential, mail.attachments.map { it.domainAttachment() }, mail.scheduledMillis?.let(Instant::ofEpochMilli), htmlBody = mail.body)
+    }
     override suspend fun setUnread(account: AccountId, ids: List<MailId>, unread: Boolean): Outcome<Unit> = read(account) { sdk ->
         ids.distinct().chunked(50).forEach { batch -> sdk.setUnread(batch.map { it.value.readId() }, unread) }
     }
@@ -128,7 +152,7 @@ internal class SdkMailReadSource(private val sessions: SessionReadAccess) : Mail
             try { operation(sdk)?.let { Outcome.Success(it) } ?: Outcome.Failed(Failure.Protocol(404)) }
             catch (e: CancellationException) { throw e }
             catch (e: SdkException) { Outcome.Failed(when (e.failure) {
-                SdkFailure.SecureExternalUnsupported, SdkFailure.AttachmentsUnsupported -> Failure.Unsupported
+                SdkFailure.SecureExternalUnsupported, SdkFailure.AttachmentsUnsupported, SdkFailure.DraftUnsupported -> Failure.Unsupported
                 SdkFailure.Network -> Failure.Offline
                 SdkFailure.InvalidAccessToken -> Failure.Unauthorized
                 SdkFailure.InvalidSoftwareVersion -> Failure.InvalidSoftwareVersion

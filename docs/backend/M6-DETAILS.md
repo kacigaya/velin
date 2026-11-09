@@ -1,6 +1,7 @@
 # M6 compose and send
 
-M6 is incomplete. Only sender discovery is implemented here. No live Tuta
+M6 remains partial. Sender discovery and draft create, update, and reload are
+implemented. Recipient resolution and send remain unsupported. No live Tuta
 request was sent. No production dependency was added.
 
 ## Sender aliases
@@ -37,89 +38,120 @@ Release evidence:
 3. [Per-address names](https://github.com/tutao/tutanota/blob/332e57461cdc4fe4a4ad9bdc8555f56df02931c0/src/applications/common/misc/MailboxPropertiesUtils.ts#L16)
    and [legacy name migration](https://github.com/tutao/tutanota/blob/332e57461cdc4fe4a4ad9bdc8555f56df02931c0/src/applications/common/mailFunctionality/MailboxModel.ts#L214).
 
-## Draft and send limits: NOT IMPLEMENTED
+## Draft contracts
 
-`saveDraft` and `sendDraft` still return `Outcome.Failed(Failure.Unsupported)`.
-Contact suggestions remain an empty flow. There is no domain API for recipient
-resolution, draft deletion, reply creation, uploads, or scheduled-send cancellation.
-No content is sent through an unencrypted fallback.
-
-Implement the remaining paths in this order:
-
-1. Draft create, update, reload, and delete. Repeated saves must use the returned
-   draft ID. Plain text needs the release HTML conversion. Retain existing files
-   and reply-to fields during update.
-2. Recipient resolution through verified public-key lookup. Keep unknown,
-   invalid, and verification-failure states distinct.
-3. Confidential internal send with the release bucket-key construction,
-   TutaCrypt and RSA selection, and KeyVerificationFacade checks.
-4. Non-confidential external send.
-5. Reply, reply-all, and forward, with conversation linkage and quoted content.
-6. Encrypted attachment upload and retention during update and forward.
-7. Scheduled send and cancellation.
-8. Password-protected external send. Return `Failure.Unsupported` until the
-   secure-external path is complete. Never retry as non-confidential mail.
-
-The first missing protocol layer is nested service encryption:
-
-1. [Draft creation](https://github.com/tutao/tutanota/blob/332e57461cdc4fe4a4ad9bdc8555f56df02931c0/src/applications/common/api/worker/facades/lazy/MailFacade.ts#L332)
-   builds MailTransferAggregatedType and MailDetailsBlobTransferAggregatedType.
-   Both carry the same owner-wrapped mail session key. Deprecated fields stay null.
-2. [Draft update](https://github.com/tutao/tutanota/blob/332e57461cdc4fe4a4ad9bdc8555f56df02931c0/src/applications/common/api/worker/facades/lazy/MailFacade.ts#L505)
-   reuses the draft key, key version, and nonce. It preserves reply-to fields and
-   computes attachment differences. It waits for the updated mail before send.
-3. [Service encryption parameters](https://github.com/tutao/tutanota/blob/332e57461cdc4fe4a4ad9bdc8555f56df02931c0/src/platform-kit/base/base-crypto/KeyLoaderFacade.ts#L281)
-   select historical keys for update and current keys for creation.
-4. [The instance pipeline](https://github.com/tutao/tutanota/blob/332e57461cdc4fe4a4ad9bdc8555f56df02931c0/src/platform-kit/instance-pipeline/InstancePipeline.ts#L69)
-   chooses AES-CBC or AEAD from the user's encryption scheme. WithSessionKey
-   must match the nested transfer encryption. The Rust executor's single
-   `session_key` parameter does not supply this pipeline. Port and test it before
-   exposing draft writes. Do not force AES-CBC for an AEAD account.
-5. [DraftService](https://github.com/tutao/tutanota/blob/332e57461cdc4fe4a4ad9bdc8555f56df02931c0/src/entities/tutanota/Services.ts#L118)
-   has POST and PUT only. Do not invent a DraftService DELETE operation.
-
-Proposed reply API, not yet added to the domain:
+`MailRepository` adds:
 
 ```kotlin
-enum class DraftMode { Reply, ReplyAll, Forward }
-suspend fun draftFor(account: AccountId, mode: DraftMode, mailId: MailId): Outcome<Draft>
+suspend fun loadDraft(account: AccountId, id: MailId): Outcome<Draft>
 ```
 
-Before adding this API, extend Draft to retain the source message and conversation
-metadata across saves and process death. No domain signature changed in this work.
+These signatures stay the same:
+
+```kotlin
+suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<DraftId>
+suspend fun sendDraft(account: AccountId, id: DraftId): Outcome<Unit>
+```
+
+`Draft` adds a final optional property:
+
+```kotlin
+val htmlBody: String? = null
+```
+
+1. Save a new draft with `id = null`. Keep the returned DraftId. Use it for
+   every later save. Create uses DraftService POST. Update uses PUT with the
+   same mail ID. There is no DraftService DELETE operation.
+2. Create wraps a new mail session key with the current mail-group key.
+   Update uses the draft's historical owner-key version. It retains the
+   wrapped key, nonce, method, and reply-to fields. Both nested transfer roots
+   carry the same wrapped mail session key.
+3. The authenticated AEAD rollout selects the account's encryption scheme.
+   Unknown state blocks writes. An AEAD account never falls back to CBC.
+4. Plain text uses the release converter. Reload returns a plain editor view
+   and the original HTML. A subject-only edit keeps that HTML. A body edit
+   converts the new plain text to HTML.
+5. Update retains the supplied existing attachment IDs. It removes omitted
+   IDs. It rejects new files until encrypted upload exists. Scheduled drafts
+   and moves between sender mail groups remain unsupported.
+6. After POST or PUT, read the draft until its content matches. The limit is
+   20 reads, with 250 ms between reads. A timeout, cancellation, or lost
+   response can follow a successful server write. There is no automatic
+   write retry. Check the official client before retrying a failed create.
+7. `loadDraft` reads fresh authenticated data. Recipient types remain Unknown.
+   It does not infer a verified recipient from a mail address. Saved drafts
+   use the existing mailbox read path, including session-key AEAD decryption.
+8. Discard uses the existing move-to-Trash action. No UI module was changed.
+   Known cached pages refresh on the next sync.
+
+Release evidence:
+
+1. [Draft create](https://github.com/tutao/tutanota/blob/332e57461cdc4fe4a4ad9bdc8555f56df02931c0/src/applications/common/api/worker/facades/lazy/MailFacade.ts#L341)
+   and [draft update](https://github.com/tutao/tutanota/blob/332e57461cdc4fe4a4ad9bdc8555f56df02931c0/src/applications/common/api/worker/facades/lazy/MailFacade.ts#L505).
+2. [Current and historical service keys](https://github.com/tutao/tutanota/blob/332e57461cdc4fe4a4ad9bdc8555f56df02931c0/src/platform-kit/base/base-crypto/KeyLoaderFacade.ts#L281).
+3. [Scheme selection](https://github.com/tutao/tutanota/blob/332e57461cdc4fe4a4ad9bdc8555f56df02931c0/src/platform-kit/instance-pipeline/InstancePipeline.ts#L69)
+   and [the AEAD rollout](https://github.com/tutao/tutanota/blob/332e57461cdc4fe4a4ad9bdc8555f56df02931c0/src/applications/common/api/worker/EventBusEventCoordinator.ts#L162).
+4. [Plain-text conversion](https://github.com/tutao/tutanota/blob/332e57461cdc4fe4a4ad9bdc8555f56df02931c0/src/applications/common/api/common/utils/imapImportUtils/PlainTextToHtmlConverter.ts#L1).
+
+See [draft encryption and vectors](DRAFT-ENCRYPTION.md) for offline evidence.
+Server acceptance and device behavior remain UNVERIFIED.
+
+## Recipient resolution and send: NOT IMPLEMENTED
+
+`sendDraft` returns `Outcome.Failed(Failure.Unsupported)`. Contact suggestions
+remain an empty flow. No send request is constructed or sent.
+
+The next blocker is verified public-key lookup. The pinned Rust
+`tuta-sdk/rust/sdk/src/crypto/public_key_provider.rs:96` drops the public-key
+signature. Its RSA version constraint does not replace identity verification.
+The release's
+`src/platform-kit/base/facades/lazy/KeyVerificationFacade.ts:75` requires the
+public identity key, its trust source, and signature verification. The Rust
+SDK has no matching PublicIdentityKeyProvider or identity trust database.
+Using its current key loader for send would skip these checks.
+
+Port and test that path before adding recipient resolution or send vectors.
+Keep lookup absence, invalid input, and verification failure distinct.
+Then generate SendDraftData vectors with signed test keys before implementing
+confidential internal send. Sending to the owner's own address still needs
+this verification path. Do not add an unencrypted fallback.
+
+The later paths remain external send, reply creation, encrypted upload,
+scheduled send, and password-protected external send. No new domain API for
+those operations was added.
 
 ## Owner live checks: UNVERIFIED
 
-1. Sign in and sync. Compare the primary address and enabled aliases with the
+Run only after merge and separate owner authorization.
+
+1. Sign in and sync. Compare enabled aliases and sender names with the
    official client. Check that disabled aliases are absent.
-2. Set different sender names for two aliases in the official client. Sync Velin.
-   Check both names. Include a shared mailbox if the account has one.
-3. Change an alias in the official client. Sync again. Check the new snapshot.
-4. Sign out, then switch accounts. Check that aliases do not cross sessions.
-5. Do not test draft save or send from this implementation. Those paths remain
-   unsupported. After they are implemented and merged, send only to the owner's
-   own address under the owner's separate live-test authorization.
+2. In the owner's mailbox, create a draft with a subject, Unicode text,
+   escaped characters, blank lines, and quoted lines. Check the result in the
+   official client. Do not send it.
+3. Change the subject, body, sender alias within the same mailbox, and the
+   To, Cc, and Bcc fields. Save more than once. Check that one draft keeps
+   the same ID and contains the last saved content.
+4. Close and reopen the draft through `loadDraft`. Restart the app and reopen
+   it again. Check every recipient list and the body. Change only the subject
+   of a draft with rich HTML. Check that the original body format stays intact.
+5. Create a draft with an existing attachment and reply-to field in the
+   official client. Reopen it in Velin. Save it. Check that retained files and
+   reply-to fields remain. Remove one attachment and check that removal.
+6. Check both legacy CBC and AEAD accounts when available. Do not change the
+   rollout or force a scheme for a test. Unknown rollout state must block save.
+7. Sign out and switch accounts. Check that aliases, drafts, and encryption
+   state do not cross sessions. Check offline and cancelled saves. Reconcile
+   a failed create with the official client before retrying it.
+8. Send is unsupported. After verified internal send is implemented and
+   merged, any separately authorized send check must target only the owner's
+   own address. No live send check is authorized by this implementation.
 
 ## Offline verification
 
-1. The pinned native build passed for arm64-v8a, x86_64, and the host. A final
-   incremental arm64 build used the release Cargo configuration and final source.
-   `m6-artifacts.sha256` records the three final libraries. Binding generation
-   passed. Optional ktlint formatting was unavailable. Existing Rust warnings remain.
-2. `tools/backend/test-read-overlay.sh` passed all 19 matching Rust tests.
-   Three cover sender ownership, enabled aliases and names, and invalid or failed
-   GroupInfo reads. The filter excluded 304 other unit tests and all integration
-   tests. No live service test ran.
-3. `./gradlew testDebugUnitTest :core:domain:test :core:html:test assembleDebug --console=plain --max-workers=2`
-   passed all 295 tasks. JVM reports contain 127 tests with no failures, errors,
-   or skipped tests. The added data test checks alias mapping, failure
-   propagation, and the session boundary.
-4. The release pin check, Bash syntax check, and `git diff --check` passed.
-   Local review covered the changed source, callers, contracts, and tests.
-5. OSV results for all 327 public Rust packages exactly match
-   `release-native-advisories.json`: 17 affected packages and 35 advisory records.
-   The recorded 14-package Maven set has no advisory. The unchanged Rust risks
-   remain. No dependency update was made.
-
-These checks verify local construction and mapping. Server acceptance and device
-behavior remain UNVERIFIED. No complete numbered M6 slice is delivered yet.
+The final native build passed for both Android ABIs and the host. All 33
+selected Rust tests and 139 JVM tests passed. The full 296-task Gradle
+command, including assembleDebug, passed. Eight upstream draft vectors and
+one ID-only response vector passed. See
+[DRAFT-ENCRYPTION.md](DRAFT-ENCRYPTION.md#final-offline-verification) for the
+commands, test scope, artifact hashes, warnings, and dependency scan limits.
