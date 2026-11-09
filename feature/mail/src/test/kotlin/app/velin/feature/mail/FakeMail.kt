@@ -101,6 +101,9 @@ internal class FakeMailRepo : MailRepository {
         deletes += ids
         return Outcome.Success(Unit)
     }
+    var storedDraft: Draft? = null
+    override suspend fun loadDraft(account: AccountId, id: MailId): Outcome<Draft> =
+        storedDraft?.let { Outcome.Success(it) } ?: Outcome.Failed(app.velin.core.domain.Failure.Unsupported)
     val savedDrafts = mutableListOf<Draft>()
     val sentDrafts = mutableListOf<DraftId>()
     override suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<DraftId> {

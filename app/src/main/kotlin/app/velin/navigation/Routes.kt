@@ -11,5 +11,9 @@ data object MailboxRoute : NavKey
 @Serializable
 data class ConversationRoute(val conversationId: String) : NavKey
 
+/** New mail when [draftId] is null, otherwise an existing draft (UI id). */
+@Serializable
+data class ComposerRoute(val draftId: String? = null) : NavKey
+
 @Serializable
 data object SettingsRoute : NavKey

@@ -2,7 +2,15 @@ package app.velin.feature.mail.composer
 
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.snapshots.Snapshot
+import app.velin.core.domain.Address
+import app.velin.core.domain.Draft
+import app.velin.core.domain.DraftId
 import app.velin.core.domain.FolderKind
+import app.velin.core.domain.MailId
+import app.velin.core.domain.Recipient
+import app.velin.core.domain.RecipientType
+import app.velin.core.domain.SenderAlias
+import app.velin.feature.mail.eid
 import app.velin.feature.mail.FakeMailRepo
 import app.velin.feature.mail.FakeMailbox
 import app.velin.feature.mail.folder
@@ -32,9 +40,9 @@ class ComposerViewModelTest {
 
     @After fun tearDown() = Dispatchers.resetMain()
 
-    private fun TestScope.viewModel(): ComposerViewModel {
+    private fun TestScope.viewModel(draft: String? = null): ComposerViewModel {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        return ComposerViewModel(testAccount, mailbox, repo).also { vm ->
+        return ComposerViewModel(testAccount, mailbox, repo, draft).also { vm ->
             backgroundScope.launch { vm.state.collect {} }
             runCurrent()
         }
@@ -101,5 +109,25 @@ class ComposerViewModelTest {
         runCurrent()
         assertEquals("Hi", repo.savedDrafts.last().subject)
         assertEquals(1, repo.sentDrafts.size)
+    }
+
+    @Test
+    fun reopenedDraftLoadsWithoutSavingAndKeepsItsIdAndHtml() = runTest {
+        val id = DraftId(MailId(eid("drafts", "d7")))
+        repo.storedDraft = Draft(
+            id = id, sender = SenderAlias(Address("alex@tuta.com", "Alex"), true),
+            to = listOf(Recipient(Address("lena@tuta.com"), RecipientType.Internal)), cc = emptyList(), bcc = emptyList(),
+            subject = "Plan", plainText = "Hello", confidential = true, attachments = emptyList(),
+            scheduledSendAt = null, htmlBody = "<b>Hello</b>",
+        )
+        val vm = viewModel(draft = "drafts/d7")
+        advanceTimeBy(5_000); runCurrent()
+        assertEquals("Plan", vm.subject.text.toString())
+        assertEquals(listOf("lena@tuta.com"), vm.state.value.to.map { it.recipient.address })
+        assertTrue("opening must not save", repo.savedDrafts.isEmpty())
+        edit { vm.subject.setTextAndPlaceCursorAtEnd("Plan v2") }
+        advanceTimeBy(2_500); runCurrent()
+        assertEquals(id, repo.savedDrafts.single().id)
+        assertEquals("<b>Hello</b>", repo.savedDrafts.single().htmlBody)
     }
 }

@@ -1,15 +1,19 @@
 package app.velin.feature.mail.composer
 
 import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.velin.core.domain.Account
 import app.velin.core.domain.Address
+import app.velin.core.domain.Attachment
 import app.velin.core.domain.Draft
 import app.velin.core.domain.DraftId
 import app.velin.core.domain.Failure
 import app.velin.core.domain.FolderKind
+import app.velin.core.domain.MailId
 import app.velin.core.domain.MailRepository
 import app.velin.core.domain.MailboxRepository
 import app.velin.core.domain.Outcome
@@ -17,6 +21,7 @@ import app.velin.core.domain.Recipient
 import app.velin.core.domain.RecipientType
 import app.velin.core.domain.SenderAlias
 import app.velin.feature.mail.model.RecipientUi
+import app.velin.feature.mail.model.entityIdOf
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -53,21 +58,21 @@ class ComposerViewModel(
     private val account: Account,
     private val mailbox: MailboxRepository,
     private val mail: MailRepository,
-    initial: Draft? = null,
+    /** UI id of an existing draft to edit; null starts a new mail. */
+    draftToOpen: String? = null,
 ) : ViewModel() {
-    val subject = TextFieldState(initial?.subject.orEmpty())
-    val body = TextFieldState(initial?.plainText.orEmpty())
+    val subject = TextFieldState()
+    val body = TextFieldState()
 
-    private val draftId = MutableStateFlow(initial?.id)
-    private val sender = MutableStateFlow(initial?.sender)
+    private val draftId = MutableStateFlow<DraftId?>(null)
+    private val sender = MutableStateFlow<SenderAlias?>(null)
     private val recipients = MutableStateFlow(
-        mapOf(
-            RecipientField.To to initial?.to.orEmpty(),
-            RecipientField.Cc to initial?.cc.orEmpty(),
-            RecipientField.Bcc to initial?.bcc.orEmpty(),
-        ),
+        mapOf(RecipientField.To to emptyList<Recipient>(), RecipientField.Cc to emptyList(), RecipientField.Bcc to emptyList()),
     )
-    private val confidential = MutableStateFlow(initial?.confidential ?: true)
+    private val confidential = MutableStateFlow(true)
+    /** HTML of a reopened draft; the backend keeps it when the plain text is unchanged. */
+    private var originalHtml: String? = null
+    private var attachments: List<Attachment> = emptyList()
     private val passwords = MutableStateFlow(emptyMap<String, String>())
     private val query = MutableStateFlow<String?>(null)
     private val sending = MutableStateFlow(false)
@@ -109,8 +114,15 @@ class ComposerViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), ComposerUiState())
 
     init {
-        // Any edit restarts the autosave timer; the first emission is the initial state, not an edit.
         viewModelScope.launch {
+            if (draftToOpen != null) {
+                when (val loaded = mail.loadDraft(account.id, MailId(entityIdOf(draftToOpen)))) {
+                    is Outcome.Success -> fill(loaded.value)
+                    is Outcome.Failed -> effectChannel.send(ComposerEffect.Failed(loaded.failure))
+                }
+            }
+            // Autosave starts after loading, so reopening a draft never saves it unchanged. Any later
+            // edit restarts the timer; the first emission is the loaded state, not an edit.
             combine(
                 snapshotFlow { subject.text.toString() to body.text.toString() },
                 recipients,
@@ -121,6 +133,18 @@ class ComposerViewModel(
                 .debounce(AUTOSAVE_DELAY_MS)
                 .collect { if (!sending.value && hasContent()) save() }
         }
+    }
+
+    private fun fill(draft: Draft) {
+        draftId.value = draft.id
+        sender.value = draft.sender
+        recipients.value = mapOf(RecipientField.To to draft.to, RecipientField.Cc to draft.cc, RecipientField.Bcc to draft.bcc)
+        confidential.value = draft.confidential
+        originalHtml = draft.htmlBody
+        attachments = draft.attachments
+        subject.setTextAndPlaceCursorAtEnd(draft.subject)
+        body.setTextAndPlaceCursorAtEnd(draft.plainText)
+        Snapshot.sendApplyNotifications()
     }
 
     fun onEvent(event: ComposerEvent) {
@@ -199,8 +223,9 @@ class ComposerViewModel(
             subject = subject.text.toString(),
             plainText = body.text.toString(),
             confidential = confidential.value,
-            attachments = emptyList(),
+            attachments = attachments,
             scheduledSendAt = null,
+            htmlBody = originalHtml,
         )
         val outcome = mail.saveDraft(account.id, draft)
         if (outcome is Outcome.Success) draftId.value = outcome.value

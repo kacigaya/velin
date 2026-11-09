@@ -37,6 +37,12 @@ import app.velin.core.domain.MailRepository
 import app.velin.core.domain.MailboxRepository
 import app.velin.feature.auth.SignInScreen
 import app.velin.feature.auth.SignInViewModel
+import androidx.activity.compose.BackHandler
+import app.velin.core.domain.Failure
+import app.velin.feature.mail.composer.ComposerEffect
+import app.velin.feature.mail.composer.ComposerEvent
+import app.velin.feature.mail.composer.ComposerScreen
+import app.velin.feature.mail.composer.ComposerViewModel
 import app.velin.feature.mail.mailbox.FolderPane
 import app.velin.feature.mail.mailbox.DeleteForeverDialog
 import app.velin.feature.mail.mailbox.LabelSheet
@@ -99,6 +105,7 @@ private fun MailApp(account: Account, auth: AuthRepository, mailbox: MailboxRepo
     var labelRequest by remember { mutableStateOf<Set<String>?>(null) }
     var deleteRequest by remember { mutableStateOf<Set<String>?>(null) }
     val tooManyLabels = stringResource(MailR.string.too_many_labels)
+    val mailSent = stringResource(MailR.string.composer_sent)
 
     LaunchedEffect(mailboxViewModel) {
         mailboxViewModel.effects.collect { effect ->
@@ -119,8 +126,9 @@ private fun MailApp(account: Account, auth: AuthRepository, mailbox: MailboxRepo
                     if (result == SnackbarResult.ActionPerformed) mailboxViewModel.undoLastMove()
                 }
                 is MailboxEffect.ActionFailed -> scope.launch { snackbar.showSnackbar(actionFailed) }
-                // Composer, search and account switching land with their milestones.
-                MailboxEffect.OpenComposer, MailboxEffect.OpenAccount, is MailboxEffect.OpenSearch ->
+                MailboxEffect.OpenComposer -> backStack.add(ComposerRoute())
+                // Search and account switching land with their milestones.
+                MailboxEffect.OpenAccount, is MailboxEffect.OpenSearch ->
                     scope.launch { snackbar.showSnackbar(notAvailable) }
             }
         }
@@ -211,6 +219,7 @@ private fun MailApp(account: Account, auth: AuthRepository, mailbox: MailboxRepo
                             when (effect) {
                                 ConversationEffect.Close -> backStack.remove(route)
                                 ConversationEffect.PickFolder -> pickingFolder = true
+                                is ConversationEffect.EditDraft -> backStack.add(ComposerRoute(effect.messageId))
                                 is ConversationEffect.OpenLink -> openLink(context, effect.uri)
                                 is ConversationEffect.ActionFailed -> scope.launch { snackbar.showSnackbar(actionFailed) }
                                 else -> scope.launch { snackbar.showSnackbar(notAvailable) }
@@ -233,6 +242,32 @@ private fun MailApp(account: Account, auth: AuthRepository, mailbox: MailboxRepo
                         // List and detail share the screen from the same 840dp breakpoint.
                         showBack = !permanent,
                         loadAttachmentImage = viewModel::loadAttachmentImage,
+                    )
+                }
+                // Full screen: the composer is a task, not a detail of the list.
+                entry<ComposerRoute> { route ->
+                    val viewModel = viewModel(key = "composer-${route.draftId}") {
+                        ComposerViewModel(account, mailbox, mail, route.draftId)
+                    }
+                    val state by viewModel.state.collectAsStateWithLifecycle()
+                    LaunchedEffect(viewModel) {
+                        viewModel.effects.collect { effect ->
+                            when (effect) {
+                                ComposerEffect.Close -> backStack.remove(route)
+                                ComposerEffect.Sent -> scope.launch { snackbar.showSnackbar(mailSent) }
+                                is ComposerEffect.Failed -> scope.launch {
+                                    snackbar.showSnackbar(if (effect.failure == Failure.Unsupported) notAvailable else actionFailed)
+                                }
+                            }
+                        }
+                    }
+                    // System back saves the draft too, like the close button.
+                    BackHandler { viewModel.onEvent(ComposerEvent.Close) }
+                    ComposerScreen(
+                        state = state,
+                        subject = viewModel.subject,
+                        body = viewModel.body,
+                        onEvent = viewModel::onEvent,
                     )
                 }
                 entry<SettingsRoute> {
