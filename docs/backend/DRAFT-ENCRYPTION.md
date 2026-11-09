@@ -68,7 +68,8 @@ through the same EntityFacade used by mailbox reads. This does not prove
 server acceptance of a write.
 
 No app, feature, or design-system module was changed. Upload, scheduling,
-cross-mailbox sender changes, recipient resolution, and send remain unsupported.
+and cross-mailbox sender changes remain unsupported. Recipient resolution and
+confidential internal send are covered by [M6b](M6B-REPORT.md).
 `WithInstanceKey` records remain outside this session-key implementation.
 Such records fail closed. They never trigger a CBC write fallback.
 
@@ -147,5 +148,5 @@ or generated binding type enters a domain contract.
    refreshed. No dependency was changed. Fifteen checked Maven packages,
    including jsoup, have no reported advisory. Existing release blockers remain.
 6. No live Tuta request ran. Server acceptance, device behavior, and the
-   owner checks in M6-DETAILS remain unverified. Verified recipient lookup,
-   identity trust, send, and SendDraftData vectors are not implemented.
+   owner checks in M6-DETAILS remain unverified. This section records the M6a
+   checks. See [M6b](M6B-REPORT.md) for recipient trust and send verification.

@@ -1,0 +1,3 @@
+9cee9875fadc49ec6a5c76e3eabe630becf3a5fd686348a35da20f2399518c35  core/sdk/build/native/artifacts/jniLibs/arm64-v8a/libtutasdk.so
+2d45e613c0d8062a1bdbe4cd6cdad2243af311e05614c92714bc9f828b438952  core/sdk/build/native/artifacts/jniLibs/x86_64/libtutasdk.so
+21282d961d587d8bfd15f8a0b6191d86f562f23c1bb75b77f3f43f920ecef5fd  core/sdk/build/native/artifacts/host/libtutasdk.so

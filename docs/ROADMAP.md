@@ -12,7 +12,7 @@ Each milestone is small and can be tested alone. A milestone is complete when it
 | M3 | Read path: folders, mail list paging, decryption, mail body, HTML sanitizer, attachment download | Backend, then UI wiring | in progress: folders, labels, inbox paging and received mail bodies verified live 2026-11-08; attachments and unread counters not yet verified live | Live list and body load. Sanitizer tests pass. |
 | M4 | Sync and offline: event bus WebSocket, Room with SQLCipher, durable cursors | Backend | planned | Offline cold start shows saved mail. Missed events replay after reconnect. |
 | M5 | Mail actions: read state, move, archive, trash, labels, spam report | Backend, then UI wiring | in progress: read state, moves with undo and labels verified live 2026-11-08; permanent delete built, not tested live; spam/phishing reports not implemented | Actions reflect on the server and in a second client. |
-| M6 | Compose and send: drafts, attachment upload, internal confidential, external non-confidential, scheduled send | Backend, then UI wiring | in progress: sender aliases and drafts done; draft create, update in place, reload and discard to Trash verified live 2026-11-09; sending not implemented | Mail arrives at a Tuta and a non-Tuta address. Drafts survive process death. |
+| M6 | Compose and send: drafts, attachment upload, internal confidential, external non-confidential, scheduled send | Backend, then UI wiring | in progress: sender aliases and drafts done; draft create, update in place, reload and discard to Trash verified live 2026-11-09; verified internal send implemented offline in M6b; live send unverified | Mail arrives at a Tuta and a non-Tuta address. Drafts survive process death. |
 | M7 | Notifications: SSE service, notification UI, quick actions | Backend, then UI | planned | New mail notifies with the app in the background. |
 | M8 | Search, contact suggestions, settings (signatures, aliases, inbox rules), multi-account | Both | planned | Feature parity rows below are checked. |
 | M9 | Hardening: security review, performance, accessibility audit, parity review against the official app | Both | planned | No open high-severity findings. |
@@ -47,7 +47,7 @@ Source status comes from research §6. "UI" shows the Velin screen state.
 | Phishing and authentication banners | Data from server and TS logic | done (sample data) |
 | Read state, archive, trash | Verified live | done, wired |
 | Move, labels, spam report | Move and labels verified live; spam report sends no report yet | done, wired |
-| Compose, reply, forward | Send, reply and forward: port from TS | composer wired to drafts |
+| Compose, reply, forward | Confidential internal send implemented offline; reply and forward unsupported | composer wired to drafts |
 | Drafts | Done, verified live | done, wired |
 | External confidential mail | Blocked in Rust core | password fields done |
 | Scheduled send, undo send | Port from TS | entry points done |
