@@ -86,7 +86,11 @@ internal class FakeMailRepo : MailRepository {
     override fun conversation(account: AccountId, id: ConversationId): Flow<Outcome<Conversation>> = conversation
     override suspend fun loadMore(account: AccountId, folder: FolderId, cursor: PageCursor): Outcome<Unit> = Outcome.Success(Unit)
     override suspend fun load(account: AccountId, id: MailId): Outcome<MailMessage> = Outcome.Failed(app.velin.core.domain.Failure.Unsupported)
-    override suspend fun setUnread(account: AccountId, ids: List<MailId>, unread: Boolean): Outcome<Unit> = Outcome.Success(Unit)
+    val unreadCalls = mutableListOf<Pair<List<MailId>, Boolean>>()
+    override suspend fun setUnread(account: AccountId, ids: List<MailId>, unread: Boolean): Outcome<Unit> {
+        unreadCalls += ids to unread
+        return Outcome.Success(Unit)
+    }
     override suspend fun move(account: AccountId, ids: List<MailId>, target: FolderId): Outcome<Unit> {
         moves += ids to target
         return moveResult

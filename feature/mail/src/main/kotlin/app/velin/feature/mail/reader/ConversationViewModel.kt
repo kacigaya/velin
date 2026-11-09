@@ -66,6 +66,24 @@ class ConversationViewModel(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), ConversationUiState.Loading)
 
+    /** Messages already marked read here, so a refreshed conversation does not mark them again. */
+    private val markedRead = mutableSetOf<MailId>()
+
+    init {
+        // Opening a conversation reads it: unread messages start expanded, and upstream marks a
+        // message read when it expands (MailViewerViewModel.expandMail). Drafts have no read state.
+        viewModelScope.launch {
+            mail.conversation(account.id, conversationId).collect { outcome ->
+                val messages = (outcome as? Outcome.Success)?.value?.messages ?: return@collect
+                val unread = messages.filter { it.unread && !it.isDraft && it.id !in markedRead }.map { it.id }
+                if (unread.isEmpty()) return@collect
+                markedRead += unread
+                // Best effort, like upstream: an automatic mark is not worth an error message.
+                mail.setUnread(account.id, unread, false)
+            }
+        }
+    }
+
     fun onEvent(event: ConversationEvent) {
         when (event) {
             ConversationEvent.Back -> effectChannel.trySend(ConversationEffect.Close)

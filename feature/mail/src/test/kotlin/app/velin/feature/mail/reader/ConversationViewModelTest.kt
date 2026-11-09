@@ -43,15 +43,16 @@ class ConversationViewModelTest {
     @Before fun setUp() = Dispatchers.setMain(UnconfinedTestDispatcher())
     @After fun tearDown() = Dispatchers.resetMain()
 
-    private fun TestScope.viewModel(): ConversationViewModel {
-        val message = MailMessage(
-            id = MailId(eid("mails", "m1")), from = Address("a@tuta.com"), to = emptyList(), cc = emptyList(),
-            bcc = emptyList(), replyTo = emptyList(), subject = "s", sentAt = Instant.EPOCH, confidential = true,
-            unread = false, isDraft = false,
-            body = BodyState.Loaded("<img src=\"$placeholder\">", true, true, mapOf(placeholder to AttachmentId(eid("files", "f1")))),
-            attachments = emptyList(), authentication = MailAuthentication.Unknown, finding = null, scheduledSendAt = null,
-        )
-        repo.conversation.value = Outcome.Success(Conversation(ConversationId(eid("conv", "c1")), "s", emptyList(), null, listOf(message)))
+    private fun message(id: String, unread: Boolean = false, draft: Boolean = false) = MailMessage(
+        id = MailId(eid("mails", id)), from = Address("a@tuta.com"), to = emptyList(), cc = emptyList(),
+        bcc = emptyList(), replyTo = emptyList(), subject = "s", sentAt = Instant.EPOCH, confidential = true,
+        unread = unread, isDraft = draft,
+        body = BodyState.Loaded("<img src=\"$placeholder\">", true, true, mapOf(placeholder to AttachmentId(eid("files", "f1")))),
+        attachments = emptyList(), authentication = MailAuthentication.Unknown, finding = null, scheduledSendAt = null,
+    )
+
+    private fun TestScope.viewModel(messages: List<MailMessage> = listOf(message("m1"))): ConversationViewModel {
+        repo.conversation.value = Outcome.Success(Conversation(ConversationId(eid("conv", "c1")), "s", emptyList(), null, messages))
         return ConversationViewModel(testAccount, "conv/c1", mailbox, repo).also { vm ->
             backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.state.collect {} }
         }
@@ -80,5 +81,15 @@ class ConversationViewModelTest {
         val image = vm.loadAttachmentImage("files/f1")!!
         assertArrayEquals(byteArrayOf(1, 2), image.bytes)
         assertEquals("image/png", image.mimeType)
+    }
+
+    @Test
+    fun openingMarksUnreadMessagesReadOnce() = runTest {
+        val messages = listOf(message("m1", unread = true), message("m2"), message("d1", unread = true, draft = true))
+        viewModel(messages)
+        assertEquals(listOf(listOf(MailId(eid("mails", "m1"))) to false), repo.unreadCalls)
+        // A refresh that still reports the message unread does not mark it again.
+        repo.conversation.value = Outcome.Success(Conversation(ConversationId(eid("conv", "c1")), "s2", emptyList(), null, messages))
+        assertEquals(1, repo.unreadCalls.size)
     }
 }
