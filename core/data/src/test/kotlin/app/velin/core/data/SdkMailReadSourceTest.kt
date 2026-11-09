@@ -26,6 +26,19 @@ class SdkMailReadSourceTest {
     private val child = ReadFolder(ReadId("folders", "child"), "Child", 0, inbox.id, "childEntries", "group", null)
     private val label = ReadFolder(ReadId("folders", "label"), "Work", 8, null, "labels", "group", "#112233")
     private class Reader : SdkMailReader {
+        var resolved = ReadRecipient(true, ReadRecipientKeyState.VerifiedTofu)
+        var resolutionAddress: String? = null
+        var failure: SdkException? = null
+        var sent: ReadId? = null
+        override suspend fun resolveRecipient(address: String): ReadRecipient {
+            resolutionAddress = address
+            failure?.let { throw it }
+            return resolved
+        }
+        override suspend fun sendDraft(id: ReadId) {
+            failure?.let { throw it }
+            sent = id
+        }
         val saved = mutableListOf<WriteDraft>()
         var draftFailure: SdkFailure? = null
         var loadedDraft: ReadMessage? = null
@@ -309,6 +322,49 @@ class SdkMailReadSourceTest {
             assertEquals(Outcome.Success(Unit), source.delete(account, ids))
             assertEquals(folder.id, reader.deleted.last().second)
         }
+    }
+    @Test fun recipientResolutionCleansAndRetainsTrustState() = runBlocking {
+        val reader = Reader()
+        val source = source(reader)
+        assertEquals(Outcome.Success(Recipient(Address("self@tuta.com"), RecipientType.Internal,
+            keyState = RecipientKeyState.VerifiedTofu)), source.resolveRecipient(account, "  SELF@TUTA.COM  "))
+        assertEquals("self@tuta.com", reader.resolutionAddress)
+        reader.resolved = ReadRecipient(false, ReadRecipientKeyState.NoEntry)
+        assertEquals(Outcome.Success(Recipient(Address("other@example.invalid"), RecipientType.External,
+            keyState = RecipientKeyState.NoEntry)), source.resolveRecipient(account, "other@example.invalid"))
+        reader.resolved = ReadRecipient(true, ReadRecipientKeyState.Mismatch)
+        assertEquals(RecipientKeyState.Mismatch, (source.resolveRecipient(account, "self@tuta.com") as Outcome.Success).value.keyState)
+    }
+    @Test fun recipientErrorsNeverBecomeExternalRecipients() = runBlocking {
+        val reader = Reader()
+        val source = source(reader)
+        assertEquals(Outcome.Failed(Failure.RecipientResolution(RecipientResolutionReason.InvalidAddress)),
+            source.resolveRecipient(account, "self@tuta.com\nBcc: injected"))
+        assertNull(reader.resolutionAddress)
+        reader.failure = SdkException(SdkFailure.RecipientRateLimited)
+        assertEquals(Outcome.Failed(Failure.RecipientResolution(RecipientResolutionReason.RateLimited)),
+            source.resolveRecipient(account, "self@tuta.com"))
+        reader.failure = SdkException(SdkFailure.Network)
+        assertEquals(Outcome.Failed(Failure.Offline), source.resolveRecipient(account, "self@tuta.com"))
+    }
+    @Test fun sendMapsTypedFailuresWithoutRetry() = runBlocking {
+        val reader = Reader()
+        val source = source(reader)
+        val id = DraftId(MailId(ReadId("mail", "draft").domain()))
+        reader.failure = SdkException(SdkFailure.SendBlocked, reason = 1, recipientIndices = listOf(2))
+        assertEquals(Outcome.Failed(Failure.SendBlocked(SendBlockReason.KeyMismatch, listOf(2))), source.sendDraft(account, id))
+        assertNull(reader.sent)
+        for ((reason, expected) in listOf(1 to UnsupportedReason.ScheduledSend, 2 to UnsupportedReason.NonConfidentialSend,
+            3 to UnsupportedReason.Attachments, 4 to UnsupportedReason.ReplyOrForward, 5 to UnsupportedReason.IdentityTrustStore,
+            6 to UnsupportedReason.ExternalRecipient, 7 to UnsupportedReason.CalendarMail,
+            8 to UnsupportedReason.CustomReplyTo)) {
+            reader.failure = SdkException(SdkFailure.SendUnsupported, reason = reason)
+            assertEquals(Outcome.Failed(Failure.Unsupported.Operation(expected)), source.sendDraft(account, id))
+            assertNull(reader.sent)
+        }
+        reader.failure = null
+        assertEquals(Outcome.Success(Unit), source.sendDraft(account, id))
+        assertEquals(ReadId("mail", "draft"), reader.sent)
     }
     private fun readMessage(id: ReadId) = ReadMessage(id, ReadAddress("from@example.invalid", "Sender"),
         emptyList(), emptyList(), emptyList(), emptyList(), "Subject", 1700000000000, true, true,

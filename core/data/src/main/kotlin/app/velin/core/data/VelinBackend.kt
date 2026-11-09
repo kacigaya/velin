@@ -19,7 +19,8 @@ class VelinBackend(context: Context, readSource: MailReadSource? = null) {
     private val store = EncryptedCredentialStore(
         File(context.applicationContext.noBackupFilesDir, "credentials.v1"), AndroidCredentialKey::get)
     private val repository = BackendAuthRepository(AuthService(baseUrl, transport), store, SessionLoader { c ->
-        val engine = SdkEngine(baseUrl, transport, PrivateSdkContentStore())
+        val engine = SdkEngine(baseUrl, transport, PrivateSdkContentStore(), IdentityTrustStore(
+            File(context.applicationContext.noBackupFilesDir, "identity-trust"), c.user, AndroidCredentialKey::get))
         try {
             val session = engine.resume(SessionCredentials.internalAccount(c.login, c.user, c.token, c.encryptedKey))
             val counters = CounterEvents(URI(baseUrl), c.user, c.token)
