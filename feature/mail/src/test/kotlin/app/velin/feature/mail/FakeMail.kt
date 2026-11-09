@@ -110,10 +110,15 @@ internal class FakeMailRepo : MailRepository {
         savedDrafts += draft
         return Outcome.Success(draft.id ?: DraftId(MailId(eid("drafts", "d${savedDrafts.size}"))))
     }
+    var sendOutcome: Outcome<Unit> = Outcome.Success(Unit)
     override suspend fun sendDraft(account: AccountId, id: DraftId): Outcome<Unit> {
         sentDrafts += id
-        return Outcome.Success(Unit)
+        return sendOutcome
     }
+    /** Lookup results by lowercase address; others fail as unsupported, like the interface default. */
+    val resolved = mutableMapOf<String, Recipient>()
+    override suspend fun resolveRecipient(account: AccountId, address: String): Outcome<Recipient> =
+        resolved[address.lowercase()]?.let { Outcome.Success(it) } ?: Outcome.Failed(app.velin.core.domain.Failure.Unsupported)
     override suspend fun downloadAttachment(account: AccountId, id: AttachmentId): Outcome<File> = Outcome.Failed(app.velin.core.domain.Failure.Unsupported)
     override fun search(account: AccountId, query: String): Flow<Outcome<List<MailSummary>>> = flowOf(Outcome.Success(emptyList()))
     override fun suggestRecipients(account: AccountId, query: String): Flow<List<Recipient>> = flowOf(emptyList())

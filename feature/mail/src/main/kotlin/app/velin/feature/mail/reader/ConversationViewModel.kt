@@ -59,7 +59,7 @@ class ConversationViewModel(
         when (outcome) {
             is Outcome.Success -> ConversationUiState.Loaded(outcome.value.toUi(), allowed)
             is Outcome.Failed -> when (val failure = outcome.failure) {
-                Failure.Unsupported -> ConversationUiState.Unsupported
+                is Failure.Unsupported -> ConversationUiState.Unsupported
                 is Failure.Protocol -> if (failure.status == 404) ConversationUiState.NotFound else ConversationUiState.Failed
                 else -> ConversationUiState.Failed
             }

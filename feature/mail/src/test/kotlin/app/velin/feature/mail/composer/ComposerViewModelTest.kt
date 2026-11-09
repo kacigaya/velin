@@ -4,11 +4,15 @@ import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.snapshots.Snapshot
 import app.velin.core.domain.Address
 import app.velin.core.domain.Draft
+import app.velin.core.domain.Failure
+import app.velin.core.domain.Outcome
 import app.velin.core.domain.DraftId
 import app.velin.core.domain.FolderKind
 import app.velin.core.domain.MailId
 import app.velin.core.domain.Recipient
+import app.velin.core.domain.RecipientKeyState
 import app.velin.core.domain.RecipientType
+import app.velin.core.domain.SendBlockReason
 import app.velin.core.domain.SenderAlias
 import app.velin.feature.mail.eid
 import app.velin.feature.mail.FakeMailRepo
@@ -18,6 +22,7 @@ import app.velin.feature.mail.model.RecipientUi
 import app.velin.feature.mail.testAccount
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -120,14 +125,57 @@ class ComposerViewModelTest {
             subject = "Plan", plainText = "Hello", confidential = true, attachments = emptyList(),
             scheduledSendAt = null, htmlBody = "<b>Hello</b>",
         )
+        repo.resolved["lena@tuta.com"] = internal("lena@tuta.com")
         val vm = viewModel(draft = "drafts/d7")
         advanceTimeBy(5_000); runCurrent()
         assertEquals("Plan", vm.subject.text.toString())
         assertEquals(listOf("lena@tuta.com"), vm.state.value.to.map { it.recipient.address })
-        assertTrue("opening must not save", repo.savedDrafts.isEmpty())
+        assertTrue("recipients are looked up again", vm.state.value.to.single().internal)
+        assertTrue("opening and the lookup must not save", repo.savedDrafts.isEmpty())
         edit { vm.subject.setTextAndPlaceCursorAtEnd("Plan v2") }
         advanceTimeBy(2_500); runCurrent()
         assertEquals(id, repo.savedDrafts.single().id)
         assertEquals("<b>Hello</b>", repo.savedDrafts.single().htmlBody)
+    }
+
+    private fun internal(address: String, key: RecipientKeyState = RecipientKeyState.VerifiedTofu) =
+        Recipient(Address(address), RecipientType.Internal, keyState = key)
+
+    @Test
+    fun addedRecipientIsLookedUp() = runTest {
+        repo.resolved["lena@tuta.com"] = internal("lena@tuta.com")
+        val vm = viewModel()
+        vm.onEvent(ComposerEvent.AddRecipient(RecipientField.To, RecipientUi("Lena", "Lena@tuta.com")))
+        runCurrent()
+        val chip = vm.state.value.to.single()
+        assertTrue(chip.internal)
+        assertFalse(chip.resolving)
+        assertEquals("the typed name stays", "Lena", chip.recipient.name)
+        assertTrue(vm.state.value.canSend)
+    }
+
+    @Test
+    fun changedKeyBlocksSending() = runTest {
+        repo.resolved["lena@tuta.com"] = internal("lena@tuta.com", RecipientKeyState.Mismatch)
+        val vm = viewModel()
+        vm.onEvent(ComposerEvent.AddRecipient(RecipientField.To, RecipientUi("", "lena@tuta.com")))
+        runCurrent()
+        assertTrue(vm.state.value.to.single().keyChanged)
+        assertFalse(vm.state.value.canSend)
+    }
+
+    @Test
+    fun refusedSendMarksTheRecipient() = runTest {
+        repo.sendOutcome = Outcome.Failed(Failure.SendBlocked(SendBlockReason.KeyMismatch, listOf(1)))
+        val vm = viewModel()
+        vm.onEvent(ComposerEvent.AddRecipient(RecipientField.To, RecipientUi("", "lena@tuta.com")))
+        vm.onEvent(ComposerEvent.AddRecipient(RecipientField.Cc, RecipientUi("", "max@tuta.com")))
+        runCurrent()
+        vm.onEvent(ComposerEvent.Send)
+        runCurrent()
+        assertFalse(vm.state.value.to.single().keyChanged)
+        assertTrue("index 1 is the first Cc", vm.state.value.cc.single().keyChanged)
+        assertEquals(ComposerEffect.Failed(repo.sendOutcome.let { (it as Outcome.Failed).failure }), vm.effects.first())
+        assertFalse(vm.state.value.canSend)
     }
 }

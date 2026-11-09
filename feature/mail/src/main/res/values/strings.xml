@@ -84,6 +84,16 @@
     <string name="composer_remove_attachment">Remove %1$s</string>
     <string name="composer_external_password_info">Recipients without a Tuta address open this mail with a password. Share it with them another way, not by mail.</string>
     <string name="composer_password_for">Password for %1$s</string>
+    <string name="composer_resolving">Checking address</string>
+    <string name="composer_key_changed">Encryption key changed</string>
+    <string name="composer_error_key_changed">The encryption key of a recipient changed. Remove the recipient to send.</string>
+    <string name="composer_error_not_found">A recipient address does not exist.</string>
+    <string name="composer_error_rate_limited">Too many address checks. Try again in a few minutes.</string>
+    <string name="composer_error_trust_storage">Could not read the saved encryption keys on this device.</string>
+    <string name="composer_error_lookup">Could not check a recipient address.</string>
+    <string name="composer_error_external">Sending to addresses outside Tuta is not available yet.</string>
+    <string name="composer_error_not_confidential">Sending without end-to-end encryption is not available yet.</string>
+    <string name="composer_error_attachments">Sending attachments is not available yet.</string>
 
     <!-- Pickers and undo -->
     <string name="picker_move_title">Move to</string>

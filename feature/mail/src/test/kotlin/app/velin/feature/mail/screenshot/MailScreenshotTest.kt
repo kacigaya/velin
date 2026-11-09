@@ -116,8 +116,12 @@ class MailScreenshotTest {
                 senders = persistentListOf("alex@tuta.com", "alex@tutanota.de"),
                 sender = "alex@tuta.com",
                 to = persistentListOf(
-                    ComposerRecipientUi(RecipientUi("Lena Fischer", "lena@tuta.com"), external = false),
+                    ComposerRecipientUi(RecipientUi("Lena Fischer", "lena@tuta.com"), external = false, internal = true),
                     ComposerRecipientUi(RecipientUi("", "friend@example.com"), external = true),
+                ),
+                cc = persistentListOf(
+                    ComposerRecipientUi(RecipientUi("", "max@tuta.com"), external = false, resolving = true),
+                    ComposerRecipientUi(RecipientUi("Sam", "sam@tuta.com"), external = false, internal = true, keyChanged = true),
                 ),
                 attachments = persistentListOf(AttachmentUi("a1", "itinerary.pdf", "application/pdf", 182_000)),
                 confidential = true,

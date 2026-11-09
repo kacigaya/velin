@@ -43,6 +43,7 @@ import app.velin.feature.mail.composer.ComposerEffect
 import app.velin.feature.mail.composer.ComposerEvent
 import app.velin.feature.mail.composer.ComposerScreen
 import app.velin.feature.mail.composer.ComposerViewModel
+import app.velin.feature.mail.composer.composerFailureMessage
 import app.velin.feature.mail.mailbox.FolderPane
 import app.velin.feature.mail.mailbox.DeleteForeverDialog
 import app.velin.feature.mail.mailbox.LabelSheet
@@ -256,7 +257,9 @@ private fun MailApp(account: Account, auth: AuthRepository, mailbox: MailboxRepo
                                 ComposerEffect.Close -> backStack.remove(route)
                                 ComposerEffect.Sent -> scope.launch { snackbar.showSnackbar(mailSent) }
                                 is ComposerEffect.Failed -> scope.launch {
-                                    snackbar.showSnackbar(if (effect.failure == Failure.Unsupported) notAvailable else actionFailed)
+                                    val message = composerFailureMessage(effect.failure)?.let(context::getString)
+                                        ?: if (effect.failure is Failure.Unsupported) notAvailable else actionFailed
+                                    snackbar.showSnackbar(message)
                                 }
                             }
                         }

@@ -18,7 +18,10 @@ import app.velin.core.domain.MailRepository
 import app.velin.core.domain.MailboxRepository
 import app.velin.core.domain.Outcome
 import app.velin.core.domain.Recipient
+import app.velin.core.domain.RecipientKeyState
+import app.velin.core.domain.RecipientResolutionReason
 import app.velin.core.domain.RecipientType
+import app.velin.core.domain.SendBlockReason
 import app.velin.core.domain.SenderAlias
 import app.velin.feature.mail.model.RecipientUi
 import app.velin.feature.mail.model.entityIdOf
@@ -32,10 +35,12 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -73,6 +78,8 @@ class ComposerViewModel(
     /** HTML of a reopened draft; the backend keeps it when the plain text is unchanged. */
     private var originalHtml: String? = null
     private var attachments: List<Attachment> = emptyList()
+    /** Lowercase addresses with a key lookup in flight. */
+    private val resolving = MutableStateFlow(emptySet<String>())
     private val passwords = MutableStateFlow(emptyMap<String, String>())
     private val query = MutableStateFlow<String?>(null)
     private val sending = MutableStateFlow(false)
@@ -89,11 +96,11 @@ class ComposerViewModel(
 
     val state: StateFlow<ComposerUiState> = combine(
         combine(senders, sender, ::Pair),
-        recipients,
+        combine(recipients, resolving, ::Pair),
         combine(confidential, passwords, ::Pair),
         suggestions,
         sending,
-    ) { (all, chosen), fields, (isConfidential, externalPasswords), suggested, isSending ->
+    ) { (all, chosen), (fields, inFlight), (isConfidential, externalPasswords), suggested, isSending ->
         val active = all.filter { it.enabled }
         val from = chosen ?: active.firstOrNull()
         val everyone = fields.values.flatten()
@@ -102,14 +109,16 @@ class ComposerViewModel(
         ComposerUiState(
             senders = active.map { it.address.address }.toImmutableList(),
             sender = from?.address?.address.orEmpty(),
-            to = fields.getValue(RecipientField.To).map { it.toUi() }.toImmutableList(),
-            cc = fields.getValue(RecipientField.Cc).map { it.toUi() }.toImmutableList(),
-            bcc = fields.getValue(RecipientField.Bcc).map { it.toUi() }.toImmutableList(),
+            to = fields.getValue(RecipientField.To).map { it.toUi(inFlight) }.toImmutableList(),
+            cc = fields.getValue(RecipientField.Cc).map { it.toUi(inFlight) }.toImmutableList(),
+            bcc = fields.getValue(RecipientField.Bcc).map { it.toUi(inFlight) }.toImmutableList(),
             suggestions = suggested.map { RecipientUi(it.address.name, it.address.address) }.toImmutableList(),
             confidential = isConfidential,
             externalPasswords = externalPasswords,
             sending = isSending,
-            canSend = from != null && everyone.isNotEmpty() && everyone.none { it.invalid } && passwordsComplete && !isSending,
+            // A changed key blocks sending, as upstream does; the backend checks keys again on send.
+            canSend = from != null && everyone.isNotEmpty() && everyone.none { it.invalid || it.keyState == RecipientKeyState.Mismatch } &&
+                inFlight.isEmpty() && passwordsComplete && !isSending,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), ComposerUiState())
 
@@ -122,10 +131,11 @@ class ComposerViewModel(
                 }
             }
             // Autosave starts after loading, so reopening a draft never saves it unchanged. Any later
-            // edit restarts the timer; the first emission is the loaded state, not an edit.
+            // edit restarts the timer; the first emission is the loaded state, not an edit. Only the
+            // addresses count, so a finished key lookup is not an edit.
             combine(
                 snapshotFlow { subject.text.toString() to body.text.toString() },
-                recipients,
+                recipients.map { fields -> fields.mapValues { (_, list) -> list.map { it.address } } }.distinctUntilChanged(),
                 sender,
                 confidential,
             ) { _, _, _, _ -> Unit }
@@ -145,6 +155,8 @@ class ComposerViewModel(
         subject.setTextAndPlaceCursorAtEnd(draft.subject)
         body.setTextAndPlaceCursorAtEnd(draft.plainText)
         Snapshot.sendApplyNotifications()
+        // Saved drafts do not keep the recipient type, so look every address up again.
+        (draft.to + draft.cc + draft.bcc).filterNot { it.invalid }.forEach { resolve(it.address.address) }
     }
 
     fun onEvent(event: ComposerEvent) {
@@ -178,6 +190,36 @@ class ComposerViewModel(
             fields + (field to fields.getValue(field) + added)
         }
         query.value = null
+        if (isValidAddress(address)) resolve(address)
+    }
+
+    /** Looks up whether [address] is a Tuta address and the state of its key. */
+    private fun resolve(address: String) {
+        val key = address.lowercase()
+        if (key in resolving.value) return
+        resolving.update { it + key }
+        viewModelScope.launch {
+            try {
+                when (val outcome = mail.resolveRecipient(account.id, address)) {
+                    is Outcome.Success -> updateRecipient(address) { it.copy(type = outcome.value.type, keyState = outcome.value.keyState) }
+                    is Outcome.Failed -> {
+                        val failure = outcome.failure
+                        if (failure is Failure.RecipientResolution && failure.reason == RecipientResolutionReason.InvalidAddress) {
+                            updateRecipient(address) { it.copy(invalid = true) }
+                        } else if (failure !is Failure.Unsupported) {
+                            // The type stays unknown; send resolves again and reports what blocks it.
+                            effectChannel.send(ComposerEffect.Failed(failure))
+                        }
+                    }
+                }
+            } finally {
+                resolving.update { it - key }
+            }
+        }
+    }
+
+    private fun updateRecipient(address: String, change: (Recipient) -> Recipient) = recipients.update { fields ->
+        fields.mapValues { (_, list) -> list.map { if (it.address.address.equals(address, ignoreCase = true)) change(it) else it } }
     }
 
     private fun send() {
@@ -192,7 +234,24 @@ class ComposerViewModel(
                     effectChannel.send(ComposerEffect.Sent)
                     effectChannel.send(ComposerEffect.Close)
                 }
-                is Outcome.Failed -> effectChannel.send(ComposerEffect.Failed(outcome.failure))
+                is Outcome.Failed -> {
+                    (outcome.failure as? Failure.SendBlocked)?.let(::markBlocked)
+                    effectChannel.send(ComposerEffect.Failed(outcome.failure))
+                }
+            }
+        }
+    }
+
+    /** Marks the recipients the server refused. Indices count To, then Cc, then Bcc. */
+    private fun markBlocked(blocked: Failure.SendBlocked) {
+        val fields = recipients.value
+        val ordered = RecipientField.entries.flatMap { field -> fields.getValue(field) }
+        blocked.recipientIndices.mapNotNull { ordered.getOrNull(it)?.address?.address }.forEach { address ->
+            updateRecipient(address) {
+                when (blocked.reason) {
+                    SendBlockReason.KeyMismatch -> it.copy(keyState = RecipientKeyState.Mismatch)
+                    SendBlockReason.RecipientNotFound -> it.copy(invalid = true)
+                }
             }
         }
     }
@@ -245,10 +304,13 @@ class ComposerViewModel(
     }
 }
 
-private fun Recipient.toUi() = ComposerRecipientUi(
+private fun Recipient.toUi(inFlight: Set<String>) = ComposerRecipientUi(
     recipient = RecipientUi(address.name, address.address),
     external = type == RecipientType.External,
+    internal = type == RecipientType.Internal,
     invalid = invalid,
+    resolving = address.address.lowercase() in inFlight,
+    keyChanged = keyState == RecipientKeyState.Mismatch,
 )
 
 private fun Outcome<DraftId>.toUnitOutcome(): Outcome<Unit> = when (this) {
