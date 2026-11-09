@@ -11,6 +11,7 @@ import app.velin.core.domain.SecondFactorAnswer
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -27,6 +28,17 @@ class SignInViewModel(private val auth: AuthRepository) : ViewModel() {
     val signedIn: StateFlow<Boolean> = auth.state
         .map { it is AuthState.Active }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), false)
+
+    init {
+        // Like the official app, open the only saved account without a tap. Once per launch, and
+        // never over an error, so a failed resume leaves the user on this screen.
+        viewModelScope.launch {
+            val first = auth.state.first { it !is AuthState.Credentials || !it.busy }
+            if (first is AuthState.Credentials && first.error == null) {
+                first.accounts.singleOrNull()?.let { auth.resume(it.id) }
+            }
+        }
+    }
 
     fun onEvent(event: SignInEvent) {
         viewModelScope.launch {

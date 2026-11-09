@@ -78,4 +78,27 @@ class SignInViewModelTest {
         auth.state.value = AuthState.Active(Account(AccountId(ElementId("u1")), Address("a@tuta.com")))
         assertTrue(vm.signedIn.value)
     }
+
+    @Test
+    fun resumesTheOnlySavedAccountOnce() = runTest {
+        val account = Account(AccountId(ElementId("u1")), Address("a@tuta.com"))
+        auth.state.value = AuthState.Credentials(listOf(account), busy = true)
+        SignInViewModel(auth)
+        assertTrue("waits until saved accounts are loaded", auth.calls.isEmpty())
+        auth.state.value = AuthState.Credentials(listOf(account))
+        auth.state.value = AuthState.Credentials(listOf(account), error = AuthError.Offline)
+        auth.state.value = AuthState.Credentials(listOf(account))
+        assertEquals(listOf("resume:u1"), auth.calls)
+    }
+
+    @Test
+    fun doesNotResumeWithSeveralAccountsOrAnError() = runTest {
+        val a = Account(AccountId(ElementId("u1")), Address("a@tuta.com"))
+        val b = Account(AccountId(ElementId("u2")), Address("b@tuta.com"))
+        auth.state.value = AuthState.Credentials(listOf(a, b))
+        SignInViewModel(auth)
+        auth.state.value = AuthState.Credentials(listOf(a), error = AuthError.Offline)
+        SignInViewModel(auth)
+        assertTrue(auth.calls.isEmpty())
+    }
 }
