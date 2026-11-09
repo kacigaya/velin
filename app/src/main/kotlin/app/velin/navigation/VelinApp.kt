@@ -244,6 +244,7 @@ private fun MailApp(account: Account, auth: AuthRepository, mailbox: MailboxRepo
                         // List and detail share the screen from the same 840dp breakpoint.
                         showBack = !permanent,
                         loadAttachmentImage = viewModel::loadAttachmentImage,
+                        snackbarHostState = if (permanent) null else snackbar,
                     )
                 }
                 // Full screen: the composer is a task, not a detail of the list.
@@ -272,6 +273,7 @@ private fun MailApp(account: Account, auth: AuthRepository, mailbox: MailboxRepo
                         subject = viewModel.subject,
                         body = viewModel.body,
                         onEvent = viewModel::onEvent,
+                        snackbarHostState = snackbar,
                     )
                 }
                 entry<SettingsRoute> {

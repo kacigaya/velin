@@ -34,6 +34,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -123,6 +125,8 @@ fun ConversationScreen(
     showBack: Boolean = true,
     /** Loads inline image bytes by attachment id. Called off the main thread. */
     loadAttachmentImage: (attachmentId: String) -> InlineImageData? = { null },
+    /** Set when the conversation covers the list; beside the list, the list shows messages. */
+    snackbarHostState: SnackbarHostState? = null,
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     val toolbarScrollBehavior = FloatingToolbarDefaults.exitAlwaysScrollBehavior(exitDirection = FloatingToolbarExitDirection.Bottom)
@@ -130,6 +134,7 @@ fun ConversationScreen(
         modifier = modifier
             .nestedScroll(scrollBehavior.nestedScrollConnection)
             .nestedScroll(toolbarScrollBehavior),
+        snackbarHost = { snackbarHostState?.let { SnackbarHost(it) } },
         topBar = {
             TopAppBar(
                 title = {},

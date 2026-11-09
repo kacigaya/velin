@@ -39,6 +39,8 @@ import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SplitButtonDefaults
 import androidx.compose.material3.SplitButtonLayout
 import androidx.compose.material3.Surface
@@ -168,10 +170,13 @@ fun ComposerScreen(
     body: TextFieldState,
     onEvent: (ComposerEvent) -> Unit,
     modifier: Modifier = Modifier,
+    /** The composer covers the whole window, so it shows the app's messages itself. */
+    snackbarHostState: SnackbarHostState? = null,
 ) {
     var showCcBcc by rememberSaveable { mutableStateOf(state.cc.isNotEmpty() || state.bcc.isNotEmpty()) }
     Scaffold(
         modifier = modifier.imePadding(),
+        snackbarHost = { snackbarHostState?.let { SnackbarHost(it) } },
         topBar = {
             Column {
                 TopAppBar(
