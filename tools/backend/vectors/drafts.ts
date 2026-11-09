@@ -148,3 +148,5 @@ for (const scheme of [SymmetricEncryptionScheme.AesCbc, SymmetricEncryptionSchem
 const htmlVectors = ['', 'one', 'a < b & c\nnext', 'a\r\nb\n', '\n\n', '> quoted\n> next\nplain',
   '>> nested\n> outer\nplain', '>\n>>', '>no space', '>  two spaces', '  > literal', 'λ 😀 & <tag>'].map(plain => ({ plain, html: plainTextToHtml(plain) }))
 export const output = { htmlVectors, draftUpdateReturnWire, upstreamCommit: '332e57461cdc4fe4a4ad9bdc8555f56df02931c0', vectors }
+
+export { TestRandomizer, resolver }
