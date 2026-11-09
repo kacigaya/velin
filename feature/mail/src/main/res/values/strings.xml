@@ -17,6 +17,7 @@
     <string name="mailbox_search_in">Search in %1$s</string>
     <string name="mailbox_open_folders">Open folders</string>
     <string name="mailbox_compose">Compose</string>
+    <string name="mailbox_account">Account %1$s</string>
     <string name="mailbox_loading">Loading mail</string>
     <string name="mailbox_empty_title">Nothing here</string>
     <string name="mailbox_empty_body">Mail in this folder shows here.</string>

@@ -57,6 +57,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.velin.core.designsystem.component.LoadingPane
 import app.velin.core.designsystem.component.SenderAvatar
@@ -146,11 +148,14 @@ fun MailboxScreen(
         },
         floatingActionButton = {
             if (!selectionMode) {
+                val composeLabel = stringResource(R.string.mailbox_compose)
                 MediumExtendedFloatingActionButton(
-                    text = { Text(stringResource(R.string.mailbox_compose)) },
+                    text = { Text(composeLabel) },
                     icon = { Icon(painterResource(VelinIcons.Edit), contentDescription = null) },
                     onClick = { onEvent(MailboxEvent.Compose) },
                     expanded = fabExpanded,
+                    // The label text is not exposed to accessibility, and it hides when collapsed.
+                    modifier = Modifier.semantics { contentDescription = composeLabel },
                 )
             }
         },
@@ -335,7 +340,12 @@ private fun SearchTopBar(
                 },
                 trailingIcon = state.account?.let { account ->
                     {
-                        IconButton(onClick = { onEvent(MailboxEvent.OpenAccount) }) {
+                        val accountLabel = stringResource(R.string.mailbox_account, account.address)
+                        IconButton(
+                            onClick = { onEvent(MailboxEvent.OpenAccount) },
+                            // The avatar hides its initials from accessibility; the button names the account.
+                            modifier = Modifier.semantics { contentDescription = accountLabel },
+                        ) {
                             SenderAvatar(name = account.displayName, address = account.address, size = 32.dp)
                         }
                     }
