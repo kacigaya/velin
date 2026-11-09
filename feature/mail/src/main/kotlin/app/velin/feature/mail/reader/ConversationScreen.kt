@@ -3,13 +3,12 @@ package app.velin.feature.mail.reader
 import android.net.Uri
 import android.text.format.Formatter
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -273,7 +272,9 @@ private fun MessageCard(
     val expandedLabel = stringResource(R.string.reader_expanded)
     val collapsedLabel = stringResource(R.string.reader_collapsed)
     Surface(
-        modifier = modifier.fillMaxWidth().animateContentSize(),
+        // No animateContentSize here: AnimatedVisibility below animates expanding, and a second size
+        // animation kept a stale height in the two-pane layout when the WebView body grew after loading.
+        modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.extraLarge,
         color = if (expanded) MaterialTheme.colorScheme.surfaceContainerLow else MaterialTheme.colorScheme.surfaceContainer,
     ) {
