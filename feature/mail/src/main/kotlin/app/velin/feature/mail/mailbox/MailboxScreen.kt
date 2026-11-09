@@ -119,6 +119,8 @@ fun MailboxScreen(
     modifier: Modifier = Modifier,
     showFolderButton: Boolean = true,
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
+    /** True when the open conversation shows beside the list, so its row stays marked. */
+    highlightOpenMail: Boolean = false,
 ) {
     val listState = rememberLazyListState()
     val selectionMode = state.selectedIds.isNotEmpty()
@@ -157,7 +159,7 @@ fun MailboxScreen(
         Box(Modifier.fillMaxSize().padding(padding)) {
             when {
                 state.loading && state.mails.isEmpty() -> LoadingPane(stringResource(R.string.mailbox_loading))
-                else -> MailList(state, listState, selectionMode, onEvent)
+                else -> MailList(state, listState, selectionMode, highlightOpenMail, onEvent)
             }
         }
     }
@@ -169,6 +171,7 @@ private fun MailList(
     state: MailboxUiState,
     listState: LazyListState,
     selectionMode: Boolean,
+    highlightOpenMail: Boolean,
     onEvent: (MailboxEvent) -> Unit,
 ) {
     val refreshState = rememberPullToRefreshState()
@@ -209,7 +212,7 @@ private fun MailList(
                 SwipeableMailRow(
                     mail = mail,
                     folderKind = state.folder?.kind,
-                    selected = mail.id in state.selectedIds || (!selectionMode && mail.id == state.openMailId),
+                    selected = mail.id in state.selectedIds || (highlightOpenMail && !selectionMode && mail.id == state.openMailId),
                     selectionMode = selectionMode,
                     onEvent = onEvent,
                     modifier = Modifier.animateItem(),

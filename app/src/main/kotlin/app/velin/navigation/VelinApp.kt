@@ -207,6 +207,7 @@ private fun MailApp(account: Account, auth: AuthRepository, mailbox: MailboxRepo
                         onEvent = mailboxViewModel::onEvent,
                         showFolderButton = !permanent,
                         snackbarHostState = snackbar,
+                        highlightOpenMail = permanent,
                     )
                 }
                 entry<ConversationRoute>(metadata = ListDetailSceneStrategy.detailPane()) { route ->

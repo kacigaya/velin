@@ -152,8 +152,9 @@ fun MailRow(
 private fun SelectableAvatar(mail: MailSummaryUi, selected: Boolean, selectionMode: Boolean) {
     // Avatar flips to a check mark in selection mode, like Pixel apps.
     val scale by animateFloatAsState(if (selectionMode && !selected) 0.9f else 1f, label = "avatarScale")
+    // An open-but-unselected row is highlighted only; the check mark means selection.
     AnimatedContent(
-        targetState = selected,
+        targetState = selected && selectionMode,
         modifier = Modifier.graphicsLayer { scaleX = scale; scaleY = scale },
         transitionSpec = { (scaleIn(initialScale = 0.6f) + fadeIn()) togetherWith (scaleOut(targetScale = 0.6f) + fadeOut()) },
         label = "avatarSelection",
