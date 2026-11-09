@@ -18,7 +18,7 @@ class SessionCredentials internal constructor(internal val login: String, intern
     }
 }
 enum class SdkFailure { InvalidAccessToken, InvalidPassphrase, InvalidKey, Network, Tls,
-    InvalidSoftwareVersion, TooManyAttempts, Protocol, Internal, SecureExternalUnsupported, AttachmentsUnsupported }
+    InvalidSoftwareVersion, TooManyAttempts, Protocol, Internal, SecureExternalUnsupported, AttachmentsUnsupported, DraftUnsupported }
 class SdkException(val failure: SdkFailure, val diagnostic: String? = null) : Exception(
     listOfNotNull(failure.name, diagnostic).joinToString(": "))
 
@@ -30,6 +30,7 @@ internal fun apiDiagnostic(error: ApiCallException): String = when (error) {
     is ApiCallException.RestClient -> "RestClientError." + error.source.javaClass.simpleName
     is ApiCallException.ServerResponseException -> "HttpError." + error.source.javaClass.simpleName
     is ApiCallException.VelinSecureExternalUnsupported -> "SecureExternalUnsupported"
+    is ApiCallException.VelinDraftUnsupported -> "DraftUnsupported"
     is ApiCallException.InternalSdkException -> "InternalSdkError:" + when (error.errorMessage) {
         "Missing mail details reference", "Invalid draft decryption", "Invalid received decryption",
         "Missing or duplicate mail details", "Invalid blob response", "Invalid blob server scheme",
@@ -79,5 +80,9 @@ internal fun mapApiFailure(error: ApiCallException): SdkFailure = when (error) {
         else -> SdkFailure.Protocol
     }
     is ApiCallException.VelinSecureExternalUnsupported -> SdkFailure.SecureExternalUnsupported
-    is ApiCallException.InternalSdkException -> SdkFailure.Internal
+    is ApiCallException.VelinDraftUnsupported -> SdkFailure.DraftUnsupported
+    is ApiCallException.InternalSdkException -> when (error.errorMessage) {
+        "Invalid session transfer encryption", "Draft session key resolution failed", "Missing draft session key" -> SdkFailure.InvalidKey
+        else -> SdkFailure.Internal
+    }
 }

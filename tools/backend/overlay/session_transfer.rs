@@ -131,8 +131,7 @@ fn transform(
             }
         } else { params.is_some_and(|p| p.scheme == VelinEncryptionScheme::Aead) };
         let sub_keys = if use_aead {
-            let session_key = Aes256Key::from_bytes(key.as_bytes()).map_err(|_| invalid())?;
-            Some(AeadSubKeys::derive_from_session_key(&session_key, context.as_deref().ok_or_else(invalid)?))
+            Some(aead_keys(key, context.as_deref().ok_or_else(invalid)?)?)
         } else { None };
         let result = if decrypting {
             let ElementValue::Bytes(bytes) = value else { return Err(invalid()) };
@@ -222,4 +221,41 @@ pub(crate) fn wire_json(raw: &crate::json_element::RawEntity) -> Result<Vec<u8>,
     let mut output = Vec::new();
     write(&value, &mut output).map_err(|_| invalid())?;
     Ok(output)
+}
+
+pub(crate) fn contains_session_aead(models: &TypeModelProvider, model: &TypeModel, input: &ParsedEntity) -> bool {
+    if model.values.values().any(|v| v.encrypted && matches!(input.get(&String::from(v.id)), Some(ElementValue::Bytes(bytes)) if bytes.first() == Some(&3))) {
+        return true;
+    }
+    model.associations.values().filter(|a| a.association_type == AssociationType::Aggregation).any(|a| {
+        let Some(child) = models.resolve_server_type_ref(&TypeRef::new(a.dependency.unwrap_or(model.app), a.ref_type_id)) else { return false };
+        matches!(input.get(&String::from(a.id)), Some(ElementValue::Array(items)) if items.iter().any(|item| matches!(item, ElementValue::Dict(item) if contains_session_aead(models, &child, item))))
+    })
+}
+
+// The release permits legacy 128-bit session keys as AEAD input key material.
+// The primitive's existing adapter accepts only Aes256Key. Keep its 256-bit path
+// and use the same release KDF/domain for historical 128-bit session keys.
+fn aead_keys(key: &GenericAesKey, context: &str) -> Result<AeadSubKeys, ApiCallError> {
+    match key {
+        GenericAesKey::Aes256(key) => Ok(AeadSubKeys::derive_from_session_key(key, context)),
+        GenericAesKey::Aes128(_) => {
+            let bytes = zeroize::Zeroizing::new(crypto_primitives::blake3::blake3_kdf(
+                &[key.as_bytes()], &format!("SK instanceSessionKey\u{001f}{context}"), 64));
+            Ok(AeadSubKeys::AeadWithSessionKeySubKeys {
+                encryption_key: Aes256Key::from_bytes(&bytes[..32]).map_err(|_| invalid())?,
+                authentication_key: Aes256Key::from_bytes(&bytes[32..]).map_err(|_| invalid())?,
+            })
+        },
+    }
+}
+
+pub(crate) fn wrap_session_key(owner: &GenericAesKey, session: &GenericAesKey, random: &RandomizerFacade) -> Vec<u8> {
+    // The upstream primitive uses its fixed IV for legacy AES-128 key wrapping.
+    // It ignores this argument in that branch. Attribute IVs remain random.
+    let iv = match owner {
+        GenericAesKey::Aes128(_) => InitializationVector::from_arr([0x88; 16]),
+        GenericAesKey::Aes256(_) => InitializationVector::generate(random),
+    };
+    owner.encrypt_key(session, iv)
 }

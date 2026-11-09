@@ -82,11 +82,27 @@ mod velin_session_transfer_tests {
             let (tr, input, params) = inputs(&vector, &plain);
             let model = models.resolve_client_type_ref(&tr).unwrap();
             let session_key = key(&vector["sessionKeyHex"]);
-            let wrapped = params.owner_key.object.encrypt_key(&session_key, InitializationVector::generate(&random(&vector, 0)));
+            let full_random = random(&vector, 0);
+            let wrapped = wrap_session_key(&params.owner_key.object, &session_key, &full_random);
             assert_eq!(const_hex::encode(wrapped), vector["wrappedSessionKeyHex"].as_str().unwrap());
             let ciphertext = encrypt(&models, model, &input, &params, &random(&vector, vector["encryptionRandomOffset"].as_u64().unwrap() as usize)).unwrap();
             let raw = JsonSerializer::new(models.clone()).serialize(&tr, ciphertext.clone()).unwrap();
             assert_eq!(String::from_utf8(wire_json(&raw).unwrap()).unwrap(), vector["wireJson"].as_str().unwrap(), "{} {}", vector["scheme"], vector["operation"]);
+            fn clear_ids(models: &TypeModelProvider, model: &TypeModel, input: &mut ParsedEntity) {
+                if model.element_type == ElementType::Aggregated {
+                    input.insert(model.get_attribute_id_by_attribute_name("_id").unwrap(), ElementValue::Null);
+                }
+                for a in model.associations.values().filter(|a| a.association_type == AssociationType::Aggregation) {
+                    let child = models.resolve_client_type_ref(&TypeRef::new(a.dependency.unwrap_or(model.app), a.ref_type_id)).unwrap();
+                    let ElementValue::Array(items) = input.get_mut(&String::from(a.id)).unwrap() else { panic!() };
+                    for item in items { let ElementValue::Dict(item) = item else { panic!() }; clear_ids(models, child, item); }
+                }
+            }
+            let mut unmapped = input.clone();
+            clear_ids(&models, model, &mut unmapped);
+            let full_ciphertext = encrypt(&models, model, &unmapped, &params, &full_random).unwrap();
+            let full_raw = JsonSerializer::new(models.clone()).serialize(&tr, full_ciphertext).unwrap();
+            assert_eq!(wire_json(&full_raw).unwrap(), vector["wireJson"].as_str().unwrap().as_bytes());
             let decrypted = decrypt(&models, model, &ciphertext, &session_key, &random(&vector, 0)).unwrap();
             assert_eq!(decrypted, input);
         }
@@ -137,4 +153,95 @@ mod velin_session_transfer_tests {
             assert!(decrypt(&models, model, &ciphertext, &key(&vector["sessionKeyHex"]), &random(&vector, 0)).is_err());
         }
     }
+    #[test]
+    fn velin_transfer_fields_decrypt_in_persistent_mail_and_draft_contexts() {
+        use crate::entities::entity_facade::EntityFacade;
+        use crate::crypto::crypto_facade::ResolvedSessionKey;
+        use crate::entities::generated::tutanota::{Mail, MailDetailsDraft};
+        use crate::entities::Entity;
+        use crate::instance_mapper::InstanceMapper;
+        use crate::metamodel::{AttributeId, ModelAssociation};
+        fn defaults(models: &TypeModelProvider, model: &TypeModel) -> ParsedEntity {
+            let mut out = ParsedEntity::new();
+            for v in model.values.values() {
+                let value = if v.cardinality == Cardinality::ZeroOrOne { ElementValue::Null }
+                    else if v.encrypted { ElementValue::String(String::new()) }
+                    else if v.name == "_id" && model.element_type != ElementType::Aggregated {
+                        ElementValue::IdTupleGeneratedElementId(crate::IdTupleGenerated::new("list".to_owned().into(), "element".to_owned().into()))
+                    } else { match v.value_type {
+                        ValueType::GeneratedId => ElementValue::IdGeneratedId("test-id".to_owned().into()),
+                        ValueType::CustomId => ElementValue::String("test-id".into()),
+                        _ => v.value_type.get_default(),
+                    }};
+                out.insert(String::from(v.id), value);
+            }
+            for a in model.associations.values() {
+                let items = if a.cardinality == Cardinality::One {
+                    if a.association_type == AssociationType::Aggregation {
+                        let child = models.resolve_client_type_ref(&TypeRef::new(a.dependency.unwrap_or(model.app), a.ref_type_id)).unwrap();
+                        vec![ElementValue::Dict(defaults(models, child))]
+                    } else { vec![ElementValue::IdTupleGeneratedElementId(crate::IdTupleGenerated::new("list".to_owned().into(), "element".to_owned().into()))] }
+                } else { vec![] };
+                out.insert(String::from(a.id), ElementValue::Array(items));
+            }
+            out
+        }
+        fn remap(models: &TypeModelProvider, source: &TypeModel, target: &TypeModel, input: &ParsedEntity) -> ParsedEntity {
+            let mut out = defaults(models, target);
+            for v in source.values.values() {
+                let target_id = v.transferred_attribute_id.map(AttributeId::from).or_else(|| {
+                    (v.name == "_id" && target.element_type == ElementType::Aggregated)
+                        .then(|| target.values.values().find(|v| v.name == "_id").unwrap().id)
+                });
+                if let Some(id) = target_id { out.insert(String::from(id), input[&String::from(v.id)].clone()); }
+            }
+            for a in source.associations.values() {
+                let target_association: &ModelAssociation = target.associations.values().find(|t| t.name == a.name).unwrap();
+                let value = if a.association_type == AssociationType::Aggregation {
+                    let child_source = models.resolve_client_type_ref(&TypeRef::new(a.dependency.unwrap_or(source.app), a.ref_type_id)).unwrap();
+                    let child_target = models.resolve_client_type_ref(&TypeRef::new(target_association.dependency.unwrap_or(target.app), target_association.ref_type_id)).unwrap();
+                    let ElementValue::Array(items) = &input[&String::from(a.id)] else { panic!() };
+                    ElementValue::Array(items.iter().map(|item| {
+                        let ElementValue::Dict(item) = item else { panic!() };
+                        ElementValue::Dict(remap(models, child_source, child_target, item))
+                    }).collect())
+                } else { input[&String::from(a.id)].clone() };
+                out.insert(String::from(target_association.id), value);
+            }
+            out
+        }
+        let models = provider(false);
+        for vector in fixtures() {
+            let (tr, input, params) = inputs(&vector, &provider(true));
+            let model = models.resolve_client_type_ref(&tr).unwrap();
+            let ciphertext = encrypt(&models, model, &input, &params, &random(&vector, 0)).unwrap();
+            let data_a = model.associations.values().find(|a| a.name == "draftData").unwrap();
+            let ElementValue::Array(data) = &ciphertext[&String::from(data_a.id)] else { panic!() };
+            let ElementValue::Dict(data) = &data[0] else { panic!() };
+            let data_model = models.resolve_client_type_ref(&TypeRef::new(AppName::Tutanota, data_a.ref_type_id)).unwrap();
+            for (name, target_ref) in [("mail", Mail::type_ref()), ("mailDetailsBlob", MailDetailsDraft::type_ref())] {
+                let association = data_model.associations.values().find(|a| a.name == name).unwrap();
+                let source = models.resolve_client_type_ref(&TypeRef::new(AppName::Tutanota, association.ref_type_id)).unwrap();
+                let target = models.resolve_client_type_ref(&target_ref).unwrap();
+                let ElementValue::Array(values) = &data[&String::from(association.id)] else { panic!() };
+                let ElementValue::Dict(value) = &values[0] else { panic!() };
+                let persistent = remap(&models, source, target, value);
+                let facade = EntityFacadeImpl::new(models.clone(), random(&vector, 0));
+                let decrypted = facade.decrypt_and_map(target, persistent, ResolvedSessionKey {
+                    session_key: key(&vector["sessionKeyHex"]), owner_enc_session_key: const_hex::decode(vector["wrappedSessionKeyHex"].as_str().unwrap()).unwrap(),
+                    owner_key_version: vector["ownerKeyVersion"].as_u64().unwrap(), sender_identity_pub_key: None,
+                }).unwrap();
+                if name == "mail" {
+                    let mail: Mail = InstanceMapper::new(models.clone()).parse_entity(decrypted).unwrap();
+                    assert_eq!(mail.subject, "Test <draft> λ");
+                    assert_eq!(mail.sender.name, "Test Sender");
+                } else {
+                    let details: MailDetailsDraft = InstanceMapper::new(models.clone()).parse_entity(decrypted).unwrap();
+                    assert_eq!(details.details.replyTos[0].address, "reply@example.invalid");
+                    assert!(details.details.body.compressedText.as_ref().unwrap().contains("λ"));
+                }
+            }
+        }
+    }
+
 }

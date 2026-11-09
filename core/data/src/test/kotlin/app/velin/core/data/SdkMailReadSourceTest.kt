@@ -26,6 +26,16 @@ class SdkMailReadSourceTest {
     private val child = ReadFolder(ReadId("folders", "child"), "Child", 0, inbox.id, "childEntries", "group", null)
     private val label = ReadFolder(ReadId("folders", "label"), "Work", 8, null, "labels", "group", "#112233")
     private class Reader : SdkMailReader {
+        val saved = mutableListOf<WriteDraft>()
+        var draftFailure: SdkFailure? = null
+        var loadedDraft: ReadMessage? = null
+        override suspend fun saveDraft(draft: WriteDraft): ReadId {
+            draftFailure?.let { throw SdkException(it) }
+            saved += draft
+            return draft.id ?: ReadId("mail", "draft")
+        }
+        override suspend fun loadDraft(id: ReadId): ReadMessage = requireNotNull(loadedDraft)
+
         val moves = mutableListOf<Pair<List<ReadId>, ReadFolder>>()
         val labelsChanged = mutableListOf<Triple<List<ReadId>, List<ReadId>, List<ReadId>>>()
         val deleted = mutableListOf<Pair<List<ReadId>, ReadId>>()
@@ -70,6 +80,58 @@ class SdkMailReadSourceTest {
         override suspend fun <T> read(account: AccountId, operation: suspend (SdkMailReader) -> Outcome<T>): Outcome<T> =
             if (active) operation(reader) else Outcome.Failed(Failure.Unauthorized)
     })
+    private fun draft(id: DraftId? = null) = Draft(id, SenderAlias(Address("sender@example.invalid", "Sender"), true),
+        listOf(Recipient(Address("to@example.invalid", "To"), RecipientType.Unknown)), emptyList(), emptyList(),
+        "Subject", "a < b & c\nnext", true, emptyList(), null)
+
+    @Test fun repeatedSavesKeepReturnedDraftIdAndEscapePlainText() = runBlocking {
+        val reader = Reader()
+        val source = source(reader)
+        val first = source.saveDraft(account, draft()) as Outcome.Success
+        assertEquals(DraftId(MailId(ReadId("mail", "draft").domain())), first.value)
+        assertEquals(Outcome.Success(first.value), source.saveDraft(account, draft(first.value).copy(subject = "Changed")))
+        assertNull(reader.saved.first().id)
+        assertEquals(ReadId("mail", "draft"), reader.saved.last().id)
+        assertEquals("a &lt; b &amp; c<br>next", reader.saved.first().html)
+        assertTrue(reader.saved.all { it.confidential })
+        assertEquals("to@example.invalid", reader.saved.first().to.single().address)
+    }
+
+    @Test fun draftReopeningRetainsHtmlAndAttachmentIdsUntilEdited() = runBlocking {
+        val id = ReadId("mail", "draft")
+        val file = ReadAttachment(ReadId("files", "file"), "File", "text/plain", 2, null)
+        val reader = Reader().apply {
+            aliases = listOf(ReadAddress("sender@example.invalid", "Sender"))
+            loadedDraft = ReadMessage(id, aliases.single(), listOf(ReadAddress("to@example.invalid", "To")), emptyList(), emptyList(),
+                listOf(ReadAddress("reply@example.invalid", "Reply")), "Subject", 0, true, false, true, 0, null,
+                "<p><b>Original</b></p>", null, attachments = listOf(file))
+        }
+        val source = source(reader)
+        val loaded = (source.loadDraft(account, MailId(id.domain())) as Outcome.Success).value
+        assertEquals("Original", loaded.plainText)
+        assertEquals(RecipientType.Unknown, loaded.to.single().type)
+        assertEquals(AttachmentId(file.id.domain()), loaded.attachments.single().id)
+        source.saveDraft(account, loaded.copy(subject = "Changed"))
+        assertEquals("<p><b>Original</b></p>", reader.saved.last().html)
+        assertEquals(listOf(file.id), reader.saved.last().attachments)
+        source.saveDraft(account, loaded.copy(plainText = "Edited <text>"))
+        assertEquals("Edited &lt;text&gt;", reader.saved.last().html)
+    }
+
+    @Test fun draftWritesKeepSessionAndFailureBoundaries() = runBlocking {
+        val reader = Reader()
+        assertEquals(Outcome.Failed(Failure.Unauthorized), source(reader, false).saveDraft(account, draft()))
+        assertEquals(Outcome.Failed(Failure.Unsupported), source(reader).saveDraft(account, draft().copy(scheduledSendAt = java.time.Instant.EPOCH)))
+        assertTrue(reader.saved.isEmpty())
+        reader.draftFailure = SdkFailure.InvalidKey
+        assertEquals(Outcome.Failed(Failure.Decryption), source(reader).saveDraft(account, draft()))
+        reader.draftFailure = SdkFailure.DraftUnsupported
+        assertEquals(Outcome.Failed(Failure.Unsupported), source(reader).saveDraft(account, draft()))
+        reader.draftFailure = SdkFailure.Network
+        assertEquals(Outcome.Failed(Failure.Offline), source(reader).saveDraft(account, draft()))
+        assertEquals(Outcome.Failed(Failure.Unauthorized), source(reader, false).loadDraft(account, MailId(ReadId("mail", "draft").domain())))
+    }
+
     @Test fun foldersLabelsParentsAndCounters() = runBlocking {
         val reader = Reader().apply { sets = listOf(inbox, child, label) }
         val result = source(reader).mailbox(account) as Outcome.Success

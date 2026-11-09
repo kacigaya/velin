@@ -37,8 +37,9 @@ build. The temporary bundle is removed after each run.
    scheme and encrypts all nested fields. The runner uses upstream TypeModels,
    TypeRefs constructors, compression, key wrapping, and crypto code.
 2. The real `KeyLoaderFacade` parameter methods run against an offline key
-   store. Create uses current key version 7. Update uses historical version 3,
-   while the current key remains version 7. `keyCalls` records this selection.
+   store. Modern keys use current version 7 for create and historical version 3
+   for update. Legacy owner keys use version 0. Historical legacy drafts
+   retain a 128-bit session key while the current group key is 256-bit version 7. `keyCalls` records this selection.
 3. Draft data follows
    `src/applications/common/api/worker/facades/lazy/MailFacade.ts:341-427`
    and `:505-592`. Construction is explicit here. The full MailFacade needs
@@ -55,7 +56,7 @@ build. The temporary bundle is removed after each run.
    request. `encryptionRandomOffset` is the byte offset after key wrapping
    and model mapping, before attribute encryption.
 
-Drafts use `WithSessionKey`. These fixtures do not cover `WithInstanceKey`,
+All eight draft vectors use `WithSessionKey`. These fixtures do not cover `WithInstanceKey`,
 attachment upload, reply construction, recipient key lookup, or send.
 They verify offline protocol construction. Server acceptance remains unverified.
 
@@ -63,3 +64,23 @@ The crypto barrel also exports Ed25519. This program does not use it.
 Tree shaking removes that unbuilt WebAssembly import. The runner rejects
 any remaining non-Node import. It does not replace crypto with a stub.
 `fetch` is disabled, and no HTTP client is supplied.
+
+The same command also writes twelve HTML conversion cases to
+`core/html/src/test/resources/draft-html.tsv`. Each line contains a base64
+UTF-8 input and output, separated by a tab. Each value starts with `b64:`
+so empty strings do not create trailing whitespace. Kotlin tests read this file.
+The draft update vectors include repeated text to check exact compression.
+Rust also regenerates aggregate IDs from null with the full injected random
+stream. The result must still match each complete `wireJson` string.
+
+Legacy key wrapping follows the release's fixed-IV AES-128 key-wrap format.
+It consumes no random bytes. Attribute encryption still uses fresh IVs or
+nonces. AEAD derives 256-bit subkeys from historical 128-bit session keys,
+as in `src/platform-kit/crypto/encryption/symmetric/SymmetricKeyDeriver.ts:178`.
+New drafts always use a 256-bit session key.
+
+`draftUpdateReturnWire` is generated and decrypted by the release pipeline
+with no session key. The type's legacy encrypted marker does not imply
+ciphertext: its only fields are `_format` and attachment ID references.
+The Rust decoder accepts this exact ID-only model. New encrypted fields or
+aggregate fields disable that case and require key resolution.

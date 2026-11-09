@@ -21,7 +21,12 @@ data class ReadMessage(val id: ReadId, val sender: ReadAddress, val to: List<Rea
     val draft: Boolean, val phishing: Long, val encryptionAuth: Long?, val body: String,
     val scheduledMillis: Long?, val mailAuthStatus: Long = -1, val attachments: List<ReadAttachment> = emptyList())
 
+data class WriteDraft(val id: ReadId?, val sender: ReadAddress, val to: List<ReadAddress>, val cc: List<ReadAddress>,
+    val bcc: List<ReadAddress>, val subject: String, val html: String, val confidential: Boolean, val attachments: List<ReadId>)
+
 interface SdkMailReader {
+    suspend fun saveDraft(draft: WriteDraft): ReadId = throw SdkException(SdkFailure.DraftUnsupported)
+    suspend fun loadDraft(id: ReadId): ReadMessage = throw SdkException(SdkFailure.DraftUnsupported)
     suspend fun setUnread(ids: List<ReadId>, unread: Boolean): Unit = throw SdkException(SdkFailure.Protocol)
     suspend fun move(ids: List<ReadId>, target: ReadFolder): Unit = throw SdkException(SdkFailure.Protocol)
     suspend fun applyLabels(ids: List<ReadId>, added: List<ReadId>, removed: List<ReadId>): Unit = throw SdkException(SdkFailure.Protocol)
@@ -37,6 +42,24 @@ interface SdkMailReader {
 }
 
 internal class NativeMailReader(private val facade: MailFacade) : SdkMailReader, AutoCloseable {
+    override suspend fun saveDraft(draft: WriteDraft): ReadId = api {
+        fun ReadAddress.sender() = VelinSender(address, name)
+        facade.velinSaveDraft(VelinDraftInput(draft.id?.native(), draft.sender.sender(), draft.to.map { it.sender() },
+            draft.cc.map { it.sender() }, draft.bcc.map { it.sender() }, draft.subject, draft.html, draft.confidential,
+            draft.attachments.map { it.native() })).readId()
+    }
+    override suspend fun loadDraft(id: ReadId): ReadMessage = api {
+        val content = facade.velinLoadDraft(id.native())
+        val mail = content.mail
+        val details = content.details
+        require(mail.id?.readId() == id && mail.mailDetailsDraft != null)
+        fun MailAddress.address() = ReadAddress(address, name)
+        ReadMessage(id, mail.sender.address(), details.recipients.toRecipients.map { it.address() },
+            details.recipients.ccRecipients.map { it.address() }, details.recipients.bccRecipients.map { it.address() },
+            details.replyTos.map { ReadAddress(it.address, it.name) }, mail.subject, 0, mail.confidential, mail.unread,
+            true, mail.phishingStatus, mail.encryptionAuthStatus, details.body.compressedText ?: details.body.text.orEmpty(),
+            mail.sendAt?.millis(), attachments = content.attachments.map { it.metadata() })
+    }
     override suspend fun setUnread(ids: List<ReadId>, unread: Boolean): Unit = api {
         facade.setUnreadStatusForMails(ids.distinct().map { it.native() }, unread)
     }

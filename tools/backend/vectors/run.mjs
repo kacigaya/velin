@@ -37,6 +37,8 @@ try {
   globalThis.fetch = () => { throw new Error('Network is forbidden in vector generation') }
   const { output } = await import(pathToFileURL(join(temp, 'drafts.mjs')).href)
   writeFileSync(new URL('./drafts.json', import.meta.url), JSON.stringify(output, null, 2) + '\n')
+  const htmlFile = new URL('../../../core/html/src/test/resources/draft-html.tsv', import.meta.url)
+  writeFileSync(htmlFile, output.htmlVectors.map(v => 'b64:' + Buffer.from(v.plain).toString('base64') + '\t' + 'b64:' + Buffer.from(v.html).toString('base64')).join('\n') + '\n')
 } finally {
   rmSync(temp, { recursive: true, force: true })
 }

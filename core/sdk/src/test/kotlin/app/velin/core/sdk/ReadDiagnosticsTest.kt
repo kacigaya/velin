@@ -5,6 +5,15 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class ReadDiagnosticsTest {
+    @Test fun draftCryptoFailuresAreTypedAndRedacted() {
+        for (message in listOf("Invalid session transfer encryption", "Draft session key resolution failed", "Missing draft session key")) {
+            val error = ApiCallException.InternalSdkException(message)
+            assertEquals(SdkFailure.InvalidKey, mapApiFailure(error))
+            assertEquals("InternalSdkError:redacted", apiDiagnostic(error))
+        }
+        assertEquals(SdkFailure.DraftUnsupported, mapApiFailure(ApiCallException.VelinDraftUnsupported()))
+    }
+
     @Test fun diagnosticsKeepKindsAndDiscardRemoteText() {
         assertEquals("HttpError.InvalidSoftwareVersionError", apiDiagnostic(
             ApiCallException.ServerResponseException(HttpError.InvalidSoftwareVersionError)))
