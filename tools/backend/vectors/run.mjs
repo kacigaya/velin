@@ -18,15 +18,16 @@ const alias = Object.fromEntries(Object.entries(paths).map(([key, value]) => [ke
 alias['@release'] = root
 const temp = mkdtempSync(join(tmpdir(), 'velin-vectors-'))
 try {
+  for (const name of ['drafts', 'sends']) {
   const bundle = await rolldown({
-    input: fileURLToPath(new URL('./drafts.ts', import.meta.url)), platform: 'node',
+    input: fileURLToPath(new URL(`./${name}.ts`, import.meta.url)), platform: 'node',
     resolve: { alias, extensions: ['.ts', '.js', '.json'] },
     treeshake: { moduleSideEffects: false },
     // The crypto barrel exports Ed25519 too. It is unused here. Fail below if
     // tree shaking leaves this unbuilt WebAssembly import in the draft program.
     external: id => id.includes('crypto-primitives/crypto_primitives'),
   })
-  const result = await bundle.write({ file: join(temp, 'drafts.mjs'), format: 'esm' })
+  const result = await bundle.write({ file: join(temp, `${name}.mjs`), format: 'esm' })
   for (const chunk of result.output) {
     if (chunk.type === 'chunk' && chunk.imports.some(id => !id.startsWith('node:'))) {
       throw new Error('Vector program still requires an external module')
@@ -35,10 +36,13 @@ try {
   await bundle.close()
   // No HTTP client is supplied to the release code. Block fetch as well.
   globalThis.fetch = () => { throw new Error('Network is forbidden in vector generation') }
-  const { output } = await import(pathToFileURL(join(temp, 'drafts.mjs')).href)
-  writeFileSync(new URL('./drafts.json', import.meta.url), JSON.stringify(output, null, 2) + '\n')
+  const { output } = await import(pathToFileURL(join(temp, `${name}.mjs`)).href)
+  writeFileSync(new URL(`./${name}.json`, import.meta.url), JSON.stringify(output, null, 2) + '\n')
+  if (name === 'drafts') {
   const htmlFile = new URL('../../../core/html/src/test/resources/draft-html.tsv', import.meta.url)
   writeFileSync(htmlFile, output.htmlVectors.map(v => 'b64:' + Buffer.from(v.plain).toString('base64') + '\t' + 'b64:' + Buffer.from(v.html).toString('base64')).join('\n') + '\n')
+  }
+  }
 } finally {
   rmSync(temp, { recursive: true, force: true })
 }

@@ -4,6 +4,11 @@ import app.velin.core.domain.*
 
 /** Decrypted source boundary. Implementations must authenticate before returning plaintext. */
 interface MailReadSource {
+    suspend fun sendDraft(account: AccountId, id: DraftId): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)
+    suspend fun recipientFingerprint(account: AccountId, address: String): Outcome<String> = Outcome.Failed(Failure.Unsupported)
+    suspend fun verifyRecipient(account: AccountId, address: String, fingerprint: String): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)
+    suspend fun untrustRecipient(account: AccountId, address: String): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)
+    suspend fun resolveRecipient(account: AccountId, address: String): Outcome<Recipient> = Outcome.Failed(Failure.Unsupported)
     suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<DraftId> = Outcome.Failed(Failure.Unsupported)
     suspend fun loadDraft(account: AccountId, id: MailId): Outcome<Draft> = Outcome.Failed(Failure.Unsupported)
     suspend fun setUnread(account: AccountId, ids: List<MailId>, unread: Boolean): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)

@@ -12,6 +12,37 @@ internal interface SessionReadAccess {
 
 /** Session adapter. Sender authentication remains unverified. */
 internal class SdkMailReadSource(private val sessions: SessionReadAccess) : MailReadSource {
+    override suspend fun recipientFingerprint(account: AccountId, address: String): Outcome<String> = read(account) {
+        it.recipientFingerprint(address.trim().lowercase(java.util.Locale.ROOT))
+    }
+    override suspend fun verifyRecipient(account: AccountId, address: String, fingerprint: String): Outcome<Unit> = read(account) {
+        it.verifyRecipient(address.trim().lowercase(java.util.Locale.ROOT), fingerprint)
+    }
+    override suspend fun untrustRecipient(account: AccountId, address: String): Outcome<Unit> = read(account) {
+        it.untrustRecipient(address.trim().lowercase(java.util.Locale.ROOT))
+    }
+    override suspend fun sendDraft(account: AccountId, id: DraftId): Outcome<Unit> = read(account) { sdk ->
+        sdk.sendDraft(id.value.value.readId())
+    }
+    override suspend fun resolveRecipient(account: AccountId, address: String): Outcome<Recipient> {
+        // RecipientsModel cleans addresses before resolving their type.
+        val cleaned = address.trim().lowercase(java.util.Locale.ROOT)
+        if (cleaned.length !in 3..254 || cleaned.count { it == '@' } != 1 ||
+            cleaned.startsWith('@') || cleaned.endsWith('@') || cleaned.any { it.isWhitespace() || it.isISOControl() }) {
+            return Outcome.Failed(Failure.RecipientResolution(RecipientResolutionReason.InvalidAddress))
+        }
+        return read(account) { sdk ->
+            val resolved = sdk.resolveRecipient(cleaned)
+            Recipient(Address(cleaned), if (resolved.internal) RecipientType.Internal else RecipientType.External,
+                keyState = when (resolved.keyState) {
+                    ReadRecipientKeyState.NoEntry -> RecipientKeyState.NoEntry
+                    ReadRecipientKeyState.TrustStoreUnsupported -> RecipientKeyState.TrustStoreUnsupported
+                    ReadRecipientKeyState.Mismatch -> RecipientKeyState.Mismatch
+                    ReadRecipientKeyState.VerifiedTofu -> RecipientKeyState.VerifiedTofu
+                    ReadRecipientKeyState.VerifiedManual -> RecipientKeyState.VerifiedManual
+                })
+        }
+    }
     override suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<DraftId> = read(account) { sdk ->
         if (draft.scheduledSendAt != null) throw SdkException(SdkFailure.DraftUnsupported)
         require(draft.sender.enabled && (draft.to + draft.cc + draft.bcc).none { it.invalid })
@@ -153,6 +184,25 @@ internal class SdkMailReadSource(private val sessions: SessionReadAccess) : Mail
             catch (e: CancellationException) { throw e }
             catch (e: SdkException) { Outcome.Failed(when (e.failure) {
                 SdkFailure.SecureExternalUnsupported, SdkFailure.AttachmentsUnsupported, SdkFailure.DraftUnsupported -> Failure.Unsupported
+                SdkFailure.IdentityTrustStorage -> Failure.RecipientResolution(RecipientResolutionReason.TrustStorageUnavailable)
+                SdkFailure.SendUnsupported -> Failure.Unsupported.Operation(when (e.reason) {
+                    1 -> UnsupportedReason.ScheduledSend
+                    2 -> UnsupportedReason.NonConfidentialSend
+                    3 -> UnsupportedReason.Attachments
+                    4 -> UnsupportedReason.ReplyOrForward
+                    5 -> UnsupportedReason.IdentityTrustStore
+                    6 -> UnsupportedReason.ExternalRecipient
+                    7 -> UnsupportedReason.CalendarMail
+                    8 -> UnsupportedReason.CustomReplyTo
+                    else -> UnsupportedReason.Unspecified
+                })
+                SdkFailure.SendBlocked -> when (e.reason) {
+                    0 -> Failure.SendBlocked(SendBlockReason.RecipientNotFound, e.recipientIndices)
+                    1 -> Failure.SendBlocked(SendBlockReason.KeyMismatch, e.recipientIndices)
+                    else -> Failure.Protocol(502)
+                }
+                SdkFailure.RecipientRateLimited -> Failure.RecipientResolution(RecipientResolutionReason.RateLimited)
+                SdkFailure.RecipientInvalidKey -> Failure.RecipientResolution(RecipientResolutionReason.InvalidKeyData)
                 SdkFailure.Network -> Failure.Offline
                 SdkFailure.InvalidAccessToken -> Failure.Unauthorized
                 SdkFailure.InvalidSoftwareVersion -> Failure.InvalidSoftwareVersion

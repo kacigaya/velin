@@ -84,3 +84,17 @@ with no session key. The type's legacy encrypted marker does not imply
 ciphertext: its only fields are `_format` and attachment ID references.
 The Rust decoder accepts this exact ID-only model. New encrypted fields or
 aggregate fields disable that case and require key resolution.
+
+## M6b send vectors
+
+The same command also writes `sends.json`. Four fixtures cover a 256-bit
+bucket key, 128/256-bit draft session keys, and both account schemes.
+The release supplies RSA encryption, key wrapping, signature canonicalization,
+SendDraftData constructors, model mapping, aggregate IDs, and wire serialization.
+Node supplies real Ed25519 signing. No crypto function is replaced with a stub.
+
+Rust checks every wire byte and the RSA and wrapping ciphertexts. It verifies
+the Ed25519 signature over the release's canonical key bytes. These fixtures
+cover signed RSA recipients. They do not cover deterministic TutaCrypt
+encapsulation or the release Ed25519 WASM. See `docs/backend/M6B-REPORT.md`
+for the native random-source limit and remaining live checks.

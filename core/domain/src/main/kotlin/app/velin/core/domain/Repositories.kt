@@ -36,6 +36,10 @@ interface MailRepository {
     /** Permanent deletion is restricted to mails currently in Trash or Spam. */
     suspend fun delete(account: AccountId, ids: List<MailId>): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)
     suspend fun loadDraft(account: AccountId, id: MailId): Outcome<Draft> = Outcome.Failed(Failure.Unsupported)
+    suspend fun recipientFingerprint(account: AccountId, address: String): Outcome<String> = Outcome.Failed(Failure.Unsupported)
+    suspend fun verifyRecipient(account: AccountId, address: String, fingerprint: String): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)
+    suspend fun untrustRecipient(account: AccountId, address: String): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)
+    suspend fun resolveRecipient(account: AccountId, address: String): Outcome<Recipient> = Outcome.Failed(Failure.Unsupported)
     suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<DraftId>
     suspend fun sendDraft(account: AccountId, id: DraftId): Outcome<Unit>
     suspend fun downloadAttachment(account: AccountId, id: AttachmentId): Outcome<java.io.File>

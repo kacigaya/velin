@@ -24,7 +24,22 @@ data class ReadMessage(val id: ReadId, val sender: ReadAddress, val to: List<Rea
 data class WriteDraft(val id: ReadId?, val sender: ReadAddress, val to: List<ReadAddress>, val cc: List<ReadAddress>,
     val bcc: List<ReadAddress>, val subject: String, val html: String, val confidential: Boolean, val attachments: List<ReadId>)
 
+class TrustedIdentity(val key: ByteArray, val version: Long, val manual: Boolean)
+interface SdkIdentityTrustStore {
+    suspend fun load(address: String): TrustedIdentity?
+    suspend fun verify(address: String, expected: TrustedIdentity): Unit = throw SdkException(SdkFailure.DraftUnsupported)
+    suspend fun untrust(address: String): Unit = throw SdkException(SdkFailure.DraftUnsupported)
+    suspend fun trustOnFirstUse(address: String, identity: TrustedIdentity): TrustedIdentity
+}
+enum class ReadRecipientKeyState { NoEntry, TrustStoreUnsupported, Mismatch, VerifiedTofu, VerifiedManual }
+data class ReadRecipient(val internal: Boolean, val keyState: ReadRecipientKeyState)
+
 interface SdkMailReader {
+    suspend fun recipientFingerprint(address: String): String = throw SdkException(SdkFailure.DraftUnsupported)
+    suspend fun verifyRecipient(address: String, fingerprint: String): Unit = throw SdkException(SdkFailure.DraftUnsupported)
+    suspend fun untrustRecipient(address: String): Unit = throw SdkException(SdkFailure.DraftUnsupported)
+    suspend fun sendDraft(id: ReadId): Unit = throw SdkException(SdkFailure.DraftUnsupported)
+    suspend fun resolveRecipient(address: String): ReadRecipient = throw SdkException(SdkFailure.DraftUnsupported)
     suspend fun saveDraft(draft: WriteDraft): ReadId = throw SdkException(SdkFailure.DraftUnsupported)
     suspend fun loadDraft(id: ReadId): ReadMessage = throw SdkException(SdkFailure.DraftUnsupported)
     suspend fun setUnread(ids: List<ReadId>, unread: Boolean): Unit = throw SdkException(SdkFailure.Protocol)
@@ -41,7 +56,51 @@ interface SdkMailReader {
     suspend fun conversation(id: ReadId): List<ReadId> = throw SdkException(SdkFailure.Protocol)
 }
 
-internal class NativeMailReader(private val facade: MailFacade) : SdkMailReader, AutoCloseable {
+internal class NativeMailReader(private val facade: MailFacade, private val trust: SdkIdentityTrustStore? = null) : SdkMailReader, AutoCloseable {
+    init {
+        if (trust != null) facade.velinSetIdentityTrustStore(object : VelinIdentityTrustStore {
+            private fun TrustedIdentity.native() = VelinTrustedIdentity(key, version, manual)
+            override suspend fun load(address: String): VelinTrustedIdentity? = try { trust.load(address)?.native() }
+            catch (_: SdkException) { throw ApiCallException.InternalSdkException("Identity trust storage failed") }
+            override suspend fun trustOnFirstUse(address: String, identity: VelinTrustedIdentity): VelinTrustedIdentity = try {
+                trust.trustOnFirstUse(address, TrustedIdentity(identity.key, identity.version, identity.manual)).native()
+            } catch (_: SdkException) { throw ApiCallException.InternalSdkException("Identity trust storage failed") }
+        })
+    }
+    private fun TrustedIdentity.fingerprint(): String {
+        require(key.size == 32 && version in 0..255)
+        return java.security.MessageDigest.getInstance("SHA-256").digest(byteArrayOf(version.toByte(), 0) + key)
+            .joinToString("") { "%02x".format(it) }
+    }
+    override suspend fun recipientFingerprint(address: String): String {
+        resolveRecipient(address)
+        return (trust?.load(address) ?: throw SdkException(SdkFailure.DraftUnsupported)).fingerprint()
+    }
+    override suspend fun verifyRecipient(address: String, fingerprint: String) {
+        require(fingerprint.matches(Regex("[0-9a-fA-F]{64}")))
+        val store = trust ?: throw SdkException(SdkFailure.DraftUnsupported)
+        val identity = store.load(address) ?: throw SdkException(SdkFailure.RecipientInvalidKey)
+        if (!java.security.MessageDigest.isEqual(identity.fingerprint().toByteArray(Charsets.US_ASCII),
+                fingerprint.lowercase(java.util.Locale.ROOT).toByteArray(Charsets.US_ASCII))) {
+            throw SdkException(SdkFailure.SendBlocked, reason = 1)
+        }
+        store.verify(address, identity)
+    }
+    override suspend fun untrustRecipient(address: String) {
+        (trust ?: throw SdkException(SdkFailure.DraftUnsupported)).untrust(address)
+    }
+    override suspend fun sendDraft(id: ReadId): Unit = api { facade.velinSendDraft(id.native()) }
+    override suspend fun resolveRecipient(address: String): ReadRecipient = api {
+        val result = facade.velinResolveRecipient(address)
+        ReadRecipient(result.internal, when (result.keyState) {
+            0L -> ReadRecipientKeyState.NoEntry
+            1L -> ReadRecipientKeyState.TrustStoreUnsupported
+            2L -> ReadRecipientKeyState.Mismatch
+            3L -> ReadRecipientKeyState.VerifiedTofu
+            4L -> ReadRecipientKeyState.VerifiedManual
+            else -> throw SdkException(SdkFailure.Protocol)
+        })
+    }
     override suspend fun saveDraft(draft: WriteDraft): ReadId = api {
         fun ReadAddress.sender() = VelinSender(address, name)
         facade.velinSaveDraft(VelinDraftInput(draft.id?.native(), draft.sender.sender(), draft.to.map { it.sender() },

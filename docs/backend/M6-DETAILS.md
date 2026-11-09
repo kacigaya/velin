@@ -1,7 +1,8 @@
 # M6 compose and send
 
 M6 remains partial. Sender discovery and draft create, update, and reload are
-implemented. Recipient resolution and send remain unsupported. No live Tuta
+implemented. M6b adds recipient resolution, persistent identity trust, and
+confidential internal send. See [the M6b report](M6B-REPORT.md). No live Tuta
 request was sent. No production dependency was added.
 
 ## Sender aliases
@@ -96,29 +97,11 @@ Release evidence:
 See [draft encryption and vectors](DRAFT-ENCRYPTION.md) for offline evidence.
 Server acceptance and device behavior remain UNVERIFIED.
 
-## Recipient resolution and send: NOT IMPLEMENTED
+## Recipient resolution and send
 
-`sendDraft` returns `Outcome.Failed(Failure.Unsupported)`. Contact suggestions
-remain an empty flow. No send request is constructed or sent.
-
-The next blocker is verified public-key lookup. The pinned Rust
-`tuta-sdk/rust/sdk/src/crypto/public_key_provider.rs:96` drops the public-key
-signature. Its RSA version constraint does not replace identity verification.
-The release's
-`src/platform-kit/base/facades/lazy/KeyVerificationFacade.ts:75` requires the
-public identity key, its trust source, and signature verification. The Rust
-SDK has no matching PublicIdentityKeyProvider or identity trust database.
-Using its current key loader for send would skip these checks.
-
-Port and test that path before adding recipient resolution or send vectors.
-Keep lookup absence, invalid input, and verification failure distinct.
-Then generate SendDraftData vectors with signed test keys before implementing
-confidential internal send. Sending to the owner's own address still needs
-this verification path. Do not add an unencrypted fallback.
-
-The later paths remain external send, reply creation, encrypted upload,
-scheduled send, and password-protected external send. No new domain API for
-those operations was added.
+M6b implements verified recipient lookup and confidential internal send.
+See [contracts, release evidence, limits, and live checks](M6B-REPORT.md).
+External send, upload, reply/forward, and scheduling remain unsupported.
 
 ## Owner live checks: UNVERIFIED
 
@@ -143,9 +126,8 @@ Run only after merge and separate owner authorization.
 7. Sign out and switch accounts. Check that aliases, drafts, and encryption
    state do not cross sessions. Check offline and cancelled saves. Reconcile
    a failed create with the official client before retrying it.
-8. Send is unsupported. After verified internal send is implemented and
-   merged, any separately authorized send check must target only the owner's
-   own address. No live send check is authorized by this implementation.
+8. M6b send checks must follow [the self-send instructions](M6B-REPORT.md#owner-live-check).
+   No live send check is authorized by this implementation.
 
 ## Offline verification
 

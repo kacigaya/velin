@@ -26,7 +26,9 @@ data class Folder(val id: FolderId, val name: String, val kind: FolderKind,
 data class Label(val id: LabelId, val name: String, val colorHex: String?)
 data class Address(val address: String, val name: String = "")
 enum class RecipientType { Internal, External, Unknown }
-data class Recipient(val address: Address, val type: RecipientType, val invalid: Boolean = false)
+enum class RecipientKeyState { Unresolved, NoEntry, VerifiedTofu, VerifiedManual, TrustStoreUnsupported, Mismatch }
+data class Recipient(val address: Address, val type: RecipientType, val invalid: Boolean = false,
+    val keyState: RecipientKeyState = RecipientKeyState.Unresolved)
 data class SenderAlias(val address: Address, val enabled: Boolean)
 data class Account(val id: AccountId, val address: Address)
 enum class ReplyType { None, Replied, Forwarded, RepliedAndForwarded }
@@ -63,12 +65,20 @@ data class Draft(val id: DraftId?, val sender: SenderAlias, val to: List<Recipie
     val confidential: Boolean, val attachments: List<Attachment>, val scheduledSendAt: Instant?,
     val htmlBody: String? = null)
 data class MailPage(val mails: List<MailSummary>, val next: PageCursor?)
+enum class RecipientResolutionReason { InvalidAddress, KeyMismatch, RateLimited, InvalidKeyData, TrustStorageUnavailable }
+enum class UnsupportedReason { Unspecified, ScheduledSend, NonConfidentialSend, Attachments, ReplyOrForward, IdentityTrustStore, ExternalRecipient, CalendarMail, CustomReplyTo }
+enum class SendBlockReason { RecipientNotFound, KeyMismatch }
 sealed interface Failure {
     data object Offline : Failure
     data object Unauthorized : Failure
     data object Decryption : Failure
     data object InvalidSoftwareVersion : Failure
-    data object Unsupported : Failure
+    sealed class Unsupported(val reason: UnsupportedReason) : Failure {
+        companion object : Unsupported(UnsupportedReason.Unspecified)
+        data class Operation(val cause: UnsupportedReason) : Unsupported(cause)
+    }
+    data class SendBlocked(val reason: SendBlockReason, val recipientIndices: List<Int>) : Failure
+    data class RecipientResolution(val reason: RecipientResolutionReason) : Failure
     data class Protocol(val status: Int, val diagnostic: String? = null) : Failure
 }
 sealed interface Outcome<out T> {

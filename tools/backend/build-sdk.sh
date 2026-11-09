@@ -19,6 +19,7 @@ python3 "$root/tools/backend/overlay/read-source.py" "$out/source"
 python3 "$root/tools/backend/overlay/compose-source.py" "$out/source"
 python3 "$root/tools/backend/overlay/session-source.py" "$out/source"
 python3 "$root/tools/backend/overlay/draft_source.py" "$out/source"
+python3 "$root/tools/backend/overlay/recipient_source.py" "$out/source"
 if [[ ! -f "$out/ndk.zip" ]]; then
   curl -fL --retry 3 https://dl.google.com/android/repository/android-ndk-r29-linux.zip -o "$out/ndk.zip"
 fi
@@ -60,7 +61,7 @@ mkdir -p "$out/artifacts/notices"
 cp LICENSE.txt "$out/artifacts/notices/TUTA-LICENSE.txt"
 printf '%s\n' "$ref" > "$out/artifacts/UPSTREAM_COMMIT"
 (cd "$out" && sha256sum ndk.zip source/Cargo.lock source/tuta-sdk/rust/sdk/uniffi.toml) > "$out/artifacts/INPUTS-SHA256"
-(cd "$root" && sha256sum tools/backend/overlay/* tools/backend/build-sdk.sh) > "$out/artifacts/OVERLAY-SHA256"
+(cd "$root" && { find tools/backend/overlay -maxdepth 1 -type f -print0; printf '%s\0' tools/backend/build-sdk.sh; } | sort -z | xargs -0 sha256sum) > "$out/artifacts/OVERLAY-SHA256"
 rustc --version > "$out/artifacts/TOOLCHAIN"
 clang --version >> "$out/artifacts/TOOLCHAIN"
 (cd "$out/artifacts" && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS)

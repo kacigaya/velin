@@ -361,7 +361,27 @@ class BackendReadRepository(private val source: MailReadSource, private val cach
             }
         }
     }
-    override suspend fun sendDraft(account: AccountId, id: DraftId) = unsupported()
+    override suspend fun recipientFingerprint(account: AccountId, address: String): Outcome<String> = io { source.recipientFingerprint(account, address) }
+    override suspend fun verifyRecipient(account: AccountId, address: String, fingerprint: String): Outcome<Unit> = io { source.verifyRecipient(account, address, fingerprint) }
+    override suspend fun untrustRecipient(account: AccountId, address: String): Outcome<Unit> = io { source.untrustRecipient(account, address) }
+    override suspend fun resolveRecipient(account: AccountId, address: String): Outcome<Recipient> = io { source.resolveRecipient(account, address) }
+    override suspend fun sendDraft(account: AccountId, id: DraftId): Outcome<Unit> = io {
+        val result = source.sendDraft(account, id)
+        if (result is Outcome.Success) {
+            val state = this.account(account)
+            state.messages.remove(id.value)
+            state.rawBodies.remove(id.value)
+            state.summaries.remove(id.value)
+            state.consent.remove(id.value)
+            state.pages.values.forEach { flow -> flow.value = flow.value.copy(mails = flow.value.mails.filterNot { it.id == id.value }) }
+            state.conversations.values.forEach { flow ->
+                val previous = flow.value
+                if (previous is Outcome.Success) flow.value = Outcome.Success(previous.value.copy(
+                    messages = previous.value.messages.filterNot { it.id == id.value }))
+            }
+        }
+        result
+    }
     override fun search(account: AccountId, query: String): Flow<Outcome<List<MailSummary>>> = flowOf(unsupported())
     override fun suggestRecipients(account: AccountId, query: String): Flow<List<Recipient>> = flowOf(emptyList())
     private fun unsupported(): Outcome.Failed = Outcome.Failed(Failure.Unsupported)

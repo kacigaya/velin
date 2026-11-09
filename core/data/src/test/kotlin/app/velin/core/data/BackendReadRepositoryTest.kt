@@ -25,6 +25,8 @@ class BackendReadRepositoryTest {
         var deleted = false
         var currentFolder = folder
         val label = Label(LabelId(entity("label")), "Work", null)
+        var sendCalls = 0
+        override suspend fun sendDraft(account: AccountId, id: DraftId): Outcome<Unit> { sendCalls++; return actionResult() }
         override suspend fun setUnread(account: AccountId, ids: List<MailId>, unread: Boolean) = actionResult()
         override suspend fun move(account: AccountId, ids: List<MailId>, target: FolderId): Outcome<Unit> {
             if (!actionFailure) currentFolder = target
@@ -56,6 +58,27 @@ class BackendReadRepositoryTest {
         }
         override suspend fun attachment(account: AccountId, id: AttachmentId) = Outcome.Success(AttachmentContent(
             attachment, byteArrayOf(137.toByte(), 80, 78, 71, 13, 10, 26, 10)))
+    }
+    @Test fun failedSendKeepsDraftAndSuccessfulSendInvalidatesPage() = runBlocking {
+        val source = Source()
+        val cache = Files.createTempDirectory("mail-send").toFile()
+        try {
+            val repo = BackendReadRepository(source, cache)
+            repo.sync(account)
+            val pages = mutableListOf<MailPage>()
+            val collector = launch(start = CoroutineStart.UNDISPATCHED) { repo.messages(account, folder).toList(pages) }
+            withTimeout(5000) { while (pages.isEmpty()) yield() }
+            val initial = pages.last()
+            val id = DraftId(initial.mails.single().id)
+            source.actionFailure = true
+            assertEquals(Outcome.Failed(Failure.Offline), repo.sendDraft(account, id))
+            assertEquals(initial, pages.last())
+            source.actionFailure = false
+            assertEquals(Outcome.Success(Unit), repo.sendDraft(account, id))
+            withTimeout(5000) { while (pages.last().mails.isNotEmpty()) yield() }
+            assertEquals(2, source.sendCalls)
+            collector.cancelAndJoin()
+        } finally { cache.deleteRecursively() }
     }
     @Test fun folderTreeAndPagingUseEntryCursor() = runBlocking {
         val source = Source()
