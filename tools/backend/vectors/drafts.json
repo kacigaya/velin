@@ -1,0 +1,2031 @@
+{
+  "upstreamCommit": "332e57461cdc4fe4a4ad9bdc8555f56df02931c0",
+  "vectors": [
+    {
+      "encryptionRandomOffset": 60,
+      "scheme": "aes-cbc",
+      "operation": "create",
+      "seed": "velin-draft-0-create-v1",
+      "ownerKeyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "currentOwnerKeyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "sessionKeyHex": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "ownerKeyVersion": 7,
+      "wrappedSessionKeyHex": "01c61a6ef9c000d88eaa8f4142d8a12157f898c06837c020646275d651c8c9746e1e17952079dee9483db7bb26843ceec466001656a0e35bd7ed9785ddad9bdc1c337cc175caa030031eda3c7ff27e66f4",
+      "keyCalls": [
+        "current:test-mail-group"
+      ],
+      "randomCalls": [
+        16,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "input": {
+        "_type": {
+          "app": "tutanota",
+          "typeId": 508,
+          "phantom": null
+        },
+        "_original": null,
+        "isAdapter": false,
+        "_permissions": null,
+        "bucketKey": null,
+        "_ownerGroup": null,
+        "_ownerEncSessionKey": null,
+        "_ownerKeyVersion": null,
+        "_kdfNonce": null,
+        "ownerEncSessionKey": null,
+        "ownerEncSessionKeyVersion": null,
+        "_format": "0",
+        "previousMessageId": null,
+        "conversationType": "0",
+        "ownerKeyVersion": null,
+        "draftData": {
+          "_type": {
+            "app": "tutanota",
+            "typeId": 496,
+            "phantom": null
+          },
+          "_original": null,
+          "isAdapter": false,
+          "_permissions": null,
+          "bucketKey": null,
+          "_ownerGroup": null,
+          "_ownerEncSessionKey": null,
+          "_ownerKeyVersion": null,
+          "_kdfNonce": null,
+          "ownerEncSessionKey": null,
+          "ownerEncSessionKeyVersion": null,
+          "_id": null,
+          "subject": null,
+          "bodyText": null,
+          "senderMailAddress": null,
+          "senderName": null,
+          "confidential": null,
+          "method": null,
+          "compressedBodyText": null,
+          "toRecipients": [],
+          "ccRecipients": [],
+          "bccRecipients": [],
+          "addedAttachments": [],
+          "removedAttachments": [],
+          "replyTos": [],
+          "mail": {
+            "_type": {
+              "app": "tutanota",
+              "typeId": 2058,
+              "phantom": null
+            },
+            "_original": null,
+            "isAdapter": false,
+            "_permissions": null,
+            "bucketKey": null,
+            "_ownerGroup": null,
+            "_ownerEncSessionKey": {
+              "bytes": "01c61a6ef9c000d88eaa8f4142d8a12157f898c06837c020646275d651c8c9746e1e17952079dee9483db7bb26843ceec466001656a0e35bd7ed9785ddad9bdc1c337cc175caa030031eda3c7ff27e66f4"
+            },
+            "_ownerKeyVersion": "7",
+            "_kdfNonce": null,
+            "ownerEncSessionKey": null,
+            "ownerEncSessionKeyVersion": null,
+            "_id": null,
+            "subject": "Test <draft> λ",
+            "confidential": true,
+            "method": "0",
+            "sender": {
+              "_type": {
+                "app": "tutanota",
+                "typeId": 2029,
+                "phantom": null
+              },
+              "_original": null,
+              "isAdapter": false,
+              "_permissions": null,
+              "bucketKey": null,
+              "_ownerGroup": null,
+              "_ownerEncSessionKey": null,
+              "_ownerKeyVersion": null,
+              "_kdfNonce": null,
+              "ownerEncSessionKey": null,
+              "ownerEncSessionKeyVersion": null,
+              "_id": null,
+              "name": "Test Sender",
+              "address": "sender@example.invalid",
+              "contact": null
+            },
+            "firstRecipient": {
+              "_type": {
+                "app": "tutanota",
+                "typeId": 2029,
+                "phantom": null
+              },
+              "_original": null,
+              "isAdapter": false,
+              "_permissions": null,
+              "bucketKey": null,
+              "_ownerGroup": null,
+              "_ownerEncSessionKey": null,
+              "_ownerKeyVersion": null,
+              "_kdfNonce": null,
+              "ownerEncSessionKey": null,
+              "ownerEncSessionKeyVersion": null,
+              "_id": null,
+              "name": "Recipient λ",
+              "address": "recipient@example.invalid",
+              "contact": null
+            }
+          },
+          "mailDetailsBlob": {
+            "_type": {
+              "app": "tutanota",
+              "typeId": 2052,
+              "phantom": null
+            },
+            "_original": null,
+            "isAdapter": false,
+            "_permissions": null,
+            "bucketKey": null,
+            "_ownerGroup": null,
+            "_ownerEncSessionKey": {
+              "bytes": "01c61a6ef9c000d88eaa8f4142d8a12157f898c06837c020646275d651c8c9746e1e17952079dee9483db7bb26843ceec466001656a0e35bd7ed9785ddad9bdc1c337cc175caa030031eda3c7ff27e66f4"
+            },
+            "_ownerKeyVersion": "7",
+            "_kdfNonce": null,
+            "ownerEncSessionKey": null,
+            "ownerEncSessionKeyVersion": null,
+            "_id": null,
+            "details": {
+              "_type": {
+                "app": "tutanota",
+                "typeId": 2047,
+                "phantom": null
+              },
+              "_original": null,
+              "isAdapter": false,
+              "_permissions": null,
+              "bucketKey": null,
+              "_ownerGroup": null,
+              "_ownerEncSessionKey": null,
+              "_ownerKeyVersion": null,
+              "_kdfNonce": null,
+              "ownerEncSessionKey": null,
+              "ownerEncSessionKeyVersion": null,
+              "_id": null,
+              "replyTos": [
+                {
+                  "_type": {
+                    "app": "tutanota",
+                    "typeId": 2034,
+                    "phantom": null
+                  },
+                  "_original": null,
+                  "isAdapter": false,
+                  "_permissions": null,
+                  "bucketKey": null,
+                  "_ownerGroup": null,
+                  "_ownerEncSessionKey": null,
+                  "_ownerKeyVersion": null,
+                  "_kdfNonce": null,
+                  "ownerEncSessionKey": null,
+                  "ownerEncSessionKeyVersion": null,
+                  "_id": null,
+                  "name": "Reply",
+                  "address": "reply@example.invalid"
+                }
+              ],
+              "recipients": {
+                "_type": {
+                  "app": "tutanota",
+                  "typeId": 2042,
+                  "phantom": null
+                },
+                "_original": null,
+                "isAdapter": false,
+                "_permissions": null,
+                "bucketKey": null,
+                "_ownerGroup": null,
+                "_ownerEncSessionKey": null,
+                "_ownerKeyVersion": null,
+                "_kdfNonce": null,
+                "ownerEncSessionKey": null,
+                "ownerEncSessionKeyVersion": null,
+                "_id": null,
+                "toRecipients": [
+                  {
+                    "_type": {
+                      "app": "tutanota",
+                      "typeId": 2029,
+                      "phantom": null
+                    },
+                    "_original": null,
+                    "isAdapter": false,
+                    "_permissions": null,
+                    "bucketKey": null,
+                    "_ownerGroup": null,
+                    "_ownerEncSessionKey": null,
+                    "_ownerKeyVersion": null,
+                    "_kdfNonce": null,
+                    "ownerEncSessionKey": null,
+                    "ownerEncSessionKeyVersion": null,
+                    "_id": null,
+                    "name": "Recipient λ",
+                    "address": "recipient@example.invalid",
+                    "contact": null
+                  }
+                ],
+                "ccRecipients": [
+                  {
+                    "_type": {
+                      "app": "tutanota",
+                      "typeId": 2029,
+                      "phantom": null
+                    },
+                    "_original": null,
+                    "isAdapter": false,
+                    "_permissions": null,
+                    "bucketKey": null,
+                    "_ownerGroup": null,
+                    "_ownerEncSessionKey": null,
+                    "_ownerKeyVersion": null,
+                    "_kdfNonce": null,
+                    "ownerEncSessionKey": null,
+                    "ownerEncSessionKeyVersion": null,
+                    "_id": null,
+                    "name": "",
+                    "address": "cc@example.invalid",
+                    "contact": null
+                  }
+                ],
+                "bccRecipients": []
+              },
+              "body": {
+                "_type": {
+                  "app": "tutanota",
+                  "typeId": 2038,
+                  "phantom": null
+                },
+                "_original": null,
+                "isAdapter": false,
+                "_permissions": null,
+                "bucketKey": null,
+                "_ownerGroup": null,
+                "_ownerEncSessionKey": null,
+                "_ownerKeyVersion": null,
+                "_kdfNonce": null,
+                "ownerEncSessionKey": null,
+                "ownerEncSessionKeyVersion": null,
+                "_id": null,
+                "text": "",
+                "compressedText": "<div>Hello &amp; goodbye λ</div>"
+              }
+            }
+          }
+        }
+      },
+      "mappedInput": {
+        "509": "0",
+        "510": null,
+        "511": "0",
+        "512": null,
+        "515": [
+          {
+            "497": "mn3_UQ",
+            "498": null,
+            "499": null,
+            "500": null,
+            "501": null,
+            "502": null,
+            "503": [],
+            "504": [],
+            "505": [],
+            "506": [],
+            "507": [],
+            "819": [],
+            "1116": null,
+            "1194": null,
+            "2069": [
+              {
+                "2059": "Wk5drg",
+                "2060": "AcYabvnAANiOqo9BQtihIVf4mMBoN8AgZGJ11lHIyXRuHheVIHne6Ug9t7smhDzuxGYAFlag41vX7ZeF3a2b3BwzfMF1yqAwAx7aPH/yfmb0",
+                "2061": "7",
+                "2062": null,
+                "2063": "Test <draft> λ",
+                "2064": "1",
+                "2065": "0",
+                "2066": [
+                  {
+                    "2030": "h7AYug",
+                    "2031": "Test Sender",
+                    "2032": "sender@example.invalid",
+                    "2033": []
+                  }
+                ],
+                "2067": [
+                  {
+                    "2030": "24y7NA",
+                    "2031": "Recipient λ",
+                    "2032": "recipient@example.invalid",
+                    "2033": []
+                  }
+                ]
+              }
+            ],
+            "2070": [
+              {
+                "2053": "7DHdwA",
+                "2054": "AcYabvnAANiOqo9BQtihIVf4mMBoN8AgZGJ11lHIyXRuHheVIHne6Ug9t7smhDzuxGYAFlag41vX7ZeF3a2b3BwzfMF1yqAwAx7aPH/yfmb0",
+                "2055": "7",
+                "2056": null,
+                "2057": [
+                  {
+                    "2048": "-i1QMA",
+                    "2049": [
+                      {
+                        "2035": "UnojFw",
+                        "2036": "Reply",
+                        "2037": "reply@example.invalid"
+                      }
+                    ],
+                    "2050": [
+                      {
+                        "2043": "ImHDfg",
+                        "2044": [
+                          {
+                            "2030": "ONnj-A",
+                            "2031": "Recipient λ",
+                            "2032": "recipient@example.invalid",
+                            "2033": []
+                          }
+                        ],
+                        "2045": [
+                          {
+                            "2030": "3sTihg",
+                            "2031": "",
+                            "2032": "cc@example.invalid",
+                            "2033": []
+                          }
+                        ],
+                        "2046": []
+                      }
+                    ],
+                    "2051": [
+                      {
+                        "2039": "I9TTdw",
+                        "2040": "",
+                        "2041": "<div>Hello &amp; goodbye λ</div>"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "1427": null
+      },
+      "wire": {
+        "509": "0",
+        "510": null,
+        "511": "0",
+        "512": null,
+        "515": [
+          {
+            "497": "mn3_UQ",
+            "498": null,
+            "499": null,
+            "500": null,
+            "501": null,
+            "502": null,
+            "503": [],
+            "504": [],
+            "505": [],
+            "506": [],
+            "507": [],
+            "819": [],
+            "1116": null,
+            "1194": null,
+            "2069": [
+              {
+                "2059": "Wk5drg",
+                "2060": "AcYabvnAANiOqo9BQtihIVf4mMBoN8AgZGJ11lHIyXRuHheVIHne6Ug9t7smhDzuxGYAFlag41vX7ZeF3a2b3BwzfMF1yqAwAx7aPH/yfmb0",
+                "2061": "7",
+                "2062": null,
+                "2063": "AXPUthiG1ICYMZjfiSgJnhfdwkxOdgW3lXiouR/NTkZ8KCSCzTz3XZbP9LRl7dFMmfeUfpKaz8czMDOC6gR/zck=",
+                "2064": "AaCZZf7eSJjcV3sSWI470vdNLy7p7mwWR1KTLbCFJZwhJf9r6HdL31Bx42ckSzYlPmCf7yCiyfpW/MOFaFdDf8U=",
+                "2065": "ASWGnRTQlhaxsC1yWUBD/1ofEwVcHC910cTh8UFqCBSq96CEeFatewa4TYUd0tmpy48wJxC/RDGkc8akLwz14pA=",
+                "2066": [
+                  {
+                    "2030": "h7AYug",
+                    "2031": "AVqvl1K3ZHyzxEG4LTsziEURYTeuv4viE+eWdeF3LMcUsca5eGQ8FVXcjVEzrfBloi/lHHuckySQlJKEgFEaGTs=",
+                    "2032": "sender@example.invalid",
+                    "2033": []
+                  }
+                ],
+                "2067": [
+                  {
+                    "2030": "24y7NA",
+                    "2031": "Af+NYHxnEN6Ua9OeYL0WtHz3pJ+I4+ZX6z7IOXAqCaqvpgW/tAQinkqgWiSB3W8E/8XCajgyxpNLx1N9lYkF89E=",
+                    "2032": "recipient@example.invalid",
+                    "2033": []
+                  }
+                ]
+              }
+            ],
+            "2070": [
+              {
+                "2053": "7DHdwA",
+                "2054": "AcYabvnAANiOqo9BQtihIVf4mMBoN8AgZGJ11lHIyXRuHheVIHne6Ug9t7smhDzuxGYAFlag41vX7ZeF3a2b3BwzfMF1yqAwAx7aPH/yfmb0",
+                "2055": "7",
+                "2056": null,
+                "2057": [
+                  {
+                    "2048": "-i1QMA",
+                    "2049": [
+                      {
+                        "2035": "UnojFw",
+                        "2036": "AVVwrOYZyi5AptRDn5x1M0OO1/TOC4irFGfwZsyjHPHkxl0qss8nHZ5zpqK3PAanlJCPdxCAdHQdWRZj9JFz/Jg=",
+                        "2037": "AXIUrZylXOqXymGl3vBp/Bwo1Z0taWJD4Ojtnxgm3KCFFtFFuSkr2vR2IuZMUgA0KSnS5xMO9u4fHwnagE+XkN66aUEeXM13EZjZLQidL+01"
+                      }
+                    ],
+                    "2050": [
+                      {
+                        "2043": "ImHDfg",
+                        "2044": [
+                          {
+                            "2030": "ONnj-A",
+                            "2031": "ARvk7sv3LQndOpF8AoVwDuE44AVdm7MkuM/HqyWtZQGP+35dkzx4Z9ACFxpW+WXWBGOPqRMcj0o1NBpAyCyyTKI=",
+                            "2032": "recipient@example.invalid",
+                            "2033": []
+                          }
+                        ],
+                        "2045": [
+                          {
+                            "2030": "3sTihg",
+                            "2031": "AXZrjqqVbucscH5x142feQFETtfkoRU1TW/+cXmlupjHyWnS+0HQ/esn25vGEF50usuwigkE+QLm/i3AX/vyJBU=",
+                            "2032": "cc@example.invalid",
+                            "2033": []
+                          }
+                        ],
+                        "2046": []
+                      }
+                    ],
+                    "2051": [
+                      {
+                        "2039": "I9TTdw",
+                        "2040": "AdB8Jx49hv4Nk49cKxxg2pKDCVFZtktI0B7KZ5F1+0rFkkT3OQxAgl6NrPqSX/1CBCwq9aCEZsQRdcElvtGX+o0=",
+                        "2041": "ASY7UVUY0yumNdbczek4LPusfn+0hssfDk7XJ+dUv0bAue/Ig0IDoHeqW3z+Vr7zQLzWlKM0PUkruX11NRdkxy1l4N8b8GT/6EzQsNywpRQM1Ejb3cLUpJHaTfoINy2xTg=="
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "1427": null
+      },
+      "wireJson": "{\"509\":\"0\",\"510\":null,\"511\":\"0\",\"512\":null,\"515\":[{\"497\":\"mn3_UQ\",\"498\":null,\"499\":null,\"500\":null,\"501\":null,\"502\":null,\"503\":[],\"504\":[],\"505\":[],\"506\":[],\"507\":[],\"819\":[],\"1116\":null,\"1194\":null,\"2069\":[{\"2059\":\"Wk5drg\",\"2060\":\"AcYabvnAANiOqo9BQtihIVf4mMBoN8AgZGJ11lHIyXRuHheVIHne6Ug9t7smhDzuxGYAFlag41vX7ZeF3a2b3BwzfMF1yqAwAx7aPH/yfmb0\",\"2061\":\"7\",\"2062\":null,\"2063\":\"AXPUthiG1ICYMZjfiSgJnhfdwkxOdgW3lXiouR/NTkZ8KCSCzTz3XZbP9LRl7dFMmfeUfpKaz8czMDOC6gR/zck=\",\"2064\":\"AaCZZf7eSJjcV3sSWI470vdNLy7p7mwWR1KTLbCFJZwhJf9r6HdL31Bx42ckSzYlPmCf7yCiyfpW/MOFaFdDf8U=\",\"2065\":\"ASWGnRTQlhaxsC1yWUBD/1ofEwVcHC910cTh8UFqCBSq96CEeFatewa4TYUd0tmpy48wJxC/RDGkc8akLwz14pA=\",\"2066\":[{\"2030\":\"h7AYug\",\"2031\":\"AVqvl1K3ZHyzxEG4LTsziEURYTeuv4viE+eWdeF3LMcUsca5eGQ8FVXcjVEzrfBloi/lHHuckySQlJKEgFEaGTs=\",\"2032\":\"sender@example.invalid\",\"2033\":[]}],\"2067\":[{\"2030\":\"24y7NA\",\"2031\":\"Af+NYHxnEN6Ua9OeYL0WtHz3pJ+I4+ZX6z7IOXAqCaqvpgW/tAQinkqgWiSB3W8E/8XCajgyxpNLx1N9lYkF89E=\",\"2032\":\"recipient@example.invalid\",\"2033\":[]}]}],\"2070\":[{\"2053\":\"7DHdwA\",\"2054\":\"AcYabvnAANiOqo9BQtihIVf4mMBoN8AgZGJ11lHIyXRuHheVIHne6Ug9t7smhDzuxGYAFlag41vX7ZeF3a2b3BwzfMF1yqAwAx7aPH/yfmb0\",\"2055\":\"7\",\"2056\":null,\"2057\":[{\"2048\":\"-i1QMA\",\"2049\":[{\"2035\":\"UnojFw\",\"2036\":\"AVVwrOYZyi5AptRDn5x1M0OO1/TOC4irFGfwZsyjHPHkxl0qss8nHZ5zpqK3PAanlJCPdxCAdHQdWRZj9JFz/Jg=\",\"2037\":\"AXIUrZylXOqXymGl3vBp/Bwo1Z0taWJD4Ojtnxgm3KCFFtFFuSkr2vR2IuZMUgA0KSnS5xMO9u4fHwnagE+XkN66aUEeXM13EZjZLQidL+01\"}],\"2050\":[{\"2043\":\"ImHDfg\",\"2044\":[{\"2030\":\"ONnj-A\",\"2031\":\"ARvk7sv3LQndOpF8AoVwDuE44AVdm7MkuM/HqyWtZQGP+35dkzx4Z9ACFxpW+WXWBGOPqRMcj0o1NBpAyCyyTKI=\",\"2032\":\"recipient@example.invalid\",\"2033\":[]}],\"2045\":[{\"2030\":\"3sTihg\",\"2031\":\"AXZrjqqVbucscH5x142feQFETtfkoRU1TW/+cXmlupjHyWnS+0HQ/esn25vGEF50usuwigkE+QLm/i3AX/vyJBU=\",\"2032\":\"cc@example.invalid\",\"2033\":[]}],\"2046\":[]}],\"2051\":[{\"2039\":\"I9TTdw\",\"2040\":\"AdB8Jx49hv4Nk49cKxxg2pKDCVFZtktI0B7KZ5F1+0rFkkT3OQxAgl6NrPqSX/1CBCwq9aCEZsQRdcElvtGX+o0=\",\"2041\":\"ASY7UVUY0yumNdbczek4LPusfn+0hssfDk7XJ+dUv0bAue/Ig0IDoHeqW3z+Vr7zQLzWlKM0PUkruX11NRdkxy1l4N8b8GT/6EzQsNywpRQM1Ejb3cLUpJHaTfoINy2xTg==\"}]}]}]}],\"1427\":null}"
+    },
+    {
+      "encryptionRandomOffset": 60,
+      "scheme": "aes-cbc",
+      "operation": "update",
+      "seed": "velin-draft-0-update-v1",
+      "ownerKeyHex": "404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f",
+      "currentOwnerKeyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "sessionKeyHex": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "ownerKeyVersion": 3,
+      "wrappedSessionKeyHex": "019022d0729036d4d0e42e20c0d2ec339fac7a82300a24d00e3354a401feea59a435167f048981d01bb5ac71508b64b7e1582c28d68082f01d927fd310bf80904cdf688f953768cd04f2795f30f3ea2c3b",
+      "keyCalls": [
+        "historical:test-mail-group:3"
+      ],
+      "randomCalls": [
+        16,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "input": {
+        "_type": {
+          "app": "tutanota",
+          "typeId": 519,
+          "phantom": null
+        },
+        "_original": null,
+        "isAdapter": false,
+        "_permissions": null,
+        "bucketKey": null,
+        "_ownerGroup": null,
+        "_ownerEncSessionKey": null,
+        "_ownerKeyVersion": null,
+        "_kdfNonce": null,
+        "ownerEncSessionKey": null,
+        "ownerEncSessionKeyVersion": null,
+        "_format": "0",
+        "draftData": {
+          "_type": {
+            "app": "tutanota",
+            "typeId": 496,
+            "phantom": null
+          },
+          "_original": null,
+          "isAdapter": false,
+          "_permissions": null,
+          "bucketKey": null,
+          "_ownerGroup": null,
+          "_ownerEncSessionKey": null,
+          "_ownerKeyVersion": null,
+          "_kdfNonce": null,
+          "ownerEncSessionKey": null,
+          "ownerEncSessionKeyVersion": null,
+          "_id": null,
+          "subject": null,
+          "bodyText": null,
+          "senderMailAddress": null,
+          "senderName": null,
+          "confidential": null,
+          "method": null,
+          "compressedBodyText": null,
+          "toRecipients": [],
+          "ccRecipients": [],
+          "bccRecipients": [],
+          "addedAttachments": [],
+          "removedAttachments": [],
+          "replyTos": [],
+          "mail": {
+            "_type": {
+              "app": "tutanota",
+              "typeId": 2058,
+              "phantom": null
+            },
+            "_original": null,
+            "isAdapter": false,
+            "_permissions": null,
+            "bucketKey": null,
+            "_ownerGroup": null,
+            "_ownerEncSessionKey": {
+              "bytes": "019022d0729036d4d0e42e20c0d2ec339fac7a82300a24d00e3354a401feea59a435167f048981d01bb5ac71508b64b7e1582c28d68082f01d927fd310bf80904cdf688f953768cd04f2795f30f3ea2c3b"
+            },
+            "_ownerKeyVersion": "3",
+            "_kdfNonce": null,
+            "ownerEncSessionKey": null,
+            "ownerEncSessionKeyVersion": null,
+            "_id": null,
+            "subject": "Test <draft> λ",
+            "confidential": true,
+            "method": "0",
+            "sender": {
+              "_type": {
+                "app": "tutanota",
+                "typeId": 2029,
+                "phantom": null
+              },
+              "_original": null,
+              "isAdapter": false,
+              "_permissions": null,
+              "bucketKey": null,
+              "_ownerGroup": null,
+              "_ownerEncSessionKey": null,
+              "_ownerKeyVersion": null,
+              "_kdfNonce": null,
+              "ownerEncSessionKey": null,
+              "ownerEncSessionKeyVersion": null,
+              "_id": null,
+              "name": "Test Sender",
+              "address": "sender@example.invalid",
+              "contact": null
+            },
+            "firstRecipient": {
+              "_type": {
+                "app": "tutanota",
+                "typeId": 2029,
+                "phantom": null
+              },
+              "_original": null,
+              "isAdapter": false,
+              "_permissions": null,
+              "bucketKey": null,
+              "_ownerGroup": null,
+              "_ownerEncSessionKey": null,
+              "_ownerKeyVersion": null,
+              "_kdfNonce": null,
+              "ownerEncSessionKey": null,
+              "ownerEncSessionKeyVersion": null,
+              "_id": null,
+              "name": "Recipient λ",
+              "address": "recipient@example.invalid",
+              "contact": null
+            }
+          },
+          "mailDetailsBlob": {
+            "_type": {
+              "app": "tutanota",
+              "typeId": 2052,
+              "phantom": null
+            },
+            "_original": null,
+            "isAdapter": false,
+            "_permissions": null,
+            "bucketKey": null,
+            "_ownerGroup": null,
+            "_ownerEncSessionKey": {
+              "bytes": "019022d0729036d4d0e42e20c0d2ec339fac7a82300a24d00e3354a401feea59a435167f048981d01bb5ac71508b64b7e1582c28d68082f01d927fd310bf80904cdf688f953768cd04f2795f30f3ea2c3b"
+            },
+            "_ownerKeyVersion": "3",
+            "_kdfNonce": null,
+            "ownerEncSessionKey": null,
+            "ownerEncSessionKeyVersion": null,
+            "_id": null,
+            "details": {
+              "_type": {
+                "app": "tutanota",
+                "typeId": 2047,
+                "phantom": null
+              },
+              "_original": null,
+              "isAdapter": false,
+              "_permissions": null,
+              "bucketKey": null,
+              "_ownerGroup": null,
+              "_ownerEncSessionKey": null,
+              "_ownerKeyVersion": null,
+              "_kdfNonce": null,
+              "ownerEncSessionKey": null,
+              "ownerEncSessionKeyVersion": null,
+              "_id": null,
+              "replyTos": [
+                {
+                  "_type": {
+                    "app": "tutanota",
+                    "typeId": 2034,
+                    "phantom": null
+                  },
+                  "_original": null,
+                  "isAdapter": false,
+                  "_permissions": null,
+                  "bucketKey": null,
+                  "_ownerGroup": null,
+                  "_ownerEncSessionKey": null,
+                  "_ownerKeyVersion": null,
+                  "_kdfNonce": null,
+                  "ownerEncSessionKey": null,
+                  "ownerEncSessionKeyVersion": null,
+                  "_id": null,
+                  "name": "Reply",
+                  "address": "reply@example.invalid"
+                }
+              ],
+              "recipients": {
+                "_type": {
+                  "app": "tutanota",
+                  "typeId": 2042,
+                  "phantom": null
+                },
+                "_original": null,
+                "isAdapter": false,
+                "_permissions": null,
+                "bucketKey": null,
+                "_ownerGroup": null,
+                "_ownerEncSessionKey": null,
+                "_ownerKeyVersion": null,
+                "_kdfNonce": null,
+                "ownerEncSessionKey": null,
+                "ownerEncSessionKeyVersion": null,
+                "_id": null,
+                "toRecipients": [
+                  {
+                    "_type": {
+                      "app": "tutanota",
+                      "typeId": 2029,
+                      "phantom": null
+                    },
+                    "_original": null,
+                    "isAdapter": false,
+                    "_permissions": null,
+                    "bucketKey": null,
+                    "_ownerGroup": null,
+                    "_ownerEncSessionKey": null,
+                    "_ownerKeyVersion": null,
+                    "_kdfNonce": null,
+                    "ownerEncSessionKey": null,
+                    "ownerEncSessionKeyVersion": null,
+                    "_id": null,
+                    "name": "Recipient λ",
+                    "address": "recipient@example.invalid",
+                    "contact": null
+                  }
+                ],
+                "ccRecipients": [
+                  {
+                    "_type": {
+                      "app": "tutanota",
+                      "typeId": 2029,
+                      "phantom": null
+                    },
+                    "_original": null,
+                    "isAdapter": false,
+                    "_permissions": null,
+                    "bucketKey": null,
+                    "_ownerGroup": null,
+                    "_ownerEncSessionKey": null,
+                    "_ownerKeyVersion": null,
+                    "_kdfNonce": null,
+                    "ownerEncSessionKey": null,
+                    "ownerEncSessionKeyVersion": null,
+                    "_id": null,
+                    "name": "",
+                    "address": "cc@example.invalid",
+                    "contact": null
+                  }
+                ],
+                "bccRecipients": []
+              },
+              "body": {
+                "_type": {
+                  "app": "tutanota",
+                  "typeId": 2038,
+                  "phantom": null
+                },
+                "_original": null,
+                "isAdapter": false,
+                "_permissions": null,
+                "bucketKey": null,
+                "_ownerGroup": null,
+                "_ownerEncSessionKey": null,
+                "_ownerKeyVersion": null,
+                "_kdfNonce": null,
+                "ownerEncSessionKey": null,
+                "ownerEncSessionKeyVersion": null,
+                "_id": null,
+                "text": "",
+                "compressedText": "<div>Hello &amp; goodbye λ</div>"
+              }
+            }
+          }
+        },
+        "draft": [
+          "test-mail-list",
+          "test-draft"
+        ]
+      },
+      "mappedInput": {
+        "520": "0",
+        "521": [
+          {
+            "497": "SzJn1g",
+            "498": null,
+            "499": null,
+            "500": null,
+            "501": null,
+            "502": null,
+            "503": [],
+            "504": [],
+            "505": [],
+            "506": [],
+            "507": [],
+            "819": [],
+            "1116": null,
+            "1194": null,
+            "2069": [
+              {
+                "2059": "W6DhVQ",
+                "2060": "AZAi0HKQNtTQ5C4gwNLsM5+seoIwCiTQDjNUpAH+6lmkNRZ/BImB0Bu1rHFQi2S34VgsKNaAgvAdkn/TEL+AkEzfaI+VN2jNBPJ5XzDz6iw7",
+                "2061": "3",
+                "2062": null,
+                "2063": "Test <draft> λ",
+                "2064": "1",
+                "2065": "0",
+                "2066": [
+                  {
+                    "2030": "UFZ1Gg",
+                    "2031": "Test Sender",
+                    "2032": "sender@example.invalid",
+                    "2033": []
+                  }
+                ],
+                "2067": [
+                  {
+                    "2030": "pn0W5Q",
+                    "2031": "Recipient λ",
+                    "2032": "recipient@example.invalid",
+                    "2033": []
+                  }
+                ]
+              }
+            ],
+            "2070": [
+              {
+                "2053": "V_QfCA",
+                "2054": "AZAi0HKQNtTQ5C4gwNLsM5+seoIwCiTQDjNUpAH+6lmkNRZ/BImB0Bu1rHFQi2S34VgsKNaAgvAdkn/TEL+AkEzfaI+VN2jNBPJ5XzDz6iw7",
+                "2055": "3",
+                "2056": null,
+                "2057": [
+                  {
+                    "2048": "naP56w",
+                    "2049": [
+                      {
+                        "2035": "VclXCw",
+                        "2036": "Reply",
+                        "2037": "reply@example.invalid"
+                      }
+                    ],
+                    "2050": [
+                      {
+                        "2043": "zgJaVA",
+                        "2044": [
+                          {
+                            "2030": "vGu6hg",
+                            "2031": "Recipient λ",
+                            "2032": "recipient@example.invalid",
+                            "2033": []
+                          }
+                        ],
+                        "2045": [
+                          {
+                            "2030": "6C4LSg",
+                            "2031": "",
+                            "2032": "cc@example.invalid",
+                            "2033": []
+                          }
+                        ],
+                        "2046": []
+                      }
+                    ],
+                    "2051": [
+                      {
+                        "2039": "uuSPGw",
+                        "2040": "",
+                        "2041": "<div>Hello &amp; goodbye λ</div>"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "522": [
+          [
+            "test-mail-list",
+            "test-draft"
+          ]
+        ]
+      },
+      "wire": {
+        "520": "0",
+        "521": [
+          {
+            "497": "SzJn1g",
+            "498": null,
+            "499": null,
+            "500": null,
+            "501": null,
+            "502": null,
+            "503": [],
+            "504": [],
+            "505": [],
+            "506": [],
+            "507": [],
+            "819": [],
+            "1116": null,
+            "1194": null,
+            "2069": [
+              {
+                "2059": "W6DhVQ",
+                "2060": "AZAi0HKQNtTQ5C4gwNLsM5+seoIwCiTQDjNUpAH+6lmkNRZ/BImB0Bu1rHFQi2S34VgsKNaAgvAdkn/TEL+AkEzfaI+VN2jNBPJ5XzDz6iw7",
+                "2061": "3",
+                "2062": null,
+                "2063": "ASkg8i00LiDTgHVPAgdc3TH1Jxud/Fzsp0uJgleTf7MxDzIxdkTMcvUU3eF3WVmfZPaCV6JJ2k5WR9i6Bfcj8Nw=",
+                "2064": "AR5R2MR/N6dxkmyPmcLvQdDYlsGYcI+rpDDoXpMY2ljRvMrOpShI4p9JLsSdcZobV4FQ/nzAY02I7UkrSILOJ0I=",
+                "2065": "ATeUKFfM4H+PaAzgMUFSkoSxH1PXarIowJQ0YKUcgi+gnnIQRXCiboigssb9qtCmEiKBKezrFrKDzl4FCoGevhI=",
+                "2066": [
+                  {
+                    "2030": "UFZ1Gg",
+                    "2031": "AZBbysQYb5VRn9WwICGBp/wSWlm3YTL+Muppe28O6m3omvH6UDnX4cctEkfV9k8vpItQB3PABwJJY2LAQpBC1IA=",
+                    "2032": "sender@example.invalid",
+                    "2033": []
+                  }
+                ],
+                "2067": [
+                  {
+                    "2030": "pn0W5Q",
+                    "2031": "ARi3HvXTLbX/GKvwuskW8xrNyoVVB0PT7/1YCxiqWTVVr/IBlBlzSW84go0dZa7DXMiMQSejzz37lPAJcJn1HiA=",
+                    "2032": "recipient@example.invalid",
+                    "2033": []
+                  }
+                ]
+              }
+            ],
+            "2070": [
+              {
+                "2053": "V_QfCA",
+                "2054": "AZAi0HKQNtTQ5C4gwNLsM5+seoIwCiTQDjNUpAH+6lmkNRZ/BImB0Bu1rHFQi2S34VgsKNaAgvAdkn/TEL+AkEzfaI+VN2jNBPJ5XzDz6iw7",
+                "2055": "3",
+                "2056": null,
+                "2057": [
+                  {
+                    "2048": "naP56w",
+                    "2049": [
+                      {
+                        "2035": "VclXCw",
+                        "2036": "AYXbu90RETIBQ/J+5yddNkc3t2zp8nDVgsVKaR5xawbWjhOGT0HceyT+cshQ7txYm/4Fo2Rkre3BZdc3D7wMlDI=",
+                        "2037": "ASYLy611D7SaE4FJCODwrR3QYUDpFgz6X9+PJoodt1jcMCwlnf7W4GhQ0jrw28cNM6czuFzQCy9LBfXUC8rI1s6MlUmCZwt6vbRn9dNI7EVx"
+                      }
+                    ],
+                    "2050": [
+                      {
+                        "2043": "zgJaVA",
+                        "2044": [
+                          {
+                            "2030": "vGu6hg",
+                            "2031": "AULAoiVfM9/3QpEXmjQM13AaUaPQhHWP7tKY/IFduEfopoSLF1veWpxBlEpT40jkosgPN2vRa0CpVtyttzMDGp0=",
+                            "2032": "recipient@example.invalid",
+                            "2033": []
+                          }
+                        ],
+                        "2045": [
+                          {
+                            "2030": "6C4LSg",
+                            "2031": "AToPnFJGtulcLIsyDKj7UmbrwyynR5aed0QKbDzUwippAf6uOBe/Zxet8vUdHQCSo31jfXxvEwWDk24jzF/OdTM=",
+                            "2032": "cc@example.invalid",
+                            "2033": []
+                          }
+                        ],
+                        "2046": []
+                      }
+                    ],
+                    "2051": [
+                      {
+                        "2039": "uuSPGw",
+                        "2040": "AZB+rx7EJojN6AaC2Ps3XxsPsZZsL5P7iufmWXpVNGfPL5rmJYpdKQbB3S6Ng7zNedLi0ic2QHMitoP8rI9MOmI=",
+                        "2041": "ASMvQFs1n5mw+pznXa1G53idPKfheHpeOBP15ye1a/TSTq4f7hIn+qCaYMeVh+s+21uAh5YEZWBD1dAsOaXF9CRUwdRh2iZONTnF9C8vWI5BVAXVUY6XhvIOqrAvI4Ue1w=="
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "522": [
+          [
+            "test-mail-list",
+            "test-draft"
+          ]
+        ]
+      },
+      "wireJson": "{\"520\":\"0\",\"521\":[{\"497\":\"SzJn1g\",\"498\":null,\"499\":null,\"500\":null,\"501\":null,\"502\":null,\"503\":[],\"504\":[],\"505\":[],\"506\":[],\"507\":[],\"819\":[],\"1116\":null,\"1194\":null,\"2069\":[{\"2059\":\"W6DhVQ\",\"2060\":\"AZAi0HKQNtTQ5C4gwNLsM5+seoIwCiTQDjNUpAH+6lmkNRZ/BImB0Bu1rHFQi2S34VgsKNaAgvAdkn/TEL+AkEzfaI+VN2jNBPJ5XzDz6iw7\",\"2061\":\"3\",\"2062\":null,\"2063\":\"ASkg8i00LiDTgHVPAgdc3TH1Jxud/Fzsp0uJgleTf7MxDzIxdkTMcvUU3eF3WVmfZPaCV6JJ2k5WR9i6Bfcj8Nw=\",\"2064\":\"AR5R2MR/N6dxkmyPmcLvQdDYlsGYcI+rpDDoXpMY2ljRvMrOpShI4p9JLsSdcZobV4FQ/nzAY02I7UkrSILOJ0I=\",\"2065\":\"ATeUKFfM4H+PaAzgMUFSkoSxH1PXarIowJQ0YKUcgi+gnnIQRXCiboigssb9qtCmEiKBKezrFrKDzl4FCoGevhI=\",\"2066\":[{\"2030\":\"UFZ1Gg\",\"2031\":\"AZBbysQYb5VRn9WwICGBp/wSWlm3YTL+Muppe28O6m3omvH6UDnX4cctEkfV9k8vpItQB3PABwJJY2LAQpBC1IA=\",\"2032\":\"sender@example.invalid\",\"2033\":[]}],\"2067\":[{\"2030\":\"pn0W5Q\",\"2031\":\"ARi3HvXTLbX/GKvwuskW8xrNyoVVB0PT7/1YCxiqWTVVr/IBlBlzSW84go0dZa7DXMiMQSejzz37lPAJcJn1HiA=\",\"2032\":\"recipient@example.invalid\",\"2033\":[]}]}],\"2070\":[{\"2053\":\"V_QfCA\",\"2054\":\"AZAi0HKQNtTQ5C4gwNLsM5+seoIwCiTQDjNUpAH+6lmkNRZ/BImB0Bu1rHFQi2S34VgsKNaAgvAdkn/TEL+AkEzfaI+VN2jNBPJ5XzDz6iw7\",\"2055\":\"3\",\"2056\":null,\"2057\":[{\"2048\":\"naP56w\",\"2049\":[{\"2035\":\"VclXCw\",\"2036\":\"AYXbu90RETIBQ/J+5yddNkc3t2zp8nDVgsVKaR5xawbWjhOGT0HceyT+cshQ7txYm/4Fo2Rkre3BZdc3D7wMlDI=\",\"2037\":\"ASYLy611D7SaE4FJCODwrR3QYUDpFgz6X9+PJoodt1jcMCwlnf7W4GhQ0jrw28cNM6czuFzQCy9LBfXUC8rI1s6MlUmCZwt6vbRn9dNI7EVx\"}],\"2050\":[{\"2043\":\"zgJaVA\",\"2044\":[{\"2030\":\"vGu6hg\",\"2031\":\"AULAoiVfM9/3QpEXmjQM13AaUaPQhHWP7tKY/IFduEfopoSLF1veWpxBlEpT40jkosgPN2vRa0CpVtyttzMDGp0=\",\"2032\":\"recipient@example.invalid\",\"2033\":[]}],\"2045\":[{\"2030\":\"6C4LSg\",\"2031\":\"AToPnFJGtulcLIsyDKj7UmbrwyynR5aed0QKbDzUwippAf6uOBe/Zxet8vUdHQCSo31jfXxvEwWDk24jzF/OdTM=\",\"2032\":\"cc@example.invalid\",\"2033\":[]}],\"2046\":[]}],\"2051\":[{\"2039\":\"uuSPGw\",\"2040\":\"AZB+rx7EJojN6AaC2Ps3XxsPsZZsL5P7iufmWXpVNGfPL5rmJYpdKQbB3S6Ng7zNedLi0ic2QHMitoP8rI9MOmI=\",\"2041\":\"ASMvQFs1n5mw+pznXa1G53idPKfheHpeOBP15ye1a/TSTq4f7hIn+qCaYMeVh+s+21uAh5YEZWBD1dAsOaXF9CRUwdRh2iZONTnF9C8vWI5BVAXVUY6XhvIOqrAvI4Ue1w==\"}]}]}]}],\"522\":[[\"test-mail-list\",\"test-draft\"]]}"
+    },
+    {
+      "encryptionRandomOffset": 60,
+      "scheme": "aead",
+      "operation": "create",
+      "seed": "velin-draft-1-create-v1",
+      "ownerKeyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "currentOwnerKeyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "sessionKeyHex": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "ownerKeyVersion": 7,
+      "wrappedSessionKeyHex": "01148b224411f115a2e46f04fc4fe0a29bdfaaf917d270c5e3dc57abf9dfc714ab7e432b5f19245b13e40cd21392745b888f4436951b06f1013000c1ca0a96f42da8b8b9e7aabb29efef7a324b10575e0c",
+      "keyCalls": [
+        "current:test-mail-group"
+      ],
+      "randomCalls": [
+        16,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "input": {
+        "_type": {
+          "app": "tutanota",
+          "typeId": 508,
+          "phantom": null
+        },
+        "_original": null,
+        "isAdapter": false,
+        "_permissions": null,
+        "bucketKey": null,
+        "_ownerGroup": null,
+        "_ownerEncSessionKey": null,
+        "_ownerKeyVersion": null,
+        "_kdfNonce": null,
+        "ownerEncSessionKey": null,
+        "ownerEncSessionKeyVersion": null,
+        "_format": "0",
+        "previousMessageId": null,
+        "conversationType": "0",
+        "ownerKeyVersion": null,
+        "draftData": {
+          "_type": {
+            "app": "tutanota",
+            "typeId": 496,
+            "phantom": null
+          },
+          "_original": null,
+          "isAdapter": false,
+          "_permissions": null,
+          "bucketKey": null,
+          "_ownerGroup": null,
+          "_ownerEncSessionKey": null,
+          "_ownerKeyVersion": null,
+          "_kdfNonce": null,
+          "ownerEncSessionKey": null,
+          "ownerEncSessionKeyVersion": null,
+          "_id": null,
+          "subject": null,
+          "bodyText": null,
+          "senderMailAddress": null,
+          "senderName": null,
+          "confidential": null,
+          "method": null,
+          "compressedBodyText": null,
+          "toRecipients": [],
+          "ccRecipients": [],
+          "bccRecipients": [],
+          "addedAttachments": [],
+          "removedAttachments": [],
+          "replyTos": [],
+          "mail": {
+            "_type": {
+              "app": "tutanota",
+              "typeId": 2058,
+              "phantom": null
+            },
+            "_original": null,
+            "isAdapter": false,
+            "_permissions": null,
+            "bucketKey": null,
+            "_ownerGroup": null,
+            "_ownerEncSessionKey": {
+              "bytes": "01148b224411f115a2e46f04fc4fe0a29bdfaaf917d270c5e3dc57abf9dfc714ab7e432b5f19245b13e40cd21392745b888f4436951b06f1013000c1ca0a96f42da8b8b9e7aabb29efef7a324b10575e0c"
+            },
+            "_ownerKeyVersion": "7",
+            "_kdfNonce": null,
+            "ownerEncSessionKey": null,
+            "ownerEncSessionKeyVersion": null,
+            "_id": null,
+            "subject": "Test <draft> λ",
+            "confidential": true,
+            "method": "0",
+            "sender": {
+              "_type": {
+                "app": "tutanota",
+                "typeId": 2029,
+                "phantom": null
+              },
+              "_original": null,
+              "isAdapter": false,
+              "_permissions": null,
+              "bucketKey": null,
+              "_ownerGroup": null,
+              "_ownerEncSessionKey": null,
+              "_ownerKeyVersion": null,
+              "_kdfNonce": null,
+              "ownerEncSessionKey": null,
+              "ownerEncSessionKeyVersion": null,
+              "_id": null,
+              "name": "Test Sender",
+              "address": "sender@example.invalid",
+              "contact": null
+            },
+            "firstRecipient": {
+              "_type": {
+                "app": "tutanota",
+                "typeId": 2029,
+                "phantom": null
+              },
+              "_original": null,
+              "isAdapter": false,
+              "_permissions": null,
+              "bucketKey": null,
+              "_ownerGroup": null,
+              "_ownerEncSessionKey": null,
+              "_ownerKeyVersion": null,
+              "_kdfNonce": null,
+              "ownerEncSessionKey": null,
+              "ownerEncSessionKeyVersion": null,
+              "_id": null,
+              "name": "Recipient λ",
+              "address": "recipient@example.invalid",
+              "contact": null
+            }
+          },
+          "mailDetailsBlob": {
+            "_type": {
+              "app": "tutanota",
+              "typeId": 2052,
+              "phantom": null
+            },
+            "_original": null,
+            "isAdapter": false,
+            "_permissions": null,
+            "bucketKey": null,
+            "_ownerGroup": null,
+            "_ownerEncSessionKey": {
+              "bytes": "01148b224411f115a2e46f04fc4fe0a29bdfaaf917d270c5e3dc57abf9dfc714ab7e432b5f19245b13e40cd21392745b888f4436951b06f1013000c1ca0a96f42da8b8b9e7aabb29efef7a324b10575e0c"
+            },
+            "_ownerKeyVersion": "7",
+            "_kdfNonce": null,
+            "ownerEncSessionKey": null,
+            "ownerEncSessionKeyVersion": null,
+            "_id": null,
+            "details": {
+              "_type": {
+                "app": "tutanota",
+                "typeId": 2047,
+                "phantom": null
+              },
+              "_original": null,
+              "isAdapter": false,
+              "_permissions": null,
+              "bucketKey": null,
+              "_ownerGroup": null,
+              "_ownerEncSessionKey": null,
+              "_ownerKeyVersion": null,
+              "_kdfNonce": null,
+              "ownerEncSessionKey": null,
+              "ownerEncSessionKeyVersion": null,
+              "_id": null,
+              "replyTos": [
+                {
+                  "_type": {
+                    "app": "tutanota",
+                    "typeId": 2034,
+                    "phantom": null
+                  },
+                  "_original": null,
+                  "isAdapter": false,
+                  "_permissions": null,
+                  "bucketKey": null,
+                  "_ownerGroup": null,
+                  "_ownerEncSessionKey": null,
+                  "_ownerKeyVersion": null,
+                  "_kdfNonce": null,
+                  "ownerEncSessionKey": null,
+                  "ownerEncSessionKeyVersion": null,
+                  "_id": null,
+                  "name": "Reply",
+                  "address": "reply@example.invalid"
+                }
+              ],
+              "recipients": {
+                "_type": {
+                  "app": "tutanota",
+                  "typeId": 2042,
+                  "phantom": null
+                },
+                "_original": null,
+                "isAdapter": false,
+                "_permissions": null,
+                "bucketKey": null,
+                "_ownerGroup": null,
+                "_ownerEncSessionKey": null,
+                "_ownerKeyVersion": null,
+                "_kdfNonce": null,
+                "ownerEncSessionKey": null,
+                "ownerEncSessionKeyVersion": null,
+                "_id": null,
+                "toRecipients": [
+                  {
+                    "_type": {
+                      "app": "tutanota",
+                      "typeId": 2029,
+                      "phantom": null
+                    },
+                    "_original": null,
+                    "isAdapter": false,
+                    "_permissions": null,
+                    "bucketKey": null,
+                    "_ownerGroup": null,
+                    "_ownerEncSessionKey": null,
+                    "_ownerKeyVersion": null,
+                    "_kdfNonce": null,
+                    "ownerEncSessionKey": null,
+                    "ownerEncSessionKeyVersion": null,
+                    "_id": null,
+                    "name": "Recipient λ",
+                    "address": "recipient@example.invalid",
+                    "contact": null
+                  }
+                ],
+                "ccRecipients": [
+                  {
+                    "_type": {
+                      "app": "tutanota",
+                      "typeId": 2029,
+                      "phantom": null
+                    },
+                    "_original": null,
+                    "isAdapter": false,
+                    "_permissions": null,
+                    "bucketKey": null,
+                    "_ownerGroup": null,
+                    "_ownerEncSessionKey": null,
+                    "_ownerKeyVersion": null,
+                    "_kdfNonce": null,
+                    "ownerEncSessionKey": null,
+                    "ownerEncSessionKeyVersion": null,
+                    "_id": null,
+                    "name": "",
+                    "address": "cc@example.invalid",
+                    "contact": null
+                  }
+                ],
+                "bccRecipients": []
+              },
+              "body": {
+                "_type": {
+                  "app": "tutanota",
+                  "typeId": 2038,
+                  "phantom": null
+                },
+                "_original": null,
+                "isAdapter": false,
+                "_permissions": null,
+                "bucketKey": null,
+                "_ownerGroup": null,
+                "_ownerEncSessionKey": null,
+                "_ownerKeyVersion": null,
+                "_kdfNonce": null,
+                "ownerEncSessionKey": null,
+                "ownerEncSessionKeyVersion": null,
+                "_id": null,
+                "text": "",
+                "compressedText": "<div>Hello &amp; goodbye λ</div>"
+              }
+            }
+          }
+        }
+      },
+      "mappedInput": {
+        "509": "0",
+        "510": null,
+        "511": "0",
+        "512": null,
+        "515": [
+          {
+            "497": "xSZDKw",
+            "498": null,
+            "499": null,
+            "500": null,
+            "501": null,
+            "502": null,
+            "503": [],
+            "504": [],
+            "505": [],
+            "506": [],
+            "507": [],
+            "819": [],
+            "1116": null,
+            "1194": null,
+            "2069": [
+              {
+                "2059": "Ny8KPg",
+                "2060": "ARSLIkQR8RWi5G8E/E/gopvfqvkX0nDF49xXq/nfxxSrfkMrXxkkWxPkDNITknRbiI9ENpUbBvEBMADBygqW9C2ouLnnqrsp7+96MksQV14M",
+                "2061": "7",
+                "2062": null,
+                "2063": "Test <draft> λ",
+                "2064": "1",
+                "2065": "0",
+                "2066": [
+                  {
+                    "2030": "dFVybQ",
+                    "2031": "Test Sender",
+                    "2032": "sender@example.invalid",
+                    "2033": []
+                  }
+                ],
+                "2067": [
+                  {
+                    "2030": "7ebpUA",
+                    "2031": "Recipient λ",
+                    "2032": "recipient@example.invalid",
+                    "2033": []
+                  }
+                ]
+              }
+            ],
+            "2070": [
+              {
+                "2053": "eWi-xg",
+                "2054": "ARSLIkQR8RWi5G8E/E/gopvfqvkX0nDF49xXq/nfxxSrfkMrXxkkWxPkDNITknRbiI9ENpUbBvEBMADBygqW9C2ouLnnqrsp7+96MksQV14M",
+                "2055": "7",
+                "2056": null,
+                "2057": [
+                  {
+                    "2048": "wq2hUg",
+                    "2049": [
+                      {
+                        "2035": "muqkTA",
+                        "2036": "Reply",
+                        "2037": "reply@example.invalid"
+                      }
+                    ],
+                    "2050": [
+                      {
+                        "2043": "ZYs6CA",
+                        "2044": [
+                          {
+                            "2030": "dkEk8A",
+                            "2031": "Recipient λ",
+                            "2032": "recipient@example.invalid",
+                            "2033": []
+                          }
+                        ],
+                        "2045": [
+                          {
+                            "2030": "t9Odkw",
+                            "2031": "",
+                            "2032": "cc@example.invalid",
+                            "2033": []
+                          }
+                        ],
+                        "2046": []
+                      }
+                    ],
+                    "2051": [
+                      {
+                        "2039": "99B8EQ",
+                        "2040": "",
+                        "2041": "<div>Hello &amp; goodbye λ</div>"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "1427": null
+      },
+      "wire": {
+        "509": "0",
+        "510": null,
+        "511": "0",
+        "512": null,
+        "515": [
+          {
+            "497": "xSZDKw",
+            "498": null,
+            "499": null,
+            "500": null,
+            "501": null,
+            "502": null,
+            "503": [],
+            "504": [],
+            "505": [],
+            "506": [],
+            "507": [],
+            "819": [],
+            "1116": null,
+            "1194": null,
+            "2069": [
+              {
+                "2059": "Ny8KPg",
+                "2060": "ARSLIkQR8RWi5G8E/E/gopvfqvkX0nDF49xXq/nfxxSrfkMrXxkkWxPkDNITknRbiI9ENpUbBvEBMADBygqW9C2ouLnnqrsp7+96MksQV14M",
+                "2061": "7",
+                "2062": null,
+                "2063": "A1F+waa70ij78RVfkem7F2KHkqCVceynJcpdZvRmiW4K71Hv5pzxv43wWou0s7inEge+g/+V/rrvbetm4lqt+IE=",
+                "2064": "A4Ca7sISt/oD/3dJ9r4nsyry9Gdky+9oxPIurli+pbrhqIDgpdgTaLBJRfmtTOdiuRUyjUk=",
+                "2065": "A9MMc/wbKynoWv7jO4F9ngDQZe2Yrn0mqaETg+ns3flDlU7ONg/2CAKIlmZqBjgZ1/B4pu4=",
+                "2066": [
+                  {
+                    "2030": "dFVybQ",
+                    "2031": "A1rz/BIFp46MZzC6eWmePO5Zf5cjp3CFqYkwD5kVxPVIbqhUh2JhfeCAyhXoxnT6NeoITzRV99iLLNWl4Q==",
+                    "2032": "sender@example.invalid",
+                    "2033": []
+                  }
+                ],
+                "2067": [
+                  {
+                    "2030": "7ebpUA",
+                    "2031": "A276zfzwpxKAMcoD9uG3tO0zdnt2M+AMr3pEUOXN85e3micFp60CJFgGLjwS2XRL+apYwlDMPLo8QWf1zJoNaoE=",
+                    "2032": "recipient@example.invalid",
+                    "2033": []
+                  }
+                ]
+              }
+            ],
+            "2070": [
+              {
+                "2053": "eWi-xg",
+                "2054": "ARSLIkQR8RWi5G8E/E/gopvfqvkX0nDF49xXq/nfxxSrfkMrXxkkWxPkDNITknRbiI9ENpUbBvEBMADBygqW9C2ouLnnqrsp7+96MksQV14M",
+                "2055": "7",
+                "2056": null,
+                "2057": [
+                  {
+                    "2048": "wq2hUg",
+                    "2049": [
+                      {
+                        "2035": "muqkTA",
+                        "2036": "A4B+UxtvKn0P/E8QXkcbBZakaD+Z8KtL6ptH2LLHOaAP6waDJqbCId0RFdmBGDvHfSPP1eetdAbO",
+                        "2037": "A9BAup6erQH5LDYlfc/oWBLqxdDsKvQQMLwIYqFMvpAnF5ngu/dr5FkT5v1Qnh65Q9O17GoDekeubsoR1csyyki4G/Jg6i6N9A=="
+                      }
+                    ],
+                    "2050": [
+                      {
+                        "2043": "ZYs6CA",
+                        "2044": [
+                          {
+                            "2030": "dkEk8A",
+                            "2031": "Awsa39qkWbx9HYRJJkDf4r/al2E75CmuFUAosSDKxMPJQ1eZvytTHs5I8Zhhd0k88NtBa9vXqoeBy6Ts981daQI=",
+                            "2032": "recipient@example.invalid",
+                            "2033": []
+                          }
+                        ],
+                        "2045": [
+                          {
+                            "2030": "t9Odkw",
+                            "2031": "A58I7140uDTDW7zrH6QdEnVvxsnY2sm8ma28ep66TbvBVtKailmyf/CFSW8Bx2I5wfB2YeE=",
+                            "2032": "cc@example.invalid",
+                            "2033": []
+                          }
+                        ],
+                        "2046": []
+                      }
+                    ],
+                    "2051": [
+                      {
+                        "2039": "99B8EQ",
+                        "2040": "A0bKXbw+sdPq9/x28AtGbc23a84PpiToocgQU5Ay8yZ/rA9IybjRHHSZwoQpCsWWJab8hiw=",
+                        "2041": "Ax6j07gQ99AeyAxoJ1AzCUunDT3JtcyxM3xI+v8WCyLrVrUWGA3sGox0YCyJj/sjjoPKpoTJzDF0uVlkvq4NiabWw758Fi6nSzzsjlWsbr8/iAbafg=="
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "1427": null
+      },
+      "wireJson": "{\"509\":\"0\",\"510\":null,\"511\":\"0\",\"512\":null,\"515\":[{\"497\":\"xSZDKw\",\"498\":null,\"499\":null,\"500\":null,\"501\":null,\"502\":null,\"503\":[],\"504\":[],\"505\":[],\"506\":[],\"507\":[],\"819\":[],\"1116\":null,\"1194\":null,\"2069\":[{\"2059\":\"Ny8KPg\",\"2060\":\"ARSLIkQR8RWi5G8E/E/gopvfqvkX0nDF49xXq/nfxxSrfkMrXxkkWxPkDNITknRbiI9ENpUbBvEBMADBygqW9C2ouLnnqrsp7+96MksQV14M\",\"2061\":\"7\",\"2062\":null,\"2063\":\"A1F+waa70ij78RVfkem7F2KHkqCVceynJcpdZvRmiW4K71Hv5pzxv43wWou0s7inEge+g/+V/rrvbetm4lqt+IE=\",\"2064\":\"A4Ca7sISt/oD/3dJ9r4nsyry9Gdky+9oxPIurli+pbrhqIDgpdgTaLBJRfmtTOdiuRUyjUk=\",\"2065\":\"A9MMc/wbKynoWv7jO4F9ngDQZe2Yrn0mqaETg+ns3flDlU7ONg/2CAKIlmZqBjgZ1/B4pu4=\",\"2066\":[{\"2030\":\"dFVybQ\",\"2031\":\"A1rz/BIFp46MZzC6eWmePO5Zf5cjp3CFqYkwD5kVxPVIbqhUh2JhfeCAyhXoxnT6NeoITzRV99iLLNWl4Q==\",\"2032\":\"sender@example.invalid\",\"2033\":[]}],\"2067\":[{\"2030\":\"7ebpUA\",\"2031\":\"A276zfzwpxKAMcoD9uG3tO0zdnt2M+AMr3pEUOXN85e3micFp60CJFgGLjwS2XRL+apYwlDMPLo8QWf1zJoNaoE=\",\"2032\":\"recipient@example.invalid\",\"2033\":[]}]}],\"2070\":[{\"2053\":\"eWi-xg\",\"2054\":\"ARSLIkQR8RWi5G8E/E/gopvfqvkX0nDF49xXq/nfxxSrfkMrXxkkWxPkDNITknRbiI9ENpUbBvEBMADBygqW9C2ouLnnqrsp7+96MksQV14M\",\"2055\":\"7\",\"2056\":null,\"2057\":[{\"2048\":\"wq2hUg\",\"2049\":[{\"2035\":\"muqkTA\",\"2036\":\"A4B+UxtvKn0P/E8QXkcbBZakaD+Z8KtL6ptH2LLHOaAP6waDJqbCId0RFdmBGDvHfSPP1eetdAbO\",\"2037\":\"A9BAup6erQH5LDYlfc/oWBLqxdDsKvQQMLwIYqFMvpAnF5ngu/dr5FkT5v1Qnh65Q9O17GoDekeubsoR1csyyki4G/Jg6i6N9A==\"}],\"2050\":[{\"2043\":\"ZYs6CA\",\"2044\":[{\"2030\":\"dkEk8A\",\"2031\":\"Awsa39qkWbx9HYRJJkDf4r/al2E75CmuFUAosSDKxMPJQ1eZvytTHs5I8Zhhd0k88NtBa9vXqoeBy6Ts981daQI=\",\"2032\":\"recipient@example.invalid\",\"2033\":[]}],\"2045\":[{\"2030\":\"t9Odkw\",\"2031\":\"A58I7140uDTDW7zrH6QdEnVvxsnY2sm8ma28ep66TbvBVtKailmyf/CFSW8Bx2I5wfB2YeE=\",\"2032\":\"cc@example.invalid\",\"2033\":[]}],\"2046\":[]}],\"2051\":[{\"2039\":\"99B8EQ\",\"2040\":\"A0bKXbw+sdPq9/x28AtGbc23a84PpiToocgQU5Ay8yZ/rA9IybjRHHSZwoQpCsWWJab8hiw=\",\"2041\":\"Ax6j07gQ99AeyAxoJ1AzCUunDT3JtcyxM3xI+v8WCyLrVrUWGA3sGox0YCyJj/sjjoPKpoTJzDF0uVlkvq4NiabWw758Fi6nSzzsjlWsbr8/iAbafg==\"}]}]}]}],\"1427\":null}"
+    },
+    {
+      "encryptionRandomOffset": 60,
+      "scheme": "aead",
+      "operation": "update",
+      "seed": "velin-draft-1-update-v1",
+      "ownerKeyHex": "404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f",
+      "currentOwnerKeyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "sessionKeyHex": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "ownerKeyVersion": 3,
+      "wrappedSessionKeyHex": "011fda5d2ee4753e20150e344b0ef69bc4968d9d88e3c002d8e810cbf604b81f3f7294e28e2863818d346a85dc1c7ce6b37d5a88858530cefc8e3f17a266efac9cb13d57caa15b4a0b4c24d884d903a6d4",
+      "keyCalls": [
+        "historical:test-mail-group:3"
+      ],
+      "randomCalls": [
+        16,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16,
+        16
+      ],
+      "input": {
+        "_type": {
+          "app": "tutanota",
+          "typeId": 519,
+          "phantom": null
+        },
+        "_original": null,
+        "isAdapter": false,
+        "_permissions": null,
+        "bucketKey": null,
+        "_ownerGroup": null,
+        "_ownerEncSessionKey": null,
+        "_ownerKeyVersion": null,
+        "_kdfNonce": null,
+        "ownerEncSessionKey": null,
+        "ownerEncSessionKeyVersion": null,
+        "_format": "0",
+        "draftData": {
+          "_type": {
+            "app": "tutanota",
+            "typeId": 496,
+            "phantom": null
+          },
+          "_original": null,
+          "isAdapter": false,
+          "_permissions": null,
+          "bucketKey": null,
+          "_ownerGroup": null,
+          "_ownerEncSessionKey": null,
+          "_ownerKeyVersion": null,
+          "_kdfNonce": null,
+          "ownerEncSessionKey": null,
+          "ownerEncSessionKeyVersion": null,
+          "_id": null,
+          "subject": null,
+          "bodyText": null,
+          "senderMailAddress": null,
+          "senderName": null,
+          "confidential": null,
+          "method": null,
+          "compressedBodyText": null,
+          "toRecipients": [],
+          "ccRecipients": [],
+          "bccRecipients": [],
+          "addedAttachments": [],
+          "removedAttachments": [],
+          "replyTos": [],
+          "mail": {
+            "_type": {
+              "app": "tutanota",
+              "typeId": 2058,
+              "phantom": null
+            },
+            "_original": null,
+            "isAdapter": false,
+            "_permissions": null,
+            "bucketKey": null,
+            "_ownerGroup": null,
+            "_ownerEncSessionKey": {
+              "bytes": "011fda5d2ee4753e20150e344b0ef69bc4968d9d88e3c002d8e810cbf604b81f3f7294e28e2863818d346a85dc1c7ce6b37d5a88858530cefc8e3f17a266efac9cb13d57caa15b4a0b4c24d884d903a6d4"
+            },
+            "_ownerKeyVersion": "3",
+            "_kdfNonce": null,
+            "ownerEncSessionKey": null,
+            "ownerEncSessionKeyVersion": null,
+            "_id": null,
+            "subject": "Test <draft> λ",
+            "confidential": true,
+            "method": "0",
+            "sender": {
+              "_type": {
+                "app": "tutanota",
+                "typeId": 2029,
+                "phantom": null
+              },
+              "_original": null,
+              "isAdapter": false,
+              "_permissions": null,
+              "bucketKey": null,
+              "_ownerGroup": null,
+              "_ownerEncSessionKey": null,
+              "_ownerKeyVersion": null,
+              "_kdfNonce": null,
+              "ownerEncSessionKey": null,
+              "ownerEncSessionKeyVersion": null,
+              "_id": null,
+              "name": "Test Sender",
+              "address": "sender@example.invalid",
+              "contact": null
+            },
+            "firstRecipient": {
+              "_type": {
+                "app": "tutanota",
+                "typeId": 2029,
+                "phantom": null
+              },
+              "_original": null,
+              "isAdapter": false,
+              "_permissions": null,
+              "bucketKey": null,
+              "_ownerGroup": null,
+              "_ownerEncSessionKey": null,
+              "_ownerKeyVersion": null,
+              "_kdfNonce": null,
+              "ownerEncSessionKey": null,
+              "ownerEncSessionKeyVersion": null,
+              "_id": null,
+              "name": "Recipient λ",
+              "address": "recipient@example.invalid",
+              "contact": null
+            }
+          },
+          "mailDetailsBlob": {
+            "_type": {
+              "app": "tutanota",
+              "typeId": 2052,
+              "phantom": null
+            },
+            "_original": null,
+            "isAdapter": false,
+            "_permissions": null,
+            "bucketKey": null,
+            "_ownerGroup": null,
+            "_ownerEncSessionKey": {
+              "bytes": "011fda5d2ee4753e20150e344b0ef69bc4968d9d88e3c002d8e810cbf604b81f3f7294e28e2863818d346a85dc1c7ce6b37d5a88858530cefc8e3f17a266efac9cb13d57caa15b4a0b4c24d884d903a6d4"
+            },
+            "_ownerKeyVersion": "3",
+            "_kdfNonce": null,
+            "ownerEncSessionKey": null,
+            "ownerEncSessionKeyVersion": null,
+            "_id": null,
+            "details": {
+              "_type": {
+                "app": "tutanota",
+                "typeId": 2047,
+                "phantom": null
+              },
+              "_original": null,
+              "isAdapter": false,
+              "_permissions": null,
+              "bucketKey": null,
+              "_ownerGroup": null,
+              "_ownerEncSessionKey": null,
+              "_ownerKeyVersion": null,
+              "_kdfNonce": null,
+              "ownerEncSessionKey": null,
+              "ownerEncSessionKeyVersion": null,
+              "_id": null,
+              "replyTos": [
+                {
+                  "_type": {
+                    "app": "tutanota",
+                    "typeId": 2034,
+                    "phantom": null
+                  },
+                  "_original": null,
+                  "isAdapter": false,
+                  "_permissions": null,
+                  "bucketKey": null,
+                  "_ownerGroup": null,
+                  "_ownerEncSessionKey": null,
+                  "_ownerKeyVersion": null,
+                  "_kdfNonce": null,
+                  "ownerEncSessionKey": null,
+                  "ownerEncSessionKeyVersion": null,
+                  "_id": null,
+                  "name": "Reply",
+                  "address": "reply@example.invalid"
+                }
+              ],
+              "recipients": {
+                "_type": {
+                  "app": "tutanota",
+                  "typeId": 2042,
+                  "phantom": null
+                },
+                "_original": null,
+                "isAdapter": false,
+                "_permissions": null,
+                "bucketKey": null,
+                "_ownerGroup": null,
+                "_ownerEncSessionKey": null,
+                "_ownerKeyVersion": null,
+                "_kdfNonce": null,
+                "ownerEncSessionKey": null,
+                "ownerEncSessionKeyVersion": null,
+                "_id": null,
+                "toRecipients": [
+                  {
+                    "_type": {
+                      "app": "tutanota",
+                      "typeId": 2029,
+                      "phantom": null
+                    },
+                    "_original": null,
+                    "isAdapter": false,
+                    "_permissions": null,
+                    "bucketKey": null,
+                    "_ownerGroup": null,
+                    "_ownerEncSessionKey": null,
+                    "_ownerKeyVersion": null,
+                    "_kdfNonce": null,
+                    "ownerEncSessionKey": null,
+                    "ownerEncSessionKeyVersion": null,
+                    "_id": null,
+                    "name": "Recipient λ",
+                    "address": "recipient@example.invalid",
+                    "contact": null
+                  }
+                ],
+                "ccRecipients": [
+                  {
+                    "_type": {
+                      "app": "tutanota",
+                      "typeId": 2029,
+                      "phantom": null
+                    },
+                    "_original": null,
+                    "isAdapter": false,
+                    "_permissions": null,
+                    "bucketKey": null,
+                    "_ownerGroup": null,
+                    "_ownerEncSessionKey": null,
+                    "_ownerKeyVersion": null,
+                    "_kdfNonce": null,
+                    "ownerEncSessionKey": null,
+                    "ownerEncSessionKeyVersion": null,
+                    "_id": null,
+                    "name": "",
+                    "address": "cc@example.invalid",
+                    "contact": null
+                  }
+                ],
+                "bccRecipients": []
+              },
+              "body": {
+                "_type": {
+                  "app": "tutanota",
+                  "typeId": 2038,
+                  "phantom": null
+                },
+                "_original": null,
+                "isAdapter": false,
+                "_permissions": null,
+                "bucketKey": null,
+                "_ownerGroup": null,
+                "_ownerEncSessionKey": null,
+                "_ownerKeyVersion": null,
+                "_kdfNonce": null,
+                "ownerEncSessionKey": null,
+                "ownerEncSessionKeyVersion": null,
+                "_id": null,
+                "text": "",
+                "compressedText": "<div>Hello &amp; goodbye λ</div>"
+              }
+            }
+          }
+        },
+        "draft": [
+          "test-mail-list",
+          "test-draft"
+        ]
+      },
+      "mappedInput": {
+        "520": "0",
+        "521": [
+          {
+            "497": "S09PsA",
+            "498": null,
+            "499": null,
+            "500": null,
+            "501": null,
+            "502": null,
+            "503": [],
+            "504": [],
+            "505": [],
+            "506": [],
+            "507": [],
+            "819": [],
+            "1116": null,
+            "1194": null,
+            "2069": [
+              {
+                "2059": "hYygTA",
+                "2060": "AR/aXS7kdT4gFQ40Sw72m8SWjZ2I48AC2OgQy/YEuB8/cpTijihjgY00aoXcHHzms31aiIWFMM78jj8XombvrJyxPVfKoVtKC0wk2ITZA6bU",
+                "2061": "3",
+                "2062": null,
+                "2063": "Test <draft> λ",
+                "2064": "1",
+                "2065": "0",
+                "2066": [
+                  {
+                    "2030": "JQmAqw",
+                    "2031": "Test Sender",
+                    "2032": "sender@example.invalid",
+                    "2033": []
+                  }
+                ],
+                "2067": [
+                  {
+                    "2030": "JXVa6w",
+                    "2031": "Recipient λ",
+                    "2032": "recipient@example.invalid",
+                    "2033": []
+                  }
+                ]
+              }
+            ],
+            "2070": [
+              {
+                "2053": "R_vdtw",
+                "2054": "AR/aXS7kdT4gFQ40Sw72m8SWjZ2I48AC2OgQy/YEuB8/cpTijihjgY00aoXcHHzms31aiIWFMM78jj8XombvrJyxPVfKoVtKC0wk2ITZA6bU",
+                "2055": "3",
+                "2056": null,
+                "2057": [
+                  {
+                    "2048": "eJ0ixA",
+                    "2049": [
+                      {
+                        "2035": "PkxfBA",
+                        "2036": "Reply",
+                        "2037": "reply@example.invalid"
+                      }
+                    ],
+                    "2050": [
+                      {
+                        "2043": "X7nw6Q",
+                        "2044": [
+                          {
+                            "2030": "KGmHGw",
+                            "2031": "Recipient λ",
+                            "2032": "recipient@example.invalid",
+                            "2033": []
+                          }
+                        ],
+                        "2045": [
+                          {
+                            "2030": "iERvIw",
+                            "2031": "",
+                            "2032": "cc@example.invalid",
+                            "2033": []
+                          }
+                        ],
+                        "2046": []
+                      }
+                    ],
+                    "2051": [
+                      {
+                        "2039": "IZVHRA",
+                        "2040": "",
+                        "2041": "<div>Hello &amp; goodbye λ</div>"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "522": [
+          [
+            "test-mail-list",
+            "test-draft"
+          ]
+        ]
+      },
+      "wire": {
+        "520": "0",
+        "521": [
+          {
+            "497": "S09PsA",
+            "498": null,
+            "499": null,
+            "500": null,
+            "501": null,
+            "502": null,
+            "503": [],
+            "504": [],
+            "505": [],
+            "506": [],
+            "507": [],
+            "819": [],
+            "1116": null,
+            "1194": null,
+            "2069": [
+              {
+                "2059": "hYygTA",
+                "2060": "AR/aXS7kdT4gFQ40Sw72m8SWjZ2I48AC2OgQy/YEuB8/cpTijihjgY00aoXcHHzms31aiIWFMM78jj8XombvrJyxPVfKoVtKC0wk2ITZA6bU",
+                "2061": "3",
+                "2062": null,
+                "2063": "A6IyKdbnwQGVR90UhRR8lNERQSAtBIkxOideAlowumWUWHVkJg4sKJexDuZg1gpXuxbOC9bcLnVZ09pq4WUeqzM=",
+                "2064": "A/+zgoZTLPrOMqlGz9E3cBSshVG9537Lov92XyDTQopI5yLvfP8MMOPvtWLj9YtuJALhLH8=",
+                "2065": "A+jRHJss+YDnmxWLH8ZV14MkMV42VsX9rcZUvEg8Qn1N+cQffRxdR6cBGeUWXDP5ko896eQ=",
+                "2066": [
+                  {
+                    "2030": "JQmAqw",
+                    "2031": "A4aYSUm6/JxOAc3EGoYh5jEA7pCJ4neSvVRUW2SPevqMFTjiFYM+NI2jGS6vjvjbHtmwj1OO5FOxhElR+g==",
+                    "2032": "sender@example.invalid",
+                    "2033": []
+                  }
+                ],
+                "2067": [
+                  {
+                    "2030": "JXVa6w",
+                    "2031": "A0KCudY38MKNIHlrGvIQQo8AqO6KMEOOKJzq9wmk91R1RY+hZc5PKpM0C9iZkEmFsZYdJePQjWjYeD4c0nYya5Y=",
+                    "2032": "recipient@example.invalid",
+                    "2033": []
+                  }
+                ]
+              }
+            ],
+            "2070": [
+              {
+                "2053": "R_vdtw",
+                "2054": "AR/aXS7kdT4gFQ40Sw72m8SWjZ2I48AC2OgQy/YEuB8/cpTijihjgY00aoXcHHzms31aiIWFMM78jj8XombvrJyxPVfKoVtKC0wk2ITZA6bU",
+                "2055": "3",
+                "2056": null,
+                "2057": [
+                  {
+                    "2048": "eJ0ixA",
+                    "2049": [
+                      {
+                        "2035": "PkxfBA",
+                        "2036": "A4/waQYxbm/TYbSo4ZOztfHrEkmN+2Jq7icG2qJ78qpeqakZlM+EZQVZmwBaeURv7WQc8/vT9vu4",
+                        "2037": "AymFf3xEXQ9cCg18hXf9ryekmgM2931aWL5wrnk0WxAMwZYmgRM4oBYIKHubH+ygqOBt/3/6RHgPMA12i96Qb6vZgAjRVxA8Ww=="
+                      }
+                    ],
+                    "2050": [
+                      {
+                        "2043": "X7nw6Q",
+                        "2044": [
+                          {
+                            "2030": "KGmHGw",
+                            "2031": "A7LhMN32dLVNpnINv/vhwSYuYGPQJG8qYSMtMFLEKGgfX9MIrPG5A6BstChL0P83y0453viFNXcW3GZAe7Aj7hs=",
+                            "2032": "recipient@example.invalid",
+                            "2033": []
+                          }
+                        ],
+                        "2045": [
+                          {
+                            "2030": "iERvIw",
+                            "2031": "A/ntqmykoK6VTCa9IWDL/zqGtWHvR09tGPVhjcymw9hs2UmUwFZOJVpTHQSFLeC8q1YJmy8=",
+                            "2032": "cc@example.invalid",
+                            "2033": []
+                          }
+                        ],
+                        "2046": []
+                      }
+                    ],
+                    "2051": [
+                      {
+                        "2039": "IZVHRA",
+                        "2040": "A3RTN/j3xGIcWrWxIyiozqkpCNM1zMrCyiUQwWnDRUW1HlDi/6O907OjKDxqWVDrkla5In0=",
+                        "2041": "A0wrPdk4x2CfZysej7aP0k+WWE23vOliUxBKiq/x0vX1dEJvawihEzHKZxNw4WuNcUaoGjuXgdMgGi3Mk/zGO0IcuXgB7nzYE8mC1bXeqqf6Q13yZg=="
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "522": [
+          [
+            "test-mail-list",
+            "test-draft"
+          ]
+        ]
+      },
+      "wireJson": "{\"520\":\"0\",\"521\":[{\"497\":\"S09PsA\",\"498\":null,\"499\":null,\"500\":null,\"501\":null,\"502\":null,\"503\":[],\"504\":[],\"505\":[],\"506\":[],\"507\":[],\"819\":[],\"1116\":null,\"1194\":null,\"2069\":[{\"2059\":\"hYygTA\",\"2060\":\"AR/aXS7kdT4gFQ40Sw72m8SWjZ2I48AC2OgQy/YEuB8/cpTijihjgY00aoXcHHzms31aiIWFMM78jj8XombvrJyxPVfKoVtKC0wk2ITZA6bU\",\"2061\":\"3\",\"2062\":null,\"2063\":\"A6IyKdbnwQGVR90UhRR8lNERQSAtBIkxOideAlowumWUWHVkJg4sKJexDuZg1gpXuxbOC9bcLnVZ09pq4WUeqzM=\",\"2064\":\"A/+zgoZTLPrOMqlGz9E3cBSshVG9537Lov92XyDTQopI5yLvfP8MMOPvtWLj9YtuJALhLH8=\",\"2065\":\"A+jRHJss+YDnmxWLH8ZV14MkMV42VsX9rcZUvEg8Qn1N+cQffRxdR6cBGeUWXDP5ko896eQ=\",\"2066\":[{\"2030\":\"JQmAqw\",\"2031\":\"A4aYSUm6/JxOAc3EGoYh5jEA7pCJ4neSvVRUW2SPevqMFTjiFYM+NI2jGS6vjvjbHtmwj1OO5FOxhElR+g==\",\"2032\":\"sender@example.invalid\",\"2033\":[]}],\"2067\":[{\"2030\":\"JXVa6w\",\"2031\":\"A0KCudY38MKNIHlrGvIQQo8AqO6KMEOOKJzq9wmk91R1RY+hZc5PKpM0C9iZkEmFsZYdJePQjWjYeD4c0nYya5Y=\",\"2032\":\"recipient@example.invalid\",\"2033\":[]}]}],\"2070\":[{\"2053\":\"R_vdtw\",\"2054\":\"AR/aXS7kdT4gFQ40Sw72m8SWjZ2I48AC2OgQy/YEuB8/cpTijihjgY00aoXcHHzms31aiIWFMM78jj8XombvrJyxPVfKoVtKC0wk2ITZA6bU\",\"2055\":\"3\",\"2056\":null,\"2057\":[{\"2048\":\"eJ0ixA\",\"2049\":[{\"2035\":\"PkxfBA\",\"2036\":\"A4/waQYxbm/TYbSo4ZOztfHrEkmN+2Jq7icG2qJ78qpeqakZlM+EZQVZmwBaeURv7WQc8/vT9vu4\",\"2037\":\"AymFf3xEXQ9cCg18hXf9ryekmgM2931aWL5wrnk0WxAMwZYmgRM4oBYIKHubH+ygqOBt/3/6RHgPMA12i96Qb6vZgAjRVxA8Ww==\"}],\"2050\":[{\"2043\":\"X7nw6Q\",\"2044\":[{\"2030\":\"KGmHGw\",\"2031\":\"A7LhMN32dLVNpnINv/vhwSYuYGPQJG8qYSMtMFLEKGgfX9MIrPG5A6BstChL0P83y0453viFNXcW3GZAe7Aj7hs=\",\"2032\":\"recipient@example.invalid\",\"2033\":[]}],\"2045\":[{\"2030\":\"iERvIw\",\"2031\":\"A/ntqmykoK6VTCa9IWDL/zqGtWHvR09tGPVhjcymw9hs2UmUwFZOJVpTHQSFLeC8q1YJmy8=\",\"2032\":\"cc@example.invalid\",\"2033\":[]}],\"2046\":[]}],\"2051\":[{\"2039\":\"IZVHRA\",\"2040\":\"A3RTN/j3xGIcWrWxIyiozqkpCNM1zMrCyiUQwWnDRUW1HlDi/6O907OjKDxqWVDrkla5In0=\",\"2041\":\"A0wrPdk4x2CfZysej7aP0k+WWE23vOliUxBKiq/x0vX1dEJvawihEzHKZxNw4WuNcUaoGjuXgdMgGi3Mk/zGO0IcuXgB7nzYE8mC1bXeqqf6Q13yZg==\"}]}]}]}],\"522\":[[\"test-mail-list\",\"test-draft\"]]}"
+    }
+  ]
+}
