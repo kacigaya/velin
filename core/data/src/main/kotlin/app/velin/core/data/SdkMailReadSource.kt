@@ -72,7 +72,7 @@ internal class SdkMailReadSource(private val sessions: SessionReadAccess) : Mail
             Folder(FolderId(it.id.domain()), it.name, folderKind(it.kind), unreadOrZero(sdk, it),
                 it.parent?.let { p -> FolderId(p.domain()) })
         }
-        MailboxSnapshot(folders, labels, emptyList())
+        MailboxSnapshot(folders, labels, sdk.senders().map { SenderAlias(it.address(), enabled = true) })
     }
     /**
      * Upstream receives unread counts over the event bus (WebsocketCounterData, MailModel.ts:455-478),
