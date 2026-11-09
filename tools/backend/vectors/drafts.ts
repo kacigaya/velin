@@ -86,7 +86,7 @@ for (const scheme of [SymmetricEncryptionScheme.AesCbc, SymmetricEncryptionSchem
       mailDetailsBlob: types.createMailDetailsBlobTransferAggregatedType({
         _ownerEncSessionKey: ownerEncSessionKey, _ownerKeyVersion: String(ownerKey.version), _kdfNonce: null,
         details: types.createMailDetailsTransferAggregatedType({
-          body: types.createBodyTransferAggregatedType({ compressedText: '<div>Hello &amp; goodbye λ</div>', text: '' }),
+          body: types.createBodyTransferAggregatedType({ compressedText: operation === 'create' ? '<div>Hello &amp; goodbye λ</div>' : '<div>Repeated λ &amp; text. '.repeat(80) + '</div>', text: '' }),
           recipients: types.createRecipientsTransferAggregatedType({
             toRecipients: to, ccRecipients: [address('', 'cc@example.invalid')], bccRecipients: [],
           }),
