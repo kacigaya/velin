@@ -110,10 +110,11 @@ private fun MailApp(account: Account, auth: AuthRepository, mailbox: MailboxRepo
 
     LaunchedEffect(mailboxViewModel) {
         mailboxViewModel.effects.collect { effect ->
-            // Snackbars run in their own coroutine; awaiting one here would stall navigation.
+            // Suspending calls run in their own coroutine: a snackbar would stall navigation,
+            // and a cancelled drawer open would end this collector.
             when (effect) {
                 is MailboxEffect.OpenConversation -> backStack.showDetail(ConversationRoute(effect.conversationId))
-                MailboxEffect.OpenFolders -> drawerState.open()
+                MailboxEffect.OpenFolders -> scope.launch { drawerState.open() }
                 is MailboxEffect.PickFolder -> moveRequest = effect.mailIds
                 is MailboxEffect.PickLabels -> labelRequest = effect.mailIds
                 is MailboxEffect.ConfirmDelete -> deleteRequest = effect.mailIds

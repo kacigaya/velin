@@ -89,7 +89,7 @@ class ShellScreenshotTest {
 
 private fun id(list: String, element: String) = EntityId(ListId(list), ElementId(element))
 
-private object FakeGraph : AppGraph {
+internal object FakeGraph : AppGraph {
     private val account = Account(AccountId(ElementId("u1")), Address("alex@tuta.com", "Alex Martin"))
     private val now = Instant.now().truncatedTo(ChronoUnit.HOURS)
     private val folders = listOf(
