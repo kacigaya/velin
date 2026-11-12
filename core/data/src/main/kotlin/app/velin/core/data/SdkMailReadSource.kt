@@ -52,7 +52,8 @@ internal class SdkMailReadSource(private val sessions: SessionReadAccess) : Mail
         val input = WriteDraft(existingId, ReadAddress(draft.sender.address.address, draft.sender.address.name),
             draft.to.map { ReadAddress(it.address.address, it.address.name) }, draft.cc.map { ReadAddress(it.address.address, it.address.name) },
             draft.bcc.map { ReadAddress(it.address.address, it.address.name) }, draft.subject, html, draft.confidential,
-            draft.attachments.map { it.id.value.readId() })
+            draft.attachments.map { it.id.value.readId() }, draft.response?.previous?.value?.readId(),
+            when (draft.response?.kind) { null -> 0L; ResponseKind.Reply, ResponseKind.ReplyAll -> 1L; ResponseKind.Forward -> 2L })
         val id = sdk.saveDraft(input)
         require(existingId == null || id == existingId)
         DraftId(MailId(id.domain()))
@@ -177,7 +178,7 @@ internal class SdkMailReadSource(private val sessions: SessionReadAccess) : Mail
                 // verification is Velin's own gap, so it must not put a warning on every mail.
                 mail.mailAuthStatus == 2L -> MailFinding.AuthenticationUncertain
                 else -> null
-            }, mail.scheduledMillis?.let(Instant::ofEpochMilli))
+            }, mail.scheduledMillis?.let(Instant::ofEpochMilli), received = mail.state == MAIL_STATE_RECEIVED)
     }
     override suspend fun body(account: AccountId, id: MailId): Outcome<String> = read(account) { sdk ->
         sdk.message(id.value.readId()).also { require(it.id.domain() == id.value) }.body
@@ -250,3 +251,6 @@ private fun EntityId.readId() = ReadId(list.value, element.value)
 private fun ReadAddress.address() = Address(address, name)
 
 private fun ReadAttachment.domainAttachment() = Attachment(AttachmentId(id.domain()), name, mimeType, size, cid)
+
+// TutanotaConstants.ts MailState.RECEIVED.
+private const val MAIL_STATE_RECEIVED = 2L

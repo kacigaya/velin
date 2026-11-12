@@ -8,6 +8,7 @@ import org.jsoup.select.NodeTraversor
 import org.jsoup.select.NodeVisitor
 
 object DraftHtml {
+    private val LINK = Regex("(?i)(https?|mailto):[^\\s()<>]+")
     // src/applications/common/api/common/utils/imapImportUtils/PlainTextToHtmlConverter.ts:1
     fun fromPlainText(text: String): String = buildString {
         var previousLevel = 0
@@ -45,7 +46,7 @@ object DraftHtml {
             override fun head(node: Node, depth: Int) {
                 when (node) {
                     is TextNode -> for (character in node.wholeText) {
-                        if (quoteLevel > 0 && (text.isEmpty() || text.last() == '\n')) text.append("> ".repeat(quoteLevel))
+                        if (quoteLevel > 0 && (text.isEmpty() || text.last() == '\n')) text.append(">".repeat(quoteLevel)).append(' ')
                         text.append(character)
                         finalBlockBreak = false
                     }
@@ -57,6 +58,15 @@ object DraftHtml {
                 }
             }
             override fun tail(node: Node, depth: Int) {
+                // Plain text has no links. Keep a safe target after its label, so a quote does not lose it.
+                if (node is Element && node.normalName() == "a") {
+                    val href = node.attr("href").trim()
+                    if (LINK.matches(href) && node.text().trim() != href.substringAfter(':').trimStart('/')
+                        && node.text().trim() != href) {
+                        text.append(" (").append(href).append(')')
+                        finalBlockBreak = false
+                    }
+                }
                 if (node is Element && node.isBlock) {
                     blockBreak()
                     if (node.normalName() == "blockquote") quoteLevel--

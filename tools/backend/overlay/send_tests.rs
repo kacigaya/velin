@@ -58,10 +58,11 @@ mod velin_send_preflight_tests {
             _ownerGroup: Some("group".to_owned().into()), conversationEntry: id("conversation"),
             sender: MailAddress { address: "self@tuta.com".into(), ..create_test_entity() }, ..create_test_entity() }
     }
-    fn sender(client: &mut MockCryptoEntityClient, mail: &Mail) {
+    fn sender(client: &mut MockCryptoEntityClient, mail: &Mail) { conversation_sender(client, mail, 0, None) }
+    fn conversation_sender(client: &mut MockCryptoEntityClient, mail: &Mail, kind: i64, previous: Option<IdTupleGenerated>) {
         let entry = mail.conversationEntry.clone();
         client.expect_load::<ConversationEntry, IdTupleGenerated>().returning(move |_| Ok(ConversationEntry {
-            _id: Some(entry.clone()), conversationType: 0, previous: None, ..create_test_entity() }));
+            _id: Some(entry.clone()), conversationType: kind, previous: previous.clone(), ..create_test_entity() }));
         client.expect_load::<Group, GeneratedId>().returning(|id| Ok(Group { _id: Some(id.clone()), user: Some("user".to_owned().into()), ..create_test_entity() }));
         client.expect_load::<GroupInfo, IdTupleGenerated>().returning(|id| Ok(GroupInfo { _id: Some(id.clone()), mailAddress: Some("self@tuta.com".into()), ..create_test_entity() }));
     }
@@ -113,6 +114,27 @@ mod velin_send_preflight_tests {
             client.expect_velin_draft_mail().return_once(move |_| Ok(mail));
             let facade = MailFacade::new(Arc::new(client), Arc::new(MockUserFacade::default()), Arc::new(MockResolvingServiceExecutor::default()));
             assert!(matches!(facade.velin_send_draft(id("draft")).await, Err(ApiCallError::VelinSendUnsupported { reason: actual }) if actual == reason));
+        }
+    }
+    #[tokio::test]
+    async fn velin_send_accepts_replies_and_forwards_only() {
+        for (kind, previous, allowed) in [(1, true, true), (2, true, true), (2, false, true), (3, true, false), (0, true, false)] {
+            let mail = draft();
+            let mut client = MockCryptoEntityClient::default();
+            conversation_sender(&mut client, &mail, kind, previous.then(|| id("previous")));
+            client.expect_velin_draft_mail().return_once(move |_| Ok(mail));
+            client.expect_velin_draft_details().returning(|_| Ok(MailDetails {
+                recipients: Recipients { toRecipients: vec![MailAddress { address: "missing@tuta.com".into(), ..create_test_entity() }], ..create_test_entity() },
+                replyTos: vec![], ..create_test_entity() }));
+            let mut services = MockResolvingServiceExecutor::default();
+            services.expect_get::<PublicKeyService>().returning(|_, _| Err(ApiCallError::ServerResponseError { source: HttpError::NotFoundError }));
+            services.expect_post::<SendDraftService>().never();
+            let facade = MailFacade::new(Arc::new(client), Arc::new(user()), Arc::new(services));
+            facade.velin_set_identity_trust_store(Arc::new(Trust));
+            let result = facade.velin_send_draft(id("draft")).await;
+            // An allowed conversation reaches recipient lookup, which blocks the missing address.
+            if allowed { assert!(matches!(result, Err(ApiCallError::VelinSendBlocked { reason: 0, .. })), "{kind}") }
+            else { assert!(matches!(result, Err(ApiCallError::VelinSendUnsupported { reason: 4 })), "{kind}") }
         }
     }
     #[tokio::test]

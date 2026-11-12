@@ -610,6 +610,21 @@ class BackendReadRepository internal constructor(private val source: MailReadSou
         }
     }
     override suspend fun loadDraft(account: AccountId, id: MailId): Outcome<Draft> = io { source.loadDraft(account, id) }
+    override suspend fun prepareResponse(account: AccountId, previous: MailId, kind: ResponseKind): Outcome<PreparedResponse> =
+        io(account, save = true) {
+            // Saved mail from v0.3 has no state, so read the direction fresh. A response needs the server anyway.
+            val fresh = when (val result = source.message(account, previous)) {
+                is Outcome.Failed -> return@io result
+                is Outcome.Success -> result.value
+            }
+            when (val message = loadMessage(account, previous)) {
+                is Outcome.Failed -> message
+                // A response without the quoted body would look complete but lose the original text.
+                is Outcome.Success -> (message.value.body as? BodyState.Failed)?.let { Outcome.Failed(it.failure) }
+                    ?: responseDraft(message.value.copy(received = fresh.received), kind, this.account(account).mailbox.value.senders)
+                        ?.let { Outcome.Success(it) } ?: Outcome.Failed(Failure.Unsupported)
+            }
+        }
     override suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<DraftId> = io(account, save = true) {
         when (val saved = source.saveDraft(account, draft)) {
             is Outcome.Failed -> saved

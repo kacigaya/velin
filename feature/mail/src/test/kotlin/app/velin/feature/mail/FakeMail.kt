@@ -108,6 +108,10 @@ internal class FakeMailRepo : MailRepository {
     var storedDraft: Draft? = null
     override suspend fun loadDraft(account: AccountId, id: MailId): Outcome<Draft> =
         storedDraft?.let { Outcome.Success(it) } ?: Outcome.Failed(app.velin.core.domain.Failure.Unsupported)
+    var response: Outcome<app.velin.core.domain.PreparedResponse> = Outcome.Failed(app.velin.core.domain.Failure.Unsupported)
+    val responseCalls = mutableListOf<Pair<MailId, app.velin.core.domain.ResponseKind>>()
+    override suspend fun prepareResponse(account: AccountId, previous: MailId, kind: app.velin.core.domain.ResponseKind) =
+        response.also { responseCalls += previous to kind }
     val savedDrafts = mutableListOf<Draft>()
     val sentDrafts = mutableListOf<DraftId>()
     override suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<DraftId> {

@@ -35,6 +35,7 @@ import app.velin.core.domain.AuthRepository
 import app.velin.core.domain.AuthState
 import app.velin.core.domain.MailRepository
 import app.velin.core.domain.MailboxRepository
+import app.velin.core.domain.ResponseKind
 import app.velin.feature.auth.SignInScreen
 import app.velin.feature.auth.SignInViewModel
 import androidx.activity.compose.BackHandler
@@ -223,6 +224,10 @@ private fun MailApp(account: Account, auth: AuthRepository, mailbox: MailboxRepo
                                 ConversationEffect.Close -> backStack.remove(route)
                                 ConversationEffect.PickFolder -> pickingFolder = true
                                 is ConversationEffect.EditDraft -> backStack.add(ComposerRoute(effect.messageId))
+                                is ConversationEffect.Reply -> backStack.add(ComposerRoute(respondTo = effect.messageId,
+                                    kind = if (effect.all) ResponseKind.ReplyAll else ResponseKind.Reply))
+                                is ConversationEffect.Forward ->
+                                    backStack.add(ComposerRoute(respondTo = effect.messageId, kind = ResponseKind.Forward))
                                 is ConversationEffect.OpenLink -> openLink(context, effect.uri)
                                 is ConversationEffect.ActionFailed -> scope.launch { snackbar.showSnackbar(actionFailed) }
                                 else -> scope.launch { snackbar.showSnackbar(notAvailable) }
@@ -250,8 +255,8 @@ private fun MailApp(account: Account, auth: AuthRepository, mailbox: MailboxRepo
                 }
                 // Full screen: the composer is a task, not a detail of the list.
                 entry<ComposerRoute> { route ->
-                    val viewModel = viewModel(key = "composer-${route.draftId}") {
-                        ComposerViewModel(account, mailbox, mail, route.draftId)
+                    val viewModel = viewModel(key = "composer-${route.draftId}-${route.respondTo}-${route.kind}") {
+                        ComposerViewModel(account, mailbox, mail, route.draftId, route.respondTo, route.kind ?: ResponseKind.Reply)
                     }
                     val state by viewModel.state.collectAsStateWithLifecycle()
                     LaunchedEffect(viewModel) {
@@ -259,6 +264,10 @@ private fun MailApp(account: Account, auth: AuthRepository, mailbox: MailboxRepo
                             when (effect) {
                                 ComposerEffect.Close -> backStack.remove(route)
                                 ComposerEffect.Sent -> scope.launch { snackbar.showSnackbar(mailSent) }
+                                is ComposerEffect.AttachmentsNotForwarded -> scope.launch {
+                                    snackbar.showSnackbar(context.resources.getQuantityString(
+                                        MailR.plurals.composer_attachments_not_forwarded, effect.count, effect.count))
+                                }
                                 is ComposerEffect.Failed -> scope.launch {
                                     val message = composerFailureMessage(effect.failure)?.let(context::getString)
                                         ?: if (effect.failure is Failure.Unsupported) notAvailable else actionFailed

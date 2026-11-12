@@ -101,7 +101,57 @@ Server acceptance and device behavior remain UNVERIFIED.
 
 M6b implements verified recipient lookup and confidential internal send.
 See [contracts, release evidence, limits, and live checks](M6B-REPORT.md).
-External send, upload, reply/forward, and scheduling remain unsupported.
+External send, upload, and scheduling remain unsupported.
+
+## Reply and forward
+
+`MailRepository.prepareResponse(account, previous, kind)` builds an unsaved
+draft for `Reply`, `ReplyAll` or `Forward`. It follows
+`MailViewerViewModel.ts:1115` and `:1163` at the pinned release.
+
+1. A reply to received mail goes to the reply-to addresses, or to the sender
+   when there are none. Reply all adds the To and Cc recipients as Cc, except
+   the user's enabled addresses. A reply to sent mail goes to its recipients
+   again. Reply all then keeps its Cc and Bcc. Each address shows once.
+2. The mail state decides the direction, as upstream does: `MailState` 2 is
+   received. `prepareResponse` reads it fresh from the server, because mail
+   saved offline by v0.3 has no state.
+3. The sender is the enabled address that received the mail. Sent mail uses
+   its own sender. Otherwise the first enabled address is used.
+4. A reply subject gets `Re: ` once. A forward subject gets `FWD: `, as
+   upstream does. A forward starts with no recipients.
+5. The composer edits plain text. The quote is the previous body as `>` lines,
+   with one more level than the previous quotes. `DraftHtml.fromPlainText`
+   turns them into nested blockquotes. A safe link keeps its target after the
+   label, for example `Join (https://example.com)`. A forward adds a Date,
+   From, To, Cc and Subject header above the quote. The header words are English.
+6. `Draft.response` carries the previous mail. `velin_save_draft` uses it only
+   when it creates the draft. It loads the previous mail and its conversation
+   entry, and sends `previousMessageId` and `conversationType` (1 reply,
+   2 forward) in DraftCreateData. A deleted mail or entry sends no message ID,
+   as upstream does. The server then threads the sent mail.
+7. `velin_send_draft` accepts conversation types 1 and 2. Type 0 with a
+   previous entry and unknown types stay unsupported.
+8. An untouched response closes without a draft. The first edit creates it.
+   A failed body load fails the response, so a quote is never silently empty.
+
+Live check on 2026-11-12, Android 15 in a container, against production:
+
+1. Reply to a self-sent internal mail prefilled the sender, Re subject and
+   quote. The sent reply joined the same conversation, with sent and received
+   copies.
+2. Reply to an external mail prefilled the external sender. It was not sent.
+3. Forward prefilled FWD subject, no recipients and the header. Closing the
+   untouched reply and forward left no draft.
+
+Limits:
+
+1. Forwarding does not copy attachments. Attachment upload is not built yet.
+   The composer tells the user how many files it left out.
+2. Velin does not set the replied or forwarded state on the previous mail.
+   Upstream updates the Mail entity after send. The Rust SDK has no encrypted
+   entity update yet.
+3. Inline images in the quote are not carried. The quote keeps text only.
 
 ## Owner live checks: UNVERIFIED
 

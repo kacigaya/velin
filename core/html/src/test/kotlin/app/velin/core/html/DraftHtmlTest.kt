@@ -20,4 +20,15 @@ class DraftHtmlTest {
         assertEquals("a\n\n", DraftHtml.toPlainText("a<br><br>"))
         assertEquals("a & b", DraftHtml.toPlainText("<b>a &amp; b</b>"))
     }
+    @Test fun safeLinkTargetsFollowTheirLabel() {
+        assertEquals("Join meeting (https://example.com/m)", DraftHtml.toPlainText("<a href='https://example.com/m'>Join meeting</a>"))
+        assertEquals("https://example.com/m", DraftHtml.toPlainText("<a href='https://example.com/m'>https://example.com/m</a>"))
+        assertEquals("ann@tuta.com", DraftHtml.toPlainText("<a href='mailto:ann@tuta.com'>ann@tuta.com</a>"))
+        assertEquals("Run", DraftHtml.toPlainText("<a href='javascript:alert(1)'>Run</a>"))
+    }
+    @Test fun nestedQuotesSurviveAnEdit() {
+        val html = "Top<blockquote>One<blockquote>Two</blockquote></blockquote>"
+        assertEquals("Top\n> One\n>> Two", DraftHtml.toPlainText(html))
+        assertEquals(html, DraftHtml.fromPlainText(DraftHtml.toPlainText(html)))
+    }
 }

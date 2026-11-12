@@ -48,6 +48,8 @@ class BackendReadRepositoryTest {
         var located: Map<MailId, LocatedMail?>? = null
         var requested: PageCursor? = null
         var bodyCalls = 0
+        var senders = emptyList<SenderAlias>()
+        var received = true
         override suspend fun locate(account: AccountId, ids: List<MailId>): Outcome<Map<MailId, LocatedMail?>> =
             if (offline) Outcome.Failed(Failure.Offline) else located?.let { Outcome.Success(it) } ?: Outcome.Failed(Failure.Unsupported)
         override suspend fun mailbox(account: AccountId): Outcome<MailboxSnapshot> = if (offline) Outcome.Failed(Failure.Offline)
@@ -55,7 +57,7 @@ class BackendReadRepositoryTest {
             else Outcome.Success(MailboxSnapshot(listOf(
             Folder(folder, "Inbox", FolderKind.Inbox, 3),
             Folder(FolderId(entity("child")), "Child", FolderKind.Custom, 1, folder),
-            Folder(FolderId(entity("trash")), "Trash", FolderKind.Trash, 0)), listOf(label), emptyList(),
+            Folder(FolderId(entity("trash")), "Trash", FolderKind.Trash, 0)), listOf(label), senders,
             mapOf("inbox-entries" to folder.value))).also { mailboxCalls++ }
         override suspend fun page(account: AccountId, folder: FolderId, cursor: PageCursor?): Outcome<MailPage> {
             if (offline) return Outcome.Failed(Failure.Offline)
@@ -68,7 +70,7 @@ class BackendReadRepositoryTest {
             if (offline) Outcome.Failed(Failure.Offline) else Outcome.Success(arrived + listOf(
             summary("new", 2), summary("old"), summary("new", 2), summary("foreign", 4, ConversationId(entity("other")))))
         override suspend fun message(account: AccountId, id: MailId): Outcome<MailMessage> =
-            if (offline) Outcome.Failed(Failure.Offline) else Outcome.Success(message(id))
+            if (offline) Outcome.Failed(Failure.Offline) else Outcome.Success(message(id).copy(received = received))
         override suspend fun body(account: AccountId, id: MailId): Outcome<String> {
             if (offline) return Outcome.Failed(Failure.Offline)
             bodyCalls++
@@ -154,6 +156,29 @@ class BackendReadRepositoryTest {
             // A failed body is not kept. The next load tries again.
             source.failure = false
             assertTrue((repo.load(account, loaded.value.id) as Outcome.Success).value.body is BodyState.Loaded)
+        } finally { cache.deleteRecursively() }
+    }
+    @Test fun responseNeedsTheBodyAndAnEnabledSender() = runBlocking {
+        val source = Source().apply { failure = true }
+        val cache = Files.createTempDirectory("mail-response").toFile()
+        try {
+            val repo = BackendReadRepository(source, cache)
+            val id = MailId(entity("old"))
+            assertEquals(Outcome.Failed(Failure.Decryption), repo.prepareResponse(account, id, ResponseKind.Forward))
+            source.failure = false
+            repo.sync(account)
+            assertEquals(Outcome.Failed(Failure.Unsupported), repo.prepareResponse(account, id, ResponseKind.Reply))
+            source.senders = listOf(SenderAlias(Address("me@example.invalid"), true))
+            repo.sync(account)
+            val reply = (repo.prepareResponse(account, id, ResponseKind.Reply) as Outcome.Success).value.draft
+            assertEquals(DraftResponse(id, ResponseKind.Reply), reply.response)
+            assertTrue(reply.plainText.endsWith("> body"))
+            assertEquals(listOf("sender@example.invalid"), reply.to.map { it.address.address })
+            // The cached copy says received. The fresh state wins, so the reply goes to the sent mail's recipients.
+            source.received = false
+            assertEquals(emptyList<Recipient>(), (repo.prepareResponse(account, id, ResponseKind.Reply) as Outcome.Success).value.draft.to)
+            source.offline = true
+            assertEquals(Outcome.Failed(Failure.Offline), repo.prepareResponse(account, id, ResponseKind.Reply))
         } finally { cache.deleteRecursively() }
     }
     @Test fun downloadNeverUsesAttachmentNameAsPath() = runBlocking {

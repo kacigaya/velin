@@ -1,5 +1,6 @@
 package app.velin.feature.mail.composer
 
+import androidx.compose.foundation.text.input.insert
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.runtime.snapshots.Snapshot
 import app.velin.core.domain.Address
@@ -7,6 +8,9 @@ import app.velin.core.domain.Draft
 import app.velin.core.domain.Failure
 import app.velin.core.domain.Outcome
 import app.velin.core.domain.DraftId
+import app.velin.core.domain.DraftResponse
+import app.velin.core.domain.PreparedResponse
+import app.velin.core.domain.ResponseKind
 import app.velin.core.domain.FolderKind
 import app.velin.core.domain.MailId
 import app.velin.core.domain.Recipient
@@ -23,6 +27,8 @@ import app.velin.feature.mail.testAccount
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -45,9 +51,10 @@ class ComposerViewModelTest {
 
     @After fun tearDown() = Dispatchers.resetMain()
 
-    private fun TestScope.viewModel(draft: String? = null): ComposerViewModel {
+    private fun TestScope.viewModel(draft: String? = null, respondTo: String? = null,
+        kind: ResponseKind = ResponseKind.Reply): ComposerViewModel {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
-        return ComposerViewModel(testAccount, mailbox, repo, draft).also { vm ->
+        return ComposerViewModel(testAccount, mailbox, repo, draft, respondTo, kind).also { vm ->
             backgroundScope.launch { vm.state.collect {} }
             runCurrent()
         }
@@ -136,6 +143,55 @@ class ComposerViewModelTest {
         advanceTimeBy(2_500); runCurrent()
         assertEquals(id, repo.savedDrafts.single().id)
         assertEquals("<b>Hello</b>", repo.savedDrafts.single().htmlBody)
+    }
+
+    private fun response(kind: ResponseKind, omitted: Int = 0) = PreparedResponse(Draft(
+        id = null, sender = SenderAlias(Address("alex@tuta.com", "Alex"), true),
+        to = listOf(Recipient(Address("lena@tuta.com"), RecipientType.Unknown)), cc = emptyList(), bcc = emptyList(),
+        subject = "Re: Plan", plainText = "\n\n> Hello", confidential = true, attachments = emptyList(), scheduledSendAt = null,
+        response = DraftResponse(MailId(eid("inbox", "m1")), kind),
+    ), omitted)
+
+    @Test
+    fun replyStartsAboveTheQuoteAndClosesWithoutDraftWhenUntouched() = runTest {
+        repo.response = Outcome.Success(response(ResponseKind.ReplyAll))
+        repo.resolved["lena@tuta.com"] = internal("lena@tuta.com")
+        val vm = viewModel(respondTo = "inbox/m1", kind = ResponseKind.ReplyAll)
+        assertEquals(listOf(MailId(eid("inbox", "m1")) to ResponseKind.ReplyAll), repo.responseCalls)
+        assertEquals("Re: Plan", vm.subject.text.toString())
+        assertEquals(0, vm.body.selection.start)
+        assertTrue("recipients are looked up", vm.state.value.to.single().internal)
+        advanceTimeBy(5_000); runCurrent()
+        vm.onEvent(ComposerEvent.Close)
+        runCurrent()
+        assertTrue("an untouched reply saves nothing", repo.savedDrafts.isEmpty())
+        assertEquals(ComposerEffect.Close, vm.effects.first())
+    }
+
+    @Test
+    fun editedReplyCreatesThreadedDraftOnceThenUpdatesIt() = runTest {
+        repo.response = Outcome.Success(response(ResponseKind.Reply))
+        val vm = viewModel(respondTo = "inbox/m1")
+        edit { vm.body.edit { insert(0, "Thanks") } }
+        advanceTimeBy(2_500); runCurrent()
+        val created = repo.savedDrafts.single()
+        assertEquals(null, created.id)
+        assertEquals(DraftResponse(MailId(eid("inbox", "m1")), ResponseKind.Reply), created.response)
+        assertEquals("Thanks\n\n> Hello", created.plainText)
+        vm.onEvent(ComposerEvent.Send)
+        runCurrent()
+        assertEquals(null, repo.savedDrafts.last().response)
+        assertEquals(repo.sentDrafts.single(), repo.savedDrafts.last().id)
+    }
+
+    @Test
+    fun forwardReportsAttachmentsItCannotCarry() = runTest {
+        repo.response = Outcome.Success(response(ResponseKind.Forward, omitted = 2))
+        val vm = viewModel(respondTo = "inbox/m1", kind = ResponseKind.Forward)
+        assertEquals(ComposerEffect.AttachmentsNotForwarded(2), vm.effects.first())
+        repo.response = Outcome.Failed(Failure.Offline)
+        val failed = viewModel(respondTo = "inbox/m1")
+        assertEquals(listOf(ComposerEffect.Failed(Failure.Offline), ComposerEffect.Close), failed.effects.take(2).toList())
     }
 
     private fun internal(address: String, key: RecipientKeyState = RecipientKeyState.VerifiedTofu) =

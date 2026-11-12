@@ -71,6 +71,10 @@
     <string name="composer_confidential">End-to-end encryption</string>
     <string name="composer_send">Send</string>
     <string name="composer_sent">Mail sent</string>
+    <plurals name="composer_attachments_not_forwarded">
+        <item quantity="one">Velin cannot forward %d attachment yet</item>
+        <item quantity="other">Velin cannot forward %d attachments yet</item>
+    </plurals>
     <string name="composer_send_options">More send options</string>
     <string name="composer_send_later">Send later</string>
     <string name="composer_discard">Discard draft</string>

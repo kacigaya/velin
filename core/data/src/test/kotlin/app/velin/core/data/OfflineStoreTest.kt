@@ -30,7 +30,7 @@ class OfflineStoreTest {
             Folder(FolderId(entity("child")), "Child", FolderKind.Custom, 0, FolderId(entity("inbox")))),
             listOf(label), listOf(SenderAlias(Address("me@example.invalid", "Me"), true)), mapOf("entries" to entity("inbox"))),
         mapOf(FolderId(entity("inbox")) to MailPage(listOf(summary), PageCursor(ElementId("next")))),
-        listOf(SavedMessage(message, "<p>body</p>", summary), SavedMessage(message.copy(id = MailId(entity("sent"))), "")))
+        listOf(SavedMessage(message, "<p>body</p>", summary), SavedMessage(message.copy(id = MailId(entity("sent")), received = false), "")))
 
     @Test fun roundTripKeepsEveryField() {
         val directory = Files.createTempDirectory("offline").toFile()

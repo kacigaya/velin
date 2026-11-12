@@ -11,6 +11,7 @@ import app.velin.core.domain.Address
 import app.velin.core.domain.Attachment
 import app.velin.core.domain.Draft
 import app.velin.core.domain.DraftId
+import app.velin.core.domain.DraftResponse
 import app.velin.core.domain.Failure
 import app.velin.core.domain.FolderKind
 import app.velin.core.domain.MailId
@@ -21,6 +22,7 @@ import app.velin.core.domain.Recipient
 import app.velin.core.domain.RecipientKeyState
 import app.velin.core.domain.RecipientResolutionReason
 import app.velin.core.domain.RecipientType
+import app.velin.core.domain.ResponseKind
 import app.velin.core.domain.SendBlockReason
 import app.velin.core.domain.SenderAlias
 import app.velin.feature.mail.model.RecipientUi
@@ -41,6 +43,7 @@ import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -52,6 +55,8 @@ sealed interface ComposerEffect {
     data object Close : ComposerEffect
     data object Sent : ComposerEffect
     data class Failed(val failure: Failure) : ComposerEffect
+    /** A forward does not carry the files of the forwarded mail yet. */
+    data class AttachmentsNotForwarded(val count: Int) : ComposerEffect
 }
 
 /**
@@ -65,6 +70,9 @@ class ComposerViewModel(
     private val mail: MailRepository,
     /** UI id of an existing draft to edit; null starts a new mail. */
     draftToOpen: String? = null,
+    /** UI id of the mail to reply to or forward with [responseKind]. Ignored when [draftToOpen] is set. */
+    respondTo: String? = null,
+    responseKind: ResponseKind = ResponseKind.Reply,
 ) : ViewModel() {
     val subject = TextFieldState()
     val body = TextFieldState()
@@ -78,6 +86,10 @@ class ComposerViewModel(
     /** HTML of a reopened draft; the backend keeps it when the plain text is unchanged. */
     private var originalHtml: String? = null
     private var attachments: List<Attachment> = emptyList()
+    /** Set for a new reply or forward until its draft exists. */
+    private var response: DraftResponse? = null
+    /** False until the user changes the loaded content. */
+    private var edited = false
     /** Lowercase addresses with a key lookup in flight. */
     private val resolving = MutableStateFlow(emptySet<String>())
     private val passwords = MutableStateFlow(emptyMap<String, String>())
@@ -129,6 +141,23 @@ class ComposerViewModel(
                     is Outcome.Success -> fill(loaded.value)
                     is Outcome.Failed -> effectChannel.send(ComposerEffect.Failed(loaded.failure))
                 }
+            } else if (respondTo != null) {
+                val previous = MailId(entityIdOf(respondTo))
+                when (val prepared = mail.prepareResponse(account.id, previous, responseKind)) {
+                    is Outcome.Success -> {
+                        response = DraftResponse(previous, responseKind)
+                        fill(prepared.value.draft, cursorAtStart = true)
+                        if (prepared.value.omittedAttachments > 0) {
+                            effectChannel.send(ComposerEffect.AttachmentsNotForwarded(prepared.value.omittedAttachments))
+                        }
+                    }
+                    is Outcome.Failed -> {
+                        // An empty composer here would send a new mail outside the conversation.
+                        effectChannel.send(ComposerEffect.Failed(prepared.failure))
+                        effectChannel.send(ComposerEffect.Close)
+                        return@launch
+                    }
+                }
             }
             // The first emission is the loaded draft, so reopening never saves it unchanged.
             // Only addresses count: a finished key lookup is not an edit.
@@ -139,12 +168,14 @@ class ComposerViewModel(
                 confidential,
             ) { _, _, _, _ -> Unit }
                 .drop(1)
+                .onEach { edited = true }
                 .debounce(AUTOSAVE_DELAY_MS)
                 .collect { if (!sending.value && hasContent()) save() }
         }
     }
 
-    private fun fill(draft: Draft) {
+    /** A response starts with the cursor above the quote. */
+    private fun fill(draft: Draft, cursorAtStart: Boolean = false) {
         draftId.value = draft.id
         sender.value = draft.sender
         recipients.value = mapOf(RecipientField.To to draft.to, RecipientField.Cc to draft.cc, RecipientField.Bcc to draft.bcc)
@@ -153,6 +184,7 @@ class ComposerViewModel(
         attachments = draft.attachments
         subject.setTextAndPlaceCursorAtEnd(draft.subject)
         body.setTextAndPlaceCursorAtEnd(draft.plainText)
+        if (cursorAtStart) body.edit { placeCursorBeforeCharAt(0) }
         Snapshot.sendApplyNotifications()
         // Saved drafts do not keep the recipient type, so look every address up again.
         (draft.to + draft.cc + draft.bcc).filterNot { it.invalid }.forEach { resolve(it.address.address) }
@@ -161,7 +193,8 @@ class ComposerViewModel(
     fun onEvent(event: ComposerEvent) {
         when (event) {
             ComposerEvent.Close -> viewModelScope.launch {
-                if (hasContent()) report(save())
+                // An untouched reply or forward closes without a draft.
+                if (hasContent() && (edited || response == null)) report(save())
                 effectChannel.send(ComposerEffect.Close)
             }
             ComposerEvent.Send -> send()
@@ -284,9 +317,13 @@ class ComposerViewModel(
             attachments = attachments,
             scheduledSendAt = null,
             htmlBody = originalHtml,
+            response = response,
         )
         val outcome = mail.saveDraft(account.id, draft)
-        if (outcome is Outcome.Success) draftId.value = outcome.value
+        if (outcome is Outcome.Success) {
+            draftId.value = outcome.value
+            response = null
+        }
         outcome
     }
 

@@ -19,10 +19,14 @@ data class ReadMessage(val id: ReadId, val sender: ReadAddress, val to: List<Rea
     val cc: List<ReadAddress>, val bcc: List<ReadAddress>, val replyTo: List<ReadAddress>,
     val subject: String, val sentMillis: Long, val confidential: Boolean, val unread: Boolean,
     val draft: Boolean, val phishing: Long, val encryptionAuth: Long?, val body: String,
-    val scheduledMillis: Long?, val mailAuthStatus: Long = -1, val attachments: List<ReadAttachment> = emptyList())
+    val scheduledMillis: Long?, val mailAuthStatus: Long = -1, val attachments: List<ReadAttachment> = emptyList(),
+    /** MailState: 0 draft, 1 sent, 2 received, 3 sending. */
+    val state: Long = -1)
 
+/** [previous] and [conversationType] (0 new, 1 reply, 2 forward) apply only when the draft is created. */
 data class WriteDraft(val id: ReadId?, val sender: ReadAddress, val to: List<ReadAddress>, val cc: List<ReadAddress>,
-    val bcc: List<ReadAddress>, val subject: String, val html: String, val confidential: Boolean, val attachments: List<ReadId>)
+    val bcc: List<ReadAddress>, val subject: String, val html: String, val confidential: Boolean, val attachments: List<ReadId>,
+    val previous: ReadId? = null, val conversationType: Long = 0)
 
 class TrustedIdentity(val key: ByteArray, val version: Long, val manual: Boolean)
 interface SdkIdentityTrustStore {
@@ -105,7 +109,7 @@ internal class NativeMailReader(private val facade: MailFacade, private val trus
         fun ReadAddress.sender() = VelinSender(address, name)
         facade.velinSaveDraft(VelinDraftInput(draft.id?.native(), draft.sender.sender(), draft.to.map { it.sender() },
             draft.cc.map { it.sender() }, draft.bcc.map { it.sender() }, draft.subject, draft.html, draft.confidential,
-            draft.attachments.map { it.native() })).readId()
+            draft.attachments.map { it.native() }, draft.previous?.native(), draft.conversationType)).readId()
     }
     override suspend fun loadDraft(id: ReadId): ReadMessage = api {
         val content = facade.velinLoadDraft(id.native())
@@ -201,7 +205,7 @@ internal class NativeMailReader(private val facade: MailFacade, private val trus
             details.replyTos.map { ReadAddress(it.address, it.name) }, mail.subject,
             details.sentDate.millis(), mail.confidential, mail.unread, mail.mailDetailsDraft != null,
             mail.phishingStatus, mail.encryptionAuthStatus,
-            details.body.compressedText ?: details.body.text ?: "", mail.sendAt?.millis(), details.authStatus, attachments)
+            details.body.compressedText ?: details.body.text ?: "", mail.sendAt?.millis(), details.authStatus, attachments, mail.state)
     }
     private suspend fun <T> api(block: suspend () -> T): T = try { block() }
     catch (e: ApiCallException) { throw apiException(e) }

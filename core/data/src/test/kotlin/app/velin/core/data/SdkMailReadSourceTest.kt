@@ -127,6 +127,15 @@ class SdkMailReadSourceTest {
         assertEquals("a &lt; b &amp; c<br>next", reader.saved.first().html)
         assertTrue(reader.saved.all { it.confidential })
         assertEquals("to@example.invalid", reader.saved.first().to.single().address)
+        assertEquals(null to 0L, reader.saved.first().let { it.previous to it.conversationType })
+    }
+    @Test fun responseDraftsCarryThePreviousMailAndConversationType() = runBlocking {
+        val reader = Reader()
+        val previous = MailId(ReadId("mail", "previous").domain())
+        listOf(ResponseKind.Reply to 1L, ResponseKind.ReplyAll to 1L, ResponseKind.Forward to 2L).forEach { (kind, type) ->
+            source(reader).saveDraft(account, draft().copy(response = DraftResponse(previous, kind)))
+            assertEquals(ReadId("mail", "previous") to type, reader.saved.last().let { it.previous to it.conversationType })
+        }
     }
 
     @Test fun draftReopeningRetainsHtmlAndAttachmentIdsUntilEdited() = runBlocking {

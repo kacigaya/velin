@@ -103,7 +103,7 @@ internal fun encodeOffline(state: OfflineState): String = JSONObject().apply {
                 JSONObject().put("id", a.id.value.json()).put("name", a.name).put("mime", a.mimeType)
                     .put("size", a.sizeBytes).put("cid", a.contentId)
             })).put("authentication", m.authentication.name).put("finding", m.finding?.name)
-            .put("scheduledAt", m.scheduledSendAt?.toEpochMilli()).put("body", body).put("summary", summary?.json())
+            .put("scheduledAt", m.scheduledSendAt?.toEpochMilli()).put("received", m.received).put("body", body).put("summary", summary?.json())
     }))
 }.toString()
 
@@ -132,7 +132,9 @@ internal fun decodeOffline(text: String): OfflineState {
                     a.getLong("size"), a.nullableString("cid"))
             }, MailAuthentication.valueOf(it.getString("authentication")),
             it.nullableString("finding")?.let(MailFinding::valueOf),
-            if (it.has("scheduledAt")) Instant.ofEpochMilli(it.getLong("scheduledAt")) else null), it.getString("body"),
+            if (it.has("scheduledAt")) Instant.ofEpochMilli(it.getLong("scheduledAt")) else null,
+            // Files saved by v0.3 have no state. Most saved mail is received mail.
+            it.optBoolean("received", true)), it.getString("body"),
             it.optJSONObject("summary")?.summary())
     }
     return OfflineState(cursors, if (root.has("syncedAt")) Instant.ofEpochMilli(root.getLong("syncedAt")) else null,

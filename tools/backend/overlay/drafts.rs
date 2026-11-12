@@ -10,6 +10,10 @@ pub struct VelinDraftInput {
     pub html: String,
     pub confidential: bool,
     pub attachments: Vec<IdTupleGenerated>,
+    /// The replied or forwarded mail. Used only when the draft is created.
+    pub previous: Option<IdTupleGenerated>,
+    /// ConversationType: 0 new, 1 reply, 2 forward. Used only when the draft is created.
+    pub conversation_type: i64,
 }
 
 #[derive(uniffi::Record, Clone)]
@@ -65,6 +69,26 @@ impl MailFacade {
         Err(ApiCallError::internal("Draft sender is not enabled".into()))
     }
 
+    /// SendMailModel.ts:483: the server threads a response by the previous message ID.
+    /// A deleted mail or entry leaves the ID empty, as upstream does.
+    async fn velin_previous_message_id(&self, previous: &IdTupleGenerated) -> Result<Option<String>, ApiCallError> {
+        use crate::entities::generated::tutanota::ConversationEntry;
+        let not_found = |e: &ApiCallError| matches!(e, ApiCallError::ServerResponseError { source: HttpError::NotFoundError });
+        let mail: Mail = match self.crypto_entity_client.load(previous).await {
+            Ok(mail) => mail,
+            Err(e) if not_found(&e) => return Ok(None),
+            Err(e) => return Err(e),
+        };
+        if mail._id.as_ref() != Some(previous) { return Err(ApiCallError::internal("Invalid previous mail".into())) }
+        let entry: ConversationEntry = match self.crypto_entity_client.load(&mail.conversationEntry).await {
+            Ok(entry) => entry,
+            Err(e) if not_found(&e) => return Ok(None),
+            Err(e) => return Err(e),
+        };
+        if entry._id.as_ref() != Some(&mail.conversationEntry) { return Err(ApiCallError::internal("Invalid previous mail".into())) }
+        Ok(Some(entry.messageId))
+    }
+
     async fn velin_draft_matches(&self, id: &IdTupleGenerated, input: &VelinDraftInput) -> Result<bool, ApiCallError> {
         let mail = self.crypto_entity_client.velin_draft_mail(id).await?;
         let details = self.crypto_entity_client.velin_draft_details(&mail).await?;
@@ -108,6 +132,9 @@ impl MailFacade {
                     .any(|a| a.address.is_empty() || a.address.chars().any(|c| matches!(c, '\r' | '\n' | '\0'))) || input.attachments.iter().enumerate().any(|(i, id)| input.attachments[..i].contains(id)) {
                 return Err(ApiCallError::internal("Invalid draft input".into()));
             }
+            if !matches!(input.conversation_type, 0..=2) || input.previous.is_some() != (input.conversation_type != 0) {
+                return Err(ApiCallError::internal("Invalid draft conversation".into()));
+            }
             let group = self.velin_draft_sender_group(&input.sender.address).await?;
             let scheme = self.velin_service_encryption_scheme().await?;
             let id = if let Some(id) = &input.id {
@@ -126,13 +153,17 @@ impl MailFacade {
                 id.clone()
             } else {
                 if !input.attachments.is_empty() { return Err(ApiCallError::VelinDraftUnsupported) }
+                let previous_message_id = match &input.previous {
+                    Some(previous) => self.velin_previous_message_id(previous).await?,
+                    None => None,
+                };
                 let owner_key = self.crypto_entity_client.velin_draft_owner_key(&group, None).await?;
                 let random = RandomizerFacade::from_core(rand_core::OsRng);
                 let session_key = Aes256Key::generate(&random).into();
                 let wrapped = crate::velin_session_transfer::wrap_session_key(&owner_key.object, &session_key, &random);
                 let version = owner_key.version.try_into().map_err(|_| ApiCallError::internal("Invalid draft key version".into()))?;
                 let data = velin_draft_data(&input, wrapped, Some(version), None, 0, vec![], vec![]);
-                self.service_executor.post::<DraftService>(DraftCreateData { _format: 0, previousMessageId: None, conversationType: 0,
+                self.service_executor.post::<DraftService>(DraftCreateData { _format: 0, previousMessageId: previous_message_id, conversationType: input.conversation_type,
                     ownerEncSessionKey: None, ownerKeyVersion: None, draftData: data, _errors: Default::default() },
                     ExtraServiceParams { velin_session_transfer: Some(VelinSessionTransferEncryption { owner_key, scheme }), ..Default::default() }).await?.draft
             };

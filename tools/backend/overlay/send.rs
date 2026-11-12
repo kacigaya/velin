@@ -26,7 +26,9 @@ impl MailFacade {
             if !mail.attachments.is_empty() { return Err(ApiCallError::VelinSendUnsupported { reason: 3 }) }
             let conversation: ConversationEntry = self.crypto_entity_client.load(&mail.conversationEntry).await?;
             if conversation._id.as_ref() != Some(&mail.conversationEntry) { return Err(ApiCallError::VelinRecipientInvalidKey) }
-            if conversation.previous.is_some() || conversation.conversationType != 0 || mail.replyType != 0 {
+            // Replies and forwards thread on the server. A new mail has no previous entry.
+            let new_mail = conversation.conversationType == 0 && conversation.previous.is_none();
+            if !(new_mail || matches!(conversation.conversationType, 1 | 2)) || mail.replyType != 0 {
                 return Err(ApiCallError::VelinSendUnsupported { reason: 4 });
             }
             if mail.method != 0 { return Err(ApiCallError::VelinSendUnsupported { reason: 7 }) }

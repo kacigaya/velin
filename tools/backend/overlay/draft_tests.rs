@@ -16,7 +16,7 @@ mod velin_draft_tests {
         VelinDraftInput { id: updating.then(|| id("draft")), sender: VelinSender { address: "sender@example.invalid".into(), name: "Sender".into() },
             to: vec![VelinSender { address: "recipient@example.invalid".into(), name: "Recipient".into() }], cc: vec![], bcc: vec![],
             subject: "Draft subject".into(), html: "<b>Draft</b>".into(), confidential: true,
-            attachments: if updating { vec![id("retained")] } else { vec![] } }
+            attachments: if updating { vec![id("retained")] } else { vec![] }, previous: None, conversation_type: 0 }
     }
     fn mail(input: &VelinDraftInput) -> Mail {
         Mail { _id: Some(id("draft")), _ownerGroup: Some("group".to_owned().into()), _ownerEncSessionKey: Some(vec![17; 80]),
@@ -106,6 +106,41 @@ mod velin_draft_tests {
             sender(&mut client);
             client.expect_velin_draft_mail().returning(move |_| Ok(existing.clone()));
             let facade = MailFacade::new(Arc::new(client), Arc::new(user()), Arc::new(MockResolvingServiceExecutor::default()));
+            assert!(facade.velin_save_draft(input).await.is_err());
+        }
+    }
+    #[tokio::test]
+    async fn velin_reply_create_sends_previous_message_id() {
+        for (found, expected) in [(true, Some("<message@example.invalid>")), (false, None)] {
+            let mut input = input(false);
+            input.previous = Some(id("previous"));
+            input.conversation_type = 1;
+            let mut client = MockCryptoEntityClient::default();
+            sender(&mut client);
+            client.expect_load::<Mail, IdTupleGenerated>().returning(move |target| if found {
+                Ok(Mail { _id: Some(target.clone()), conversationEntry: id("entry"), ..create_test_entity() })
+            } else { Err(ApiCallError::ServerResponseError { source: HttpError::NotFoundError }) });
+            client.expect_load::<ConversationEntry, IdTupleGenerated>().returning(|target| Ok(ConversationEntry {
+                _id: Some(target.clone()), messageId: "<message@example.invalid>".into(), ..create_test_entity() }));
+            client.expect_velin_draft_owner_key().returning(|_, _| Ok(Versioned::new(GenericAesKey::from_bytes(&[1; 32]).unwrap(), 7)));
+            let mail = mail(&input);
+            client.expect_velin_draft_mail().returning(move |_| Ok(mail.clone()));
+            let expected_details = details(&input);
+            client.expect_velin_draft_details().returning(move |_| Ok(expected_details.clone()));
+            let mut services = MockResolvingServiceExecutor::default();
+            services.expect_post::<DraftService>().withf(move |data, _| data.conversationType == 1 && data.previousMessageId.as_deref() == expected)
+                .return_once(|_, _| Ok(DraftCreateReturn { _format: 0, draft: id("draft") }));
+            let facade = MailFacade::new(Arc::new(client), Arc::new(user()), Arc::new(services));
+            assert_eq!(facade.velin_save_draft(input).await.unwrap(), id("draft"));
+        }
+    }
+    #[tokio::test]
+    async fn velin_draft_rejects_inconsistent_conversation_before_any_request() {
+        for (previous, kind) in [(true, 0), (false, 1), (true, 3), (true, -1)] {
+            let mut input = input(false);
+            input.previous = previous.then(|| id("previous"));
+            input.conversation_type = kind;
+            let facade = MailFacade::new(Arc::new(MockCryptoEntityClient::default()), Arc::new(user()), Arc::new(MockResolvingServiceExecutor::default()));
             assert!(facade.velin_save_draft(input).await.is_err());
         }
     }

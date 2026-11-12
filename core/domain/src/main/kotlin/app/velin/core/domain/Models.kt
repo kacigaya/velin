@@ -57,13 +57,20 @@ data class MailMessage(val id: MailId, val from: Address, val to: List<Address>,
     val cc: List<Address>, val bcc: List<Address>, val replyTo: List<Address>,
     val subject: String, val sentAt: Instant, val confidential: Boolean, val unread: Boolean,
     val isDraft: Boolean, val body: BodyState, val attachments: List<Attachment>,
-    val authentication: MailAuthentication, val finding: MailFinding?, val scheduledSendAt: Instant?)
+    val authentication: MailAuthentication, val finding: MailFinding?, val scheduledSendAt: Instant?,
+    /** The server delivered this mail to the user; false for sent mail and drafts. */
+    val received: Boolean = true)
 data class Conversation(val id: ConversationId, val subject: String, val labels: List<Label>,
     val folderKind: FolderKind?, val messages: List<MailMessage>)
 data class Draft(val id: DraftId?, val sender: SenderAlias, val to: List<Recipient>,
     val cc: List<Recipient>, val bcc: List<Recipient>, val subject: String, val plainText: String,
     val confidential: Boolean, val attachments: List<Attachment>, val scheduledSendAt: Instant?,
-    val htmlBody: String? = null)
+    val htmlBody: String? = null, val response: DraftResponse? = null)
+enum class ResponseKind { Reply, ReplyAll, Forward }
+/** The mail a new draft answers. The server threads the draft into its conversation when it is created. */
+data class DraftResponse(val previous: MailId, val kind: ResponseKind)
+/** A new response draft. [omittedAttachments] counts files of the previous mail that the draft does not carry. */
+data class PreparedResponse(val draft: Draft, val omittedAttachments: Int)
 data class MailPage(val mails: List<MailSummary>, val next: PageCursor?)
 enum class RecipientResolutionReason { InvalidAddress, KeyMismatch, RateLimited, InvalidKeyData, TrustStorageUnavailable }
 enum class UnsupportedReason { Unspecified, ScheduledSend, NonConfidentialSend, Attachments, ReplyOrForward, IdentityTrustStore, ExternalRecipient, CalendarMail, CustomReplyTo }
