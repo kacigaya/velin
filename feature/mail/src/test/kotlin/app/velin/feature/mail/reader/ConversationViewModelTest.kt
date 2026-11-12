@@ -6,6 +6,7 @@ import app.velin.core.domain.BodyState
 import app.velin.core.domain.Conversation
 import app.velin.core.domain.ConversationId
 import app.velin.core.domain.Failure
+import app.velin.core.domain.FolderId
 import app.velin.core.domain.FolderKind
 import app.velin.core.domain.InlineImage
 import app.velin.core.domain.MailAuthentication
@@ -39,7 +40,7 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class ConversationViewModelTest {
     private val repo = FakeMailRepo()
-    private val mailbox = FakeMailbox(listOf(folder("inbox", FolderKind.Inbox)))
+    private val mailbox = FakeMailbox(listOf(folder("inbox", FolderKind.Inbox), folder("trash", FolderKind.Trash)))
     private val placeholder = "https://velin.invalid/inline/0"
 
     @Before fun setUp() = Dispatchers.setMain(UnconfinedTestDispatcher())
@@ -65,6 +66,16 @@ class ConversationViewModelTest {
         val loaded = viewModel().state.value as ConversationUiState.Loaded
         val body = loaded.conversation.messages.single().body as BodyUi.Loaded
         assertEquals(mapOf(placeholder to "files/f1"), body.inlineImages)
+    }
+
+    @Test
+    fun trashMovesEveryMessageThenCloses() = runTest {
+        val vm = viewModel(listOf(message("m1"), message("m2")))
+        val effects = mutableListOf<ConversationEffect>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.effects.collect { effects += it } }
+        vm.onEvent(ConversationEvent.Trash)
+        assertEquals(listOf(listOf(MailId(eid("mails", "m1")), MailId(eid("mails", "m2"))) to FolderId(eid("folders", "trash"))), repo.moves)
+        assertEquals(listOf(ConversationEffect.Close), effects)
     }
 
     @Test

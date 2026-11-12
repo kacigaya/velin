@@ -21,6 +21,7 @@ internal data class OfflineState(
     val mailbox: MailboxSnapshot = MailboxSnapshot(emptyList(), emptyList(), emptyList()),
     val pages: Map<FolderId, MailPage> = emptyMap(),
     val messages: List<SavedMessage> = emptyList(),
+    val draftRejections: Map<MailId, Set<String>> = emptyMap(),
 )
 /**
  * [body] is the decrypted HTML before sanitizing. Velin sanitizes it again on each restore.
@@ -95,6 +96,9 @@ internal fun encodeOffline(state: OfflineState): String = JSONObject().apply {
         JSONObject().put("folder", folder.value.json()).put("next", page.next?.value?.value)
             .put("mails", JSONArray(page.mails.map { it.json() }))
     }))
+    put("draftRejections", JSONArray(state.draftRejections.map { (id, addresses) ->
+        JSONObject().put("id", id.value.json()).put("addresses", JSONArray(addresses.toList()))
+    }))
     put("messages", JSONArray(state.messages.map { (m, body, summary) ->
         JSONObject().put("id", m.id.value.json()).put("from", m.from.json()).put("to", m.to.json()).put("cc", m.cc.json())
             .put("bcc", m.bcc.json()).put("replyTo", m.replyTo.json()).put("subject", m.subject)
@@ -137,8 +141,13 @@ internal fun decodeOffline(text: String): OfflineState {
             it.optBoolean("received", true)), it.getString("body"),
             it.optJSONObject("summary")?.summary())
     }
+    val rejections = root.optJSONArray("draftRejections")?.objects()?.associate { entry ->
+        MailId(entry.getJSONArray("id").entity()) to entry.getJSONArray("addresses").let { addresses ->
+            (0 until addresses.length()).map { addresses.getString(it).lowercase() }.toSet()
+        }
+    }.orEmpty()
     return OfflineState(cursors, if (root.has("syncedAt")) Instant.ofEpochMilli(root.getLong("syncedAt")) else null,
-        MailboxSnapshot(folders, labels, senders, entryLists), pages, messages)
+        MailboxSnapshot(folders, labels, senders, entryLists), pages, messages, rejections)
 }
 
 private fun EntityId.json() = JSONArray().put(list.value).put(element.value)

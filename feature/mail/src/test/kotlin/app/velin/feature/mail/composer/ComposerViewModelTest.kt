@@ -194,6 +194,166 @@ class ComposerViewModelTest {
         assertEquals(listOf(ComposerEffect.Failed(Failure.Offline), ComposerEffect.Close), failed.effects.take(2).toList())
     }
 
+    private fun TestScope.withRecipient(key: RecipientKeyState): ComposerViewModel {
+        repo.resolved["lena@tuta.com"] = internal("lena@tuta.com", key)
+        return viewModel().also { vm ->
+            vm.onEvent(ComposerEvent.AddRecipient(RecipientField.To, RecipientUi("Lena", "lena@tuta.com")))
+            runCurrent()
+        }
+    }
+
+    @Test
+    fun confirmingTheFingerprintMarksTheKeyCheckedByHand() = runTest {
+        val vm = withRecipient(RecipientKeyState.VerifiedTofu)
+        assertEquals(KeyTrustUi.FirstUse, vm.state.value.to.single().trust)
+        vm.onEvent(ComposerEvent.OpenRecipientKey(RecipientField.To, "lena@tuta.com"))
+        runCurrent()
+        assertEquals("ab".repeat(32), vm.state.value.recipientKey?.fingerprint)
+        repo.resolved["lena@tuta.com"] = internal("lena@tuta.com", RecipientKeyState.VerifiedManual)
+        vm.onEvent(ComposerEvent.ConfirmRecipientKey)
+        runCurrent()
+        // The shown fingerprint goes to the backend, which refuses it if the key changed meanwhile.
+        assertEquals(listOf("lena@tuta.com" to "ab".repeat(32)), repo.verifications)
+        assertEquals(KeyTrustUi.Verified, vm.state.value.recipientKey?.trust)
+        assertEquals(KeyTrustUi.Verified, vm.state.value.to.single().trust)
+        assertFalse(vm.state.value.recipientKey!!.busy)
+    }
+
+    @Test
+    fun aRejectedFingerprintLeadsToRemovingTheRecipient() = runTest {
+        val vm = withRecipient(RecipientKeyState.VerifiedTofu)
+        vm.onEvent(ComposerEvent.OpenRecipientKey(RecipientField.To, "lena@tuta.com"))
+        runCurrent()
+        vm.onEvent(ComposerEvent.RejectRecipientKey)
+        runCurrent()
+        assertTrue(vm.state.value.recipientKey!!.rejected)
+        assertTrue(repo.verifications.isEmpty())
+        // Closing the sheet keeps the rejection: the chip warns, sending stays blocked and the sheet reopens rejected.
+        vm.onEvent(ComposerEvent.CloseRecipientKey)
+        runCurrent()
+        assertTrue(vm.state.value.to.single().keyRejected)
+        assertFalse(vm.state.value.canSend)
+        vm.onEvent(ComposerEvent.OpenRecipientKey(RecipientField.To, "lena@tuta.com"))
+        runCurrent()
+        assertTrue(vm.state.value.recipientKey!!.rejected)
+        vm.onEvent(ComposerEvent.RemoveRecipient(RecipientField.To, "lena@tuta.com"))
+        runCurrent()
+        assertEquals(null, vm.state.value.recipientKey)
+        assertTrue(vm.state.value.to.isEmpty())
+        // Added again, the address starts unrejected.
+        vm.onEvent(ComposerEvent.AddRecipient(RecipientField.To, RecipientUi("Lena", "lena@tuta.com")))
+        runCurrent()
+        assertFalse(vm.state.value.to.single().keyRejected)
+        assertTrue(vm.state.value.canSend)
+    }
+
+    @Test
+    fun rejectionSurvivesClosingAndReopeningTheDraft() = runTest {
+        val vm = withRecipient(RecipientKeyState.VerifiedTofu)
+        vm.onEvent(ComposerEvent.OpenRecipientKey(RecipientField.To, "lena@tuta.com"))
+        runCurrent()
+        vm.onEvent(ComposerEvent.RejectRecipientKey)
+        runCurrent()
+        vm.onEvent(ComposerEvent.Close)
+        runCurrent()
+        val saved = repo.savedDrafts.last()
+        assertEquals(setOf("lena@tuta.com"), saved.rejectedRecipients)
+        repo.storedDraft = saved.copy(id = DraftId(MailId(eid("drafts", "d1"))))
+        val reopened = viewModel(draft = "drafts/d1")
+        assertTrue(reopened.state.value.to.single().keyRejected)
+        assertFalse(reopened.state.value.canSend)
+        reopened.onEvent(ComposerEvent.Send)
+        runCurrent()
+        assertTrue(repo.sentDrafts.isEmpty())
+    }
+
+    @Test
+    fun removingOneDuplicateKeepsTheOtherRejected() = runTest {
+        val recipient = internal("lena@tuta.com", RecipientKeyState.VerifiedTofu)
+        repo.resolved["lena@tuta.com"] = recipient
+        repo.storedDraft = Draft(DraftId(MailId(eid("drafts", "d1"))), SenderAlias(testAccount.address, true),
+            listOf(recipient), listOf(recipient.copy(address = Address("LENA@tuta.com"))), emptyList(),
+            "", "", true, emptyList(), null)
+        val vm = viewModel(draft = "drafts/d1")
+        vm.onEvent(ComposerEvent.OpenRecipientKey(RecipientField.To, "lena@tuta.com"))
+        runCurrent()
+        vm.onEvent(ComposerEvent.RejectRecipientKey)
+        vm.onEvent(ComposerEvent.RemoveRecipient(RecipientField.To, "lena@tuta.com"))
+        runCurrent()
+        assertTrue(vm.state.value.to.isEmpty())
+        assertTrue(vm.state.value.cc.single().keyRejected)
+        assertFalse(vm.state.value.canSend)
+    }
+
+    @Test
+    fun rejectingDuringSaveStopsSending() = runTest {
+        val vm = withRecipient(RecipientKeyState.VerifiedTofu)
+        vm.onEvent(ComposerEvent.OpenRecipientKey(RecipientField.To, "lena@tuta.com"))
+        runCurrent()
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        repo.saveGate = gate
+        vm.onEvent(ComposerEvent.Send)
+        runCurrent()
+        vm.onEvent(ComposerEvent.RejectRecipientKey)
+        gate.complete(Unit)
+        runCurrent()
+        assertTrue(repo.sentDrafts.isEmpty())
+        assertEquals(setOf("lena@tuta.com"), repo.savedDrafts.last().rejectedRecipients)
+    }
+
+    @Test
+    fun localPersistenceFailureKeepsAllocatedDraftIdForRetry() = runTest {
+        val vm = withRecipient(RecipientKeyState.VerifiedTofu)
+        val id = DraftId(MailId(eid("drafts", "allocated")))
+        repo.saveFailure = Failure.DraftPersistence(id)
+        vm.onEvent(ComposerEvent.Close)
+        runCurrent()
+        repo.saveFailure = null
+        vm.onEvent(ComposerEvent.Close)
+        runCurrent()
+        assertEquals(id, repo.savedDrafts.last().id)
+    }
+
+    @Test
+    fun aCheckedKeyIsNeverDroppedFromTheSheet() = runTest {
+        val vm = withRecipient(RecipientKeyState.VerifiedManual)
+        vm.onEvent(ComposerEvent.OpenRecipientKey(RecipientField.To, "lena@tuta.com"))
+        runCurrent()
+        assertEquals(KeyTrustUi.Verified, vm.state.value.recipientKey?.trust)
+        // Dropping it would trust whatever key the server sends now.
+        vm.onEvent(ComposerEvent.ResetRecipientKey)
+        runCurrent()
+        assertTrue(repo.untrusted.isEmpty())
+    }
+
+    @Test
+    fun trustingAChangedKeyPinsItAgainAndUnblocksSending() = runTest {
+        val vm = withRecipient(RecipientKeyState.Mismatch)
+        assertFalse(vm.state.value.canSend)
+        vm.onEvent(ComposerEvent.OpenRecipientKey(RecipientField.To, "lena@tuta.com"))
+        runCurrent()
+        assertEquals(KeyTrustUi.Changed, vm.state.value.recipientKey?.trust)
+        assertEquals("a changed key shows no fingerprint", null, vm.state.value.recipientKey?.fingerprint)
+        repo.resolved["lena@tuta.com"] = internal("lena@tuta.com", RecipientKeyState.VerifiedTofu)
+        vm.onEvent(ComposerEvent.ResetRecipientKey)
+        runCurrent()
+        assertEquals(listOf("lena@tuta.com"), repo.untrusted)
+        assertEquals(KeyTrustUi.FirstUse, vm.state.value.recipientKey?.trust)
+        assertEquals("ab".repeat(32), vm.state.value.recipientKey?.fingerprint)
+        assertTrue(vm.state.value.canSend)
+    }
+
+    @Test
+    fun externalOrUnresolvedRecipientsHaveNoKeySheet() = runTest {
+        val vm = viewModel()
+        vm.onEvent(ComposerEvent.AddRecipient(RecipientField.To, RecipientUi("", "someone@example.com")))
+        runCurrent()
+        assertEquals(null, vm.state.value.to.single().trust)
+        vm.onEvent(ComposerEvent.OpenRecipientKey(RecipientField.To, "someone@example.com"))
+        runCurrent()
+        assertEquals(null, vm.state.value.recipientKey)
+    }
+
     private fun internal(address: String, key: RecipientKeyState = RecipientKeyState.VerifiedTofu) =
         Recipient(Address(address), RecipientType.Internal, keyState = key)
 

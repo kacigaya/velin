@@ -53,8 +53,9 @@ class ConversationViewModel(
     private val effectChannel = Channel<ConversationEffect>(Channel.BUFFERED)
     val effects: Flow<ConversationEffect> = effectChannel.receiveAsFlow()
 
+    // Only read through .value by the actions, so it must not wait for a subscriber.
     private val folders = mailbox.folders(account.id)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), emptyList())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val state: StateFlow<ConversationUiState> = combine(mail.conversation(account.id, conversationId), remoteAllowed) { outcome, allowed ->
         when (outcome) {

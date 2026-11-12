@@ -95,6 +95,9 @@ class ComposerViewModel(
     private val passwords = MutableStateFlow(emptyMap<String, String>())
     private val query = MutableStateFlow<String?>(null)
     private val sending = MutableStateFlow(false)
+    private val recipientKey = MutableStateFlow<RecipientKeyUi?>(null)
+    /** Lowercase addresses whose fingerprint the user rejected. They block sending until removed. */
+    private val rejected = MutableStateFlow(emptySet<String>())
     private val saveLock = Mutex()
     private val effectChannel = Channel<ComposerEffect>(Channel.BUFFERED)
     val effects: Flow<ComposerEffect> = effectChannel.receiveAsFlow()
@@ -108,11 +111,11 @@ class ComposerViewModel(
 
     val state: StateFlow<ComposerUiState> = combine(
         combine(senders, sender, ::Pair),
-        combine(recipients, resolving, ::Pair),
+        combine(recipients, resolving, rejected, ::Triple),
         combine(confidential, passwords, ::Pair),
         suggestions,
-        sending,
-    ) { (all, chosen), (fields, inFlight), (isConfidential, externalPasswords), suggested, isSending ->
+        combine(sending, recipientKey, ::Pair),
+    ) { (all, chosen), (fields, inFlight, rejectedKeys), (isConfidential, externalPasswords), suggested, (isSending, key) ->
         val active = all.filter { it.enabled }
         val from = chosen ?: active.firstOrNull()
         val everyone = fields.values.flatten()
@@ -121,16 +124,18 @@ class ComposerViewModel(
         ComposerUiState(
             senders = active.map { it.address.address }.toImmutableList(),
             sender = from?.address?.address.orEmpty(),
-            to = fields.getValue(RecipientField.To).map { it.toUi(inFlight) }.toImmutableList(),
-            cc = fields.getValue(RecipientField.Cc).map { it.toUi(inFlight) }.toImmutableList(),
-            bcc = fields.getValue(RecipientField.Bcc).map { it.toUi(inFlight) }.toImmutableList(),
+            to = fields.getValue(RecipientField.To).map { it.toUi(inFlight, rejectedKeys) }.toImmutableList(),
+            cc = fields.getValue(RecipientField.Cc).map { it.toUi(inFlight, rejectedKeys) }.toImmutableList(),
+            bcc = fields.getValue(RecipientField.Bcc).map { it.toUi(inFlight, rejectedKeys) }.toImmutableList(),
             suggestions = suggested.map { RecipientUi(it.address.name, it.address.address) }.toImmutableList(),
             confidential = isConfidential,
             externalPasswords = externalPasswords,
             sending = isSending,
             // A changed key blocks sending, as upstream does; the backend checks keys again on send.
-            canSend = from != null && everyone.isNotEmpty() && everyone.none { it.invalid || it.keyState == RecipientKeyState.Mismatch } &&
+            canSend = from != null && everyone.isNotEmpty() &&
+                everyone.none { it.invalid || it.keyState == RecipientKeyState.Mismatch || it.address.address.lowercase() in rejectedKeys } &&
                 inFlight.isEmpty() && passwordsComplete && !isSending,
+            recipientKey = key,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), ComposerUiState())
 
@@ -166,7 +171,8 @@ class ComposerViewModel(
                 recipients.map { fields -> fields.mapValues { (_, list) -> list.map { it.address } } }.distinctUntilChanged(),
                 sender,
                 confidential,
-            ) { _, _, _, _ -> Unit }
+                rejected,
+            ) { _, _, _, _, _ -> Unit }
                 .drop(1)
                 .onEach { edited = true }
                 .debounce(AUTOSAVE_DELAY_MS)
@@ -178,6 +184,7 @@ class ComposerViewModel(
     private fun fill(draft: Draft, cursorAtStart: Boolean = false) {
         draftId.value = draft.id
         sender.value = draft.sender
+        rejected.value = draft.rejectedRecipients.map { it.lowercase() }.toSet()
         recipients.value = mapOf(RecipientField.To to draft.to, RecipientField.Cc to draft.cc, RecipientField.Bcc to draft.bcc)
         confidential.value = draft.confidential
         originalHtml = draft.htmlBody
@@ -194,7 +201,13 @@ class ComposerViewModel(
         when (event) {
             ComposerEvent.Close -> viewModelScope.launch {
                 // An untouched reply or forward closes without a draft.
-                if (hasContent() && (edited || response == null)) report(save())
+                if (hasContent() && (edited || response == null)) {
+                    val saved = save()
+                    if (saved is Outcome.Failed) {
+                        report(saved)
+                        return@launch
+                    }
+                }
                 effectChannel.send(ComposerEffect.Close)
             }
             ComposerEvent.Send -> send()
@@ -202,11 +215,23 @@ class ComposerViewModel(
             is ComposerEvent.SelectSender -> sender.value = senders.value.firstOrNull { it.address.address == event.address }
             is ComposerEvent.QueryRecipients -> query.value = event.query
             is ComposerEvent.AddRecipient -> addRecipient(event.field, event.recipient)
-            is ComposerEvent.RemoveRecipient -> recipients.update { fields ->
-                fields + (event.field to fields.getValue(event.field).filterNot { it.address.address == event.address })
+            is ComposerEvent.RemoveRecipient -> {
+                recipients.update { fields ->
+                    fields + (event.field to fields.getValue(event.field).filterNot { it.address.address == event.address })
+                }
+                if (recipient(event.address) == null) rejected.update { it - event.address.lowercase() }
+                if (recipientKey.value?.address == event.address) recipientKey.value = null
             }
             is ComposerEvent.SetConfidential -> confidential.value = event.confidential
             is ComposerEvent.SetExternalPassword -> passwords.update { it + (event.address to event.password) }
+            is ComposerEvent.OpenRecipientKey -> openKey(event.field, event.address)
+            ComposerEvent.CloseRecipientKey -> recipientKey.value = null
+            ComposerEvent.ConfirmRecipientKey -> confirmKey()
+            ComposerEvent.RejectRecipientKey -> recipientKey.value?.let { key ->
+                rejected.update { it + key.address.lowercase() }
+                recipientKey.value = key.copy(rejected = true)
+            }
+            ComposerEvent.ResetRecipientKey -> resetKey()
             // Attachments, scheduled sending and attachment removal arrive with the M6 backend.
             ComposerEvent.Attach, ComposerEvent.SendLater, is ComposerEvent.RemoveAttachment ->
                 effectChannel.trySend(ComposerEffect.Failed(Failure.Unsupported))
@@ -227,26 +252,94 @@ class ComposerViewModel(
 
     /** Looks up whether [address] is a Tuta address and the state of its key. */
     private fun resolve(address: String) {
+        if (address.lowercase() in resolving.value) return
+        viewModelScope.launch { lookup(address) }
+    }
+
+    /** Returns the key state after the lookup, or null when it failed. */
+    private suspend fun lookup(address: String): RecipientKeyState? {
         val key = address.lowercase()
-        if (key in resolving.value) return
         resolving.update { it + key }
-        viewModelScope.launch {
-            try {
-                when (val outcome = mail.resolveRecipient(account.id, address)) {
-                    is Outcome.Success -> updateRecipient(address) { it.copy(type = outcome.value.type, keyState = outcome.value.keyState) }
-                    is Outcome.Failed -> {
-                        val failure = outcome.failure
-                        if (failure is Failure.RecipientResolution && failure.reason == RecipientResolutionReason.InvalidAddress) {
-                            updateRecipient(address) { it.copy(invalid = true) }
-                        } else if (failure !is Failure.Unsupported) {
-                            // The type stays unknown; send resolves again and reports what blocks it.
-                            effectChannel.send(ComposerEffect.Failed(failure))
-                        }
-                    }
+        try {
+            when (val outcome = mail.resolveRecipient(account.id, address)) {
+                is Outcome.Success -> {
+                    updateRecipient(address) { it.copy(type = outcome.value.type, keyState = outcome.value.keyState) }
+                    return outcome.value.keyState
                 }
-            } finally {
-                resolving.update { it - key }
+                is Outcome.Failed -> {
+                    val failure = outcome.failure
+                    if (failure is Failure.RecipientResolution && failure.reason == RecipientResolutionReason.InvalidAddress) {
+                        updateRecipient(address) { it.copy(invalid = true) }
+                    } else if (failure !is Failure.Unsupported) {
+                        // The type stays unknown; send resolves again and reports what blocks it.
+                        effectChannel.send(ComposerEffect.Failed(failure))
+                    }
+                    return null
+                }
             }
+        } finally {
+            resolving.update { it - key }
+        }
+    }
+
+    private fun recipient(address: String) =
+        recipients.value.values.flatten().firstOrNull { it.address.address.equals(address, ignoreCase = true) }
+
+    private fun openKey(field: RecipientField, address: String) {
+        val trust = recipient(address)?.toTrust() ?: return
+        if (address.lowercase() in rejected.value) {
+            recipientKey.value = RecipientKeyUi(field, address, trust, rejected = true)
+            return
+        }
+        recipientKey.value = RecipientKeyUi(field, address, trust)
+        if (trust == KeyTrustUi.FirstUse || trust == KeyTrustUi.Verified) loadFingerprint(address)
+    }
+
+    private fun loadFingerprint(address: String) = viewModelScope.launch {
+        val outcome = mail.recipientFingerprint(account.id, address)
+        recipientKey.update { key ->
+            if (key?.address != address) key
+            else when (outcome) {
+                is Outcome.Success -> key.copy(fingerprint = outcome.value, failed = false)
+                is Outcome.Failed -> key.copy(failed = true)
+            }
+        }
+    }
+
+    /** Pins the shown fingerprint as checked by hand. The backend refuses it if the key changed meanwhile. */
+    private fun confirmKey() {
+        val key = recipientKey.value ?: return
+        val fingerprint = key.fingerprint ?: return
+        if (key.busy) return
+        recipientKey.value = key.copy(busy = true, failed = false)
+        viewModelScope.launch {
+            val outcome = mail.verifyRecipient(account.id, key.address, fingerprint)
+            val state = lookup(key.address)
+            recipientKey.update { current ->
+                if (current?.address != key.address) current
+                else current.copy(busy = false, failed = outcome is Outcome.Failed,
+                    trust = state?.toTrust() ?: current.trust)
+            }
+        }
+    }
+
+    /**
+     * Drops a changed pinned identity, then trusts the current key on first use. Only offered for a changed key:
+     * on a checked key it would silently accept whatever key the server sends now.
+     */
+    private fun resetKey() {
+        val key = recipientKey.value ?: return
+        if (key.busy || key.trust != KeyTrustUi.Changed) return
+        recipientKey.value = key.copy(busy = true, failed = false)
+        viewModelScope.launch {
+            val outcome = mail.untrustRecipient(account.id, key.address)
+            val state = if (outcome is Outcome.Success) lookup(key.address) else null
+            val trust = state?.toTrust()
+            recipientKey.update { current ->
+                if (current?.address != key.address) current
+                else current.copy(busy = false, failed = trust == null, trust = trust ?: current.trust, fingerprint = null, rejected = false)
+            }
+            if (trust == KeyTrustUi.FirstUse || trust == KeyTrustUi.Verified) loadFingerprint(key.address)
         }
     }
 
@@ -255,10 +348,16 @@ class ComposerViewModel(
     }
 
     private fun send() {
-        if (!state.value.canSend) return
+        if (!state.value.canSend || sending.value || rejected.value.isNotEmpty()) return
+        sending.value = true
         viewModelScope.launch {
-            sending.value = true
             val saved = save()
+            if (rejected.value.isNotEmpty()) {
+                // A fingerprint can be rejected while the network save is in flight.
+                save()
+                sending.value = false
+                return@launch
+            }
             val outcome = if (saved is Outcome.Success) mail.sendDraft(account.id, saved.value) else saved.toUnitOutcome()
             sending.value = false
             when (outcome) {
@@ -318,8 +417,15 @@ class ComposerViewModel(
             scheduledSendAt = null,
             htmlBody = originalHtml,
             response = response,
+            rejectedRecipients = rejected.value,
         )
         val outcome = mail.saveDraft(account.id, draft)
+        if (outcome is Outcome.Failed) {
+            (outcome.failure as? Failure.DraftPersistence)?.let {
+                draftId.value = it.id
+                response = null
+            }
+        }
         if (outcome is Outcome.Success) {
             draftId.value = outcome.value
             response = null
@@ -340,13 +446,26 @@ class ComposerViewModel(
     }
 }
 
-private fun Recipient.toUi(inFlight: Set<String>) = ComposerRecipientUi(
+private fun Recipient.toTrust(): KeyTrustUi? = if (type != RecipientType.Internal) null else keyState.toTrust()
+
+private fun RecipientKeyState.toTrust(): KeyTrustUi? = when (this) {
+    RecipientKeyState.VerifiedTofu -> KeyTrustUi.FirstUse
+    RecipientKeyState.VerifiedManual -> KeyTrustUi.Verified
+    RecipientKeyState.Mismatch -> KeyTrustUi.Changed
+    RecipientKeyState.NoEntry -> KeyTrustUi.NoKey
+    RecipientKeyState.TrustStoreUnsupported -> KeyTrustUi.Unsupported
+    RecipientKeyState.Unresolved -> null
+}
+
+private fun Recipient.toUi(inFlight: Set<String>, rejected: Set<String>) = ComposerRecipientUi(
     recipient = RecipientUi(address.name, address.address),
     external = type == RecipientType.External,
     internal = type == RecipientType.Internal,
     invalid = invalid,
     resolving = address.address.lowercase() in inFlight,
     keyChanged = keyState == RecipientKeyState.Mismatch,
+    keyRejected = address.address.lowercase() in rejected,
+    trust = toTrust(),
 )
 
 private fun Outcome<DraftId>.toUnitOutcome(): Outcome<Unit> = when (this) {

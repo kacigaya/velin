@@ -93,6 +93,26 @@
     <string name="composer_password_for">Password for %1$s</string>
     <string name="composer_resolving">Checking address</string>
     <string name="composer_key_changed">Encryption key changed</string>
+
+    <!-- Recipient key check -->
+    <string name="key_sheet_title">Recipient key</string>
+    <string name="key_trust_first_use">Trusted since first use. Not checked by you.</string>
+    <string name="key_trust_verified">Checked by you</string>
+    <string name="key_trust_changed">The key changed</string>
+    <string name="key_trust_rejected">The fingerprint does not match</string>
+    <string name="key_trust_none">Nothing to check</string>
+    <string name="key_sheet_loading">Loading fingerprint</string>
+    <string name="key_sheet_compare">Ask the recipient to open Settings, then Key management, in their Tuta app. Compare this fingerprint with the one they see. Use a channel that you trust, for example in person or by phone.</string>
+    <string name="key_sheet_changed">The key of this address is not the key that Velin trusts. Someone may be trying to read your mail, or the recipient set up their account again. Do not send until you know which.</string>
+    <string name="key_sheet_rejected">Do not send mail to this recipient. Their key may not be theirs. Remove them from this mail and ask them about the key in another way.</string>
+    <string name="key_sheet_no_key">This address has no identity key yet, so there is no fingerprint to check.</string>
+    <string name="key_sheet_unsupported">Velin cannot store trusted keys on this device, so it cannot check this key.</string>
+    <string name="key_sheet_failed">That did not work. Try again.</string>
+    <string name="key_action_matches">It matches</string>
+    <string name="key_action_no_match">It does not match</string>
+    <string name="key_action_remove">Remove recipient</string>
+    <string name="key_action_remove_recommended">Remove recipient (recommended)</string>
+    <string name="key_action_trust_new">Trust the new key</string>
     <string name="composer_error_key_changed">The encryption key of a recipient changed. Remove the recipient to send.</string>
     <string name="composer_error_not_found">A recipient address does not exist.</string>
     <string name="composer_error_rate_limited">Too many address checks. Try again in a few minutes.</string>

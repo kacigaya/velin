@@ -26,6 +26,15 @@ class BackendReadRepositoryTest {
         emptyList(), emptyList(), id.value.element.value, Instant.ofEpochSecond(if (id.value.element.value == "old") 1 else 2),
         true, true, false, BodyState.Loading, listOf(attachment), MailAuthentication.Unknown, null, null)
     private inner class Source : MailReadSource {
+        var draft = Draft(DraftId(MailId(entity("draft"))), SenderAlias(Address("me@example.invalid"), true),
+            listOf(Recipient(Address("to@example.invalid"), RecipientType.Internal)), emptyList(), emptyList(),
+            "Subject", "Body", true, emptyList(), null)
+        override suspend fun loadDraft(account: AccountId, id: MailId) = Outcome.Success(draft)
+        override suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<DraftId> {
+            if (offline) return Outcome.Failed(Failure.Offline)
+            this.draft = draft.copy(rejectedRecipients = emptySet())
+            return Outcome.Success(draft.id!!)
+        }
         var actionFailure = false
         var deleted = false
         var currentFolder = folder
@@ -321,11 +330,56 @@ class BackendReadRepositoryTest {
     private class MemoryOfflineStore : OfflineStore {
         val saved = mutableMapOf<AccountId, OfflineState>()
         var writes = 0
+        var failWrites = false
         override fun exists(account: AccountId) = account in saved
         override fun read(account: AccountId) = saved[account]
-        override fun write(account: AccountId, state: OfflineState) { writes++; saved[account] = state }
+        override fun write(account: AccountId, state: OfflineState) {
+            if (failWrites) throw java.io.IOException("Disk full")
+            writes++; saved[account] = state
+        }
         override fun delete(account: AccountId) { saved.remove(account) }
     }
+    @Test fun draftRejectionsSurviveRepositoryRestartAndBlockSending() = runBlocking {
+        val store = MemoryOfflineStore()
+        val source = Source()
+        val cache = Files.createTempDirectory("draft-rejection").toFile()
+        try {
+            val repo = BackendReadRepository(source, cache, store) { clock }
+            repo.open(account)
+            val rejected = source.draft.copy(rejectedRecipients = setOf("to@example.invalid"))
+            assertTrue(repo.saveDraft(account, rejected) is Outcome.Success)
+            val restarted = BackendReadRepository(source, cache, store) { clock }
+            restarted.open(account)
+            val loaded = restarted.loadDraft(account, rejected.id!!.value) as Outcome.Success
+            assertEquals(rejected.rejectedRecipients, loaded.value.rejectedRecipients)
+            assertTrue(restarted.sendDraft(account, rejected.id!!) is Outcome.Failed)
+            assertEquals(0, source.sendCalls)
+            assertTrue(restarted.saveDraft(account, loaded.value.copy(rejectedRecipients = emptySet())) is Outcome.Success)
+            assertTrue(restarted.sendDraft(account, rejected.id!!) is Outcome.Success)
+            assertEquals(1, source.sendCalls)
+        } finally { cache.deleteRecursively() }
+    }
+
+    @Test fun offlineDraftSaveStillPersistsRejection() = runBlocking {
+        val store = MemoryOfflineStore()
+        val source = Source()
+        val cache = Files.createTempDirectory("draft-offline").toFile()
+        try {
+            val repo = BackendReadRepository(source, cache, store) { clock }
+            repo.open(account)
+            source.offline = true
+            val draft = source.draft.copy(rejectedRecipients = setOf("to@example.invalid"))
+            assertEquals(Outcome.Failed(Failure.Offline), repo.saveDraft(account, draft))
+            source.offline = false
+            val restarted = BackendReadRepository(source, cache, store) { clock }
+            restarted.open(account)
+            assertEquals(draft.rejectedRecipients,
+                (restarted.loadDraft(account, draft.id!!.value) as Outcome.Success).value.rejectedRecipients)
+            source.draft = source.draft.copy(to = emptyList())
+            assertTrue((restarted.loadDraft(account, draft.id!!.value) as Outcome.Success).value.rejectedRecipients.isEmpty())
+        } finally { cache.deleteRecursively() }
+    }
+
     /** A generated ID for [millis], as EntityUtils.ts timestampToGeneratedId builds it. */
     private fun generatedId(millis: Long, counter: Int = 0): String {
         val bytes = java.nio.ByteBuffer.allocate(9).putLong(millis shl 22 or (counter.toLong() shl 8)).put(0).array()

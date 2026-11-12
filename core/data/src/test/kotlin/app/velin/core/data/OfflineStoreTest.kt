@@ -32,6 +32,13 @@ class OfflineStoreTest {
         mapOf(FolderId(entity("inbox")) to MailPage(listOf(summary), PageCursor(ElementId("next")))),
         listOf(SavedMessage(message, "<p>body</p>", summary), SavedMessage(message.copy(id = MailId(entity("sent")), received = false), "")))
 
+    @Test fun draftRejectionsRoundTripAndOldFilesDefaultToEmpty() {
+        val saved = state.copy(draftRejections = mapOf(message.id to setOf("to@example.invalid")))
+        assertEquals(saved, decodeOffline(encodeOffline(saved)))
+        val old = org.json.JSONObject(encodeOffline(state)).apply { remove("draftRejections") }
+        assertTrue(decodeOffline(old.toString()).draftRejections.isEmpty())
+    }
+
     @Test fun roundTripKeepsEveryField() {
         val directory = Files.createTempDirectory("offline").toFile()
         try {

@@ -68,6 +68,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
@@ -104,6 +105,28 @@ data class ComposerRecipientUi(
     val resolving: Boolean = false,
     /** The recipient's key does not match the trusted one. Sending is blocked. */
     val keyChanged: Boolean = false,
+    /** The user said the fingerprint does not match. Sending is blocked until the recipient is removed. */
+    val keyRejected: Boolean = false,
+    /** Identity trust of a resolved Tuta recipient; null before lookup and for external addresses. */
+    val trust: KeyTrustUi? = null,
+)
+
+/** How Velin trusts a recipient's identity key. */
+enum class KeyTrustUi { FirstUse, Verified, Changed, NoKey, Unsupported }
+
+/**
+ * The open key sheet. [fingerprint] is the pinned identity, null while it loads or when there is none.
+ * [rejected]: the user said the fingerprint does not match.
+ */
+@Immutable
+data class RecipientKeyUi(
+    val field: RecipientField,
+    val address: String,
+    val trust: KeyTrustUi,
+    val fingerprint: String? = null,
+    val busy: Boolean = false,
+    val failed: Boolean = false,
+    val rejected: Boolean = false,
 )
 
 /** Composer failures with a specific message; null means the caller's generic text. */
@@ -141,6 +164,7 @@ data class ComposerUiState(
     val externalPasswords: Map<String, String> = emptyMap(),
     val sending: Boolean = false,
     val canSend: Boolean = false,
+    val recipientKey: RecipientKeyUi? = null,
 )
 
 sealed interface ComposerEvent {
@@ -156,6 +180,13 @@ sealed interface ComposerEvent {
     data class RemoveAttachment(val id: String) : ComposerEvent
     data class SetConfidential(val confidential: Boolean) : ComposerEvent
     data class SetExternalPassword(val address: String, val password: String) : ComposerEvent
+    data class OpenRecipientKey(val field: RecipientField, val address: String) : ComposerEvent
+    data object CloseRecipientKey : ComposerEvent
+    /** The fingerprint matches the one the recipient sees in their own app. */
+    data object ConfirmRecipientKey : ComposerEvent
+    data object RejectRecipientKey : ComposerEvent
+    /** Drop a changed pinned identity and trust the current key on first use. */
+    data object ResetRecipientKey : ComposerEvent
 }
 
 /**
@@ -253,6 +284,7 @@ fun ComposerScreen(
             }
         }
     }
+    state.recipientKey?.let { RecipientKeySheet(it, onEvent) }
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -387,9 +419,12 @@ private fun RecipientChip(field: RecipientField, item: ComposerRecipientUi, conf
     val removeLabel = stringResource(R.string.composer_remove_recipient, item.recipient.address)
     val resolvingLabel = stringResource(R.string.composer_resolving)
     val colors = MaterialTheme.colorScheme
+    // A resolved Tuta recipient opens its key; the close icon still removes it. Other chips remove on tap.
+    val hasKey = item.trust != null && !item.resolving
+    val remove = { onEvent(ComposerEvent.RemoveRecipient(field, item.recipient.address)) }
     InputChip(
         selected = false,
-        onClick = { onEvent(ComposerEvent.RemoveRecipient(field, item.recipient.address)) },
+        onClick = if (hasKey) ({ onEvent(ComposerEvent.OpenRecipientKey(field, item.recipient.address)) }) else remove,
         label = { Text(item.recipient.name.ifBlank { item.recipient.address }, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         avatar = {
             when {
@@ -399,9 +434,9 @@ private fun RecipientChip(field: RecipientField, item: ComposerRecipientUi, conf
                         .semantics { contentDescription = resolvingLabel },
                     strokeWidth = 2.dp,
                 )
-                item.keyChanged -> Icon(
+                item.keyChanged || item.keyRejected -> Icon(
                     painterResource(VelinIcons.Warning),
-                    contentDescription = stringResource(R.string.composer_key_changed),
+                    contentDescription = stringResource(if (item.keyRejected) R.string.key_trust_rejected else R.string.composer_key_changed),
                     modifier = Modifier.size(18.dp),
                 )
                 confidential && item.internal -> Icon(
@@ -412,8 +447,16 @@ private fun RecipientChip(field: RecipientField, item: ComposerRecipientUi, conf
                 else -> SenderAvatar(item.recipient.name, item.recipient.address, size = 24.dp)
             }
         },
-        trailingIcon = { Icon(painterResource(VelinIcons.Close), removeLabel, Modifier.size(18.dp)) },
-        colors = if (item.invalid || item.keyChanged) {
+        trailingIcon = {
+            if (hasKey) {
+                Icon(painterResource(VelinIcons.Close), removeLabel, Modifier.size(18.dp).clickable(
+                    onClickLabel = removeLabel, role = Role.Button, onClick = remove,
+                ))
+            } else {
+                Icon(painterResource(VelinIcons.Close), removeLabel, Modifier.size(18.dp))
+            }
+        },
+        colors = if (item.invalid || item.keyChanged || item.keyRejected) {
             InputChipDefaults.inputChipColors(containerColor = colors.errorContainer, labelColor = colors.onErrorContainer)
         } else {
             InputChipDefaults.inputChipColors()

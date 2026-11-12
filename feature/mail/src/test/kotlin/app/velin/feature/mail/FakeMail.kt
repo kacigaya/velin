@@ -112,10 +112,14 @@ internal class FakeMailRepo : MailRepository {
     val responseCalls = mutableListOf<Pair<MailId, app.velin.core.domain.ResponseKind>>()
     override suspend fun prepareResponse(account: AccountId, previous: MailId, kind: app.velin.core.domain.ResponseKind) =
         response.also { responseCalls += previous to kind }
+    var saveGate: kotlinx.coroutines.CompletableDeferred<Unit>? = null
+    var saveFailure: app.velin.core.domain.Failure? = null
     val savedDrafts = mutableListOf<Draft>()
     val sentDrafts = mutableListOf<DraftId>()
     override suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<DraftId> {
         savedDrafts += draft
+        saveGate?.await()
+        saveFailure?.let { return Outcome.Failed(it) }
         return Outcome.Success(draft.id ?: DraftId(MailId(eid("drafts", "d${savedDrafts.size}"))))
     }
     var sendOutcome: Outcome<Unit> = Outcome.Success(Unit)
@@ -123,6 +127,15 @@ internal class FakeMailRepo : MailRepository {
         sentDrafts += id
         return sendOutcome
     }
+    var fingerprint: Outcome<String> = Outcome.Success("ab".repeat(32))
+    val verifications = mutableListOf<Pair<String, String>>()
+    var verifyOutcome: Outcome<Unit> = Outcome.Success(Unit)
+    val untrusted = mutableListOf<String>()
+    override suspend fun recipientFingerprint(account: AccountId, address: String): Outcome<String> = fingerprint
+    override suspend fun verifyRecipient(account: AccountId, address: String, fingerprint: String): Outcome<Unit> =
+        verifyOutcome.also { verifications += address to fingerprint }
+    override suspend fun untrustRecipient(account: AccountId, address: String): Outcome<Unit> =
+        Outcome.Success(Unit).also { untrusted += address }
     /** Lookup results by lowercase address; others fail as unsupported, like the interface default. */
     val resolved = mutableMapOf<String, Recipient>()
     override suspend fun resolveRecipient(account: AccountId, address: String): Outcome<Recipient> =

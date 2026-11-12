@@ -33,6 +33,7 @@ class BackendReadRepository internal constructor(private val source: MailReadSou
         val summaries = mutableMapOf<MailId, MailSummary>()
         val rawBodies = mutableMapOf<MailId, String>()
         val consent = mutableSetOf<MailId>()
+        val draftRejections = mutableMapOf<MailId, Set<String>>()
         var restored = false
         val cursors = mutableMapOf<String, String>()
         var syncedAt: Instant? = null
@@ -73,6 +74,7 @@ class BackendReadRepository internal constructor(private val source: MailReadSou
                     state.summaries.clear()
                     state.rawBodies.clear()
                     state.consent.clear()
+                    state.draftRejections.clear()
                     state.restored = false
                     state.cursors.clear()
                     state.syncedAt = null
@@ -328,6 +330,7 @@ class BackendReadRepository internal constructor(private val source: MailReadSou
                 state.rawBodies[message.id] = body
                 state.messages[message.id] = message.copy(body = sanitized(message, body, false))
             }
+            state.draftRejections.putAll(saved.draftRejections)
             state.cursors.putAll(saved.cursors)
             state.syncedAt = saved.syncedAt
         } catch (_: IllegalArgumentException) {
@@ -357,7 +360,7 @@ class BackendReadRepository internal constructor(private val source: MailReadSou
             state.pages.mapValues { (_, flow) -> flow.value.let { page ->
                 // A cut page has no valid next cursor. The next online load sets it again.
                 if (page.mails.size <= MAX_SAVED_PAGE) page else MailPage(page.mails.take(MAX_SAVED_PAGE), null)
-            } }, messages))
+            } }, messages, state.draftRejections.toMap()))
     }
 
     /** Cursors for the next event connection. After the server's batch lifetime, start again with a full sync. */
@@ -522,6 +525,7 @@ class BackendReadRepository internal constructor(private val source: MailReadSou
         state.summaries.remove(id)
         state.rawBodies.remove(id)
         state.consent.remove(id)
+        state.draftRejections.remove(id)
         state.pages.values.forEach { flow -> flow.value = flow.value.copy(mails = flow.value.mails.filterNot { it.id == id }) }
         state.conversations.values.forEach { flow ->
             val previous = flow.value
@@ -627,7 +631,16 @@ class BackendReadRepository internal constructor(private val source: MailReadSou
                 labels = previous.value.messages.flatMap { state.summaries[it.id]?.labels.orEmpty() }.distinctBy { it.id }))
         }
     }
-    override suspend fun loadDraft(account: AccountId, id: MailId): Outcome<Draft> = io { source.loadDraft(account, id) }
+    override suspend fun loadDraft(account: AccountId, id: MailId): Outcome<Draft> = io(account) {
+        when (val loaded = source.loadDraft(account, id)) {
+            is Outcome.Failed -> loaded
+            is Outcome.Success -> {
+                val draft = loaded.value
+                val addresses = (draft.to + draft.cc + draft.bcc).map { it.address.address.lowercase() }.toSet()
+                Outcome.Success(draft.copy(rejectedRecipients = this.account(account).draftRejections[id].orEmpty().intersect(addresses)))
+            }
+        }
+    }
     override suspend fun prepareResponse(account: AccountId, previous: MailId, kind: ResponseKind): Outcome<PreparedResponse> =
         io(account, save = true) {
             // Saved mail from v0.3 has no state, so read the direction fresh. A response needs the server anyway.
@@ -644,11 +657,22 @@ class BackendReadRepository internal constructor(private val source: MailReadSou
             }
         }
     override suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<DraftId> = io(account, save = true) {
+        val state = this.account(account)
+        fun remember(id: MailId) {
+            if (draft.rejectedRecipients.isEmpty()) state.draftRejections.remove(id)
+            else state.draftRejections[id] = draft.rejectedRecipients.map { it.lowercase() }.toSet()
+        }
+        draft.id?.let {
+            remember(it.value)
+            try { write(account) } catch (_: Exception) { return@io Outcome.Failed(Failure.DraftPersistence(it)) }
+        }
         when (val saved = source.saveDraft(account, draft)) {
             is Outcome.Failed -> saved
             is Outcome.Success -> {
                 val id = saved.value.value
-                val state = this.account(account)
+                remember(id)
+                // Rejection is a send block, so a failed durable write must reach the composer.
+                try { write(account) } catch (_: Exception) { return@io Outcome.Failed(Failure.DraftPersistence(saved.value)) }
                 state.messages.remove(id)
                 state.rawBodies.remove(id)
                 state.summaries.remove(id)
@@ -663,6 +687,9 @@ class BackendReadRepository internal constructor(private val source: MailReadSou
     override suspend fun untrustRecipient(account: AccountId, address: String): Outcome<Unit> = io { source.untrustRecipient(account, address) }
     override suspend fun resolveRecipient(account: AccountId, address: String): Outcome<Recipient> = io { source.resolveRecipient(account, address) }
     override suspend fun sendDraft(account: AccountId, id: DraftId): Outcome<Unit> = io(account, save = true) {
+        if (this.account(account).draftRejections[id.value].orEmpty().isNotEmpty()) {
+            return@io Outcome.Failed(Failure.Protocol(409, "Rejected recipient fingerprint"))
+        }
         val result = source.sendDraft(account, id)
         if (result is Outcome.Success) {
             val state = this.account(account)

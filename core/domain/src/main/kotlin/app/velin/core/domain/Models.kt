@@ -66,7 +66,9 @@ data class Conversation(val id: ConversationId, val subject: String, val labels:
 data class Draft(val id: DraftId?, val sender: SenderAlias, val to: List<Recipient>,
     val cc: List<Recipient>, val bcc: List<Recipient>, val subject: String, val plainText: String,
     val confidential: Boolean, val attachments: List<Attachment>, val scheduledSendAt: Instant?,
-    val htmlBody: String? = null, val response: DraftResponse? = null)
+    val htmlBody: String? = null, val response: DraftResponse? = null,
+    /** Local-only fingerprint rejections. Never sent to the mail server. */
+    val rejectedRecipients: Set<String> = emptySet())
 enum class ResponseKind { Reply, ReplyAll, Forward }
 /** The mail a new draft answers. The server threads the draft into its conversation when it is created. */
 data class DraftResponse(val previous: MailId, val kind: ResponseKind)
@@ -78,6 +80,8 @@ enum class UnsupportedReason { Unspecified, ScheduledSend, NonConfidentialSend, 
 enum class SendBlockReason { RecipientNotFound, KeyMismatch }
 sealed interface Failure {
     data object Offline : Failure
+    /** The server saved the draft, but its local send block could not be saved. Retry with this ID. */
+    data class DraftPersistence(val id: DraftId) : Failure
     data object Unauthorized : Failure
     data object Decryption : Failure
     data object InvalidSoftwareVersion : Failure
