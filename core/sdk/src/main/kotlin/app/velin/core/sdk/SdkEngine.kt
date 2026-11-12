@@ -18,7 +18,7 @@ class SessionCredentials internal constructor(internal val login: String, intern
     }
 }
 enum class SdkFailure { InvalidAccessToken, InvalidPassphrase, InvalidKey, Network, Tls,
-    InvalidSoftwareVersion, TooManyAttempts, Protocol, Internal, SecureExternalUnsupported, AttachmentsUnsupported, DraftUnsupported, RecipientRateLimited, RecipientInvalidKey, SendUnsupported, SendBlocked, IdentityTrustStorage }
+    InvalidSoftwareVersion, NotFound, TooManyAttempts, Protocol, Internal, SecureExternalUnsupported, AttachmentsUnsupported, DraftUnsupported, RecipientRateLimited, RecipientInvalidKey, SendUnsupported, SendBlocked, IdentityTrustStorage }
 class SdkException(val failure: SdkFailure, val diagnostic: String? = null,
     val reason: Int? = null, val recipientIndices: List<Int> = emptyList()) : Exception(
     listOfNotNull(failure.name, diagnostic).joinToString(": "))
@@ -87,6 +87,7 @@ internal fun mapApiFailure(error: ApiCallException): SdkFailure = when (error) {
         HttpError.InvalidSoftwareVersionError -> SdkFailure.InvalidSoftwareVersion
         is HttpError.TooManyRequestsError -> SdkFailure.TooManyAttempts
         HttpError.NotAuthenticatedError, HttpError.SessionExpiredError -> SdkFailure.InvalidAccessToken
+        HttpError.NotFoundError -> SdkFailure.NotFound
         else -> SdkFailure.Protocol
     }
     is ApiCallException.VelinSecureExternalUnsupported -> SdkFailure.SecureExternalUnsupported

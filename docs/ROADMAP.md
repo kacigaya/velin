@@ -10,7 +10,7 @@ Each milestone is small and can be tested alone. A milestone is complete when it
 | M1 | Native core: Rust SDK AAR builds for arm64 and x86_64, `:core:sdk` adapter, REST transport with `cv`/`v` headers | Backend | done | AAR builds from a pinned upstream commit with checksums. Adapter unit tests pass. |
 | M2 | Sign-in: salt, Argon2id and bcrypt KDF, session creation, TOTP, Keystore credential storage, session resume | Backend, then UI wiring | done, verified live and on a device 2026-11-08 | Upstream KDF test vectors pass. Live sign-in with a test account. |
 | M3 | Read path: folders, mail list paging, decryption, mail body, HTML sanitizer, attachment download | Backend, then UI wiring | in progress: folders, labels, inbox paging and received mail bodies verified live 2026-11-08; attachments and unread counters not yet verified live | Live list and body load. Sanitizer tests pass. |
-| M4 | Sync and offline: event bus WebSocket, Room with SQLCipher, durable cursors | Backend | planned | Offline cold start shows saved mail. Missed events replay after reconnect. |
+| M4 | Sync and offline: event bus WebSocket, encrypted offline store, durable cursors | Backend | done, verified live on a device 2026-11-12: offline cold start shows saved mail, and a move from a second client replays after reconnect (see [M4-SYNC.md](backend/M4-SYNC.md)) | Offline cold start shows saved mail. Missed events replay after reconnect. |
 | M5 | Mail actions: read state, move, archive, trash, labels, spam report | Backend, then UI wiring | in progress: read state, moves with undo and labels verified live 2026-11-08; permanent delete built, not tested live; spam/phishing reports not implemented | Actions reflect on the server and in a second client. |
 | M6 | Compose and send: drafts, attachment upload, internal confidential, external non-confidential, scheduled send | Backend, then UI wiring | in progress: sender aliases and drafts done; draft create, update in place, reload and discard to Trash verified live 2026-11-09; recipient lookup with key trust and confidential send to a Tuta address verified live 2026-11-09 (self-send); external send, attachments, reply/forward and scheduled send not implemented | Mail arrives at a Tuta and a non-Tuta address. Drafts survive process death. |
 | M7 | Notifications: SSE service, notification UI, quick actions | Backend, then UI | planned | New mail notifies with the app in the background. |
@@ -54,7 +54,7 @@ Source status comes from research §6. "UI" shows the Velin screen state.
 | Search | Port from TS (local index) | planned |
 | Contact suggestions | Port from TS | suggestion list done |
 | Notifications | Native reuse | planned |
-| Offline mode | New Room schema | offline banner done |
+| Offline mode | Encrypted file store and event replay, verified live | offline banner done, wired |
 | Inbox rules | Port from TS | planned |
 | Aliases and signatures | Port from TS | sender picker done |
 | Settings | Port from TS | planned |

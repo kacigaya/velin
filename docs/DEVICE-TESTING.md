@@ -48,6 +48,17 @@ adb -s 127.0.0.1:5555 shell am start -n app.velin/.MainActivity
 - Dark mode: `adb shell cmd uimode night yes`.
 - Tablet layout: `adb shell wm size 2560x1600` and `adb shell wm density 320`. Undo with `wm size reset` and `wm density reset`.
 
+## Test offline mode
+
+Block the network for Velin only. `adb` keeps working. The container has no IPv6 filter table, so this blocks IPv4 only.
+
+```sh
+UID_APP=$(adb shell pm list packages -U app.velin | grep -oE 'uid:[0-9]+' | cut -d: -f2)
+sudo docker exec velin-android iptables -I OUTPUT -m owner --uid-owner "$UID_APP" -j REJECT
+```
+
+To restore the network, run the same command with `-D` in place of `-I`.
+
 ## Stop
 
 ```sh

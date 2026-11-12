@@ -73,15 +73,15 @@ internal class EncryptedCredentialStore(file: File, private val key: () -> Secre
 }
 
 internal object CredentialCipher {
-    private val aad = "velin.credentials.v1".toByteArray()
-    fun encrypt(key: SecretKey, plaintext: ByteArray): ByteArray {
+    private val credentials = "velin.credentials.v1".toByteArray()
+    fun encrypt(key: SecretKey, plaintext: ByteArray, aad: ByteArray = credentials): ByteArray {
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.ENCRYPT_MODE, key)
         require(cipher.iv.size == 12)
         cipher.updateAAD(aad)
         return byteArrayOf(1) + cipher.iv + cipher.doFinal(plaintext)
     }
-    fun decrypt(key: SecretKey, encrypted: ByteArray): ByteArray {
+    fun decrypt(key: SecretKey, encrypted: ByteArray, aad: ByteArray = credentials): ByteArray {
         require(encrypted.size >= 29 && encrypted[0] == 1.toByte())
         val cipher = Cipher.getInstance("AES/GCM/NoPadding")
         cipher.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, encrypted.copyOfRange(1, 13)))
@@ -93,8 +93,10 @@ internal object CredentialCipher {
 // Same boundary as tutashared AndroidKeyStoreFacade.kt: a non-exportable key encrypts local credentials.
 // GPLv3 upstream idea reused; AES-GCM here replaces its CBC wrapper and requires no user authentication.
 internal object AndroidCredentialKey {
-    @Synchronized fun get(): SecretKey {
-        val alias = "app.velin.credentials.v1"
+    fun get(): SecretKey = key("app.velin.credentials.v1")
+    /** A separate key, so offline mail and credentials never share key material. */
+    fun offline(): SecretKey = key("app.velin.offline.v1")
+    @Synchronized private fun key(alias: String): SecretKey {
         val store = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         (store.getKey(alias, null) as? SecretKey)?.let { return it }
         return KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore").apply {

@@ -24,7 +24,7 @@ The official Android app is a WebView shell around the TypeScript client. Its na
 | `:core:domain` | Backend | Domain models and repository interfaces. Pure Kotlin. |
 | `:core:sdk` | Backend | Pinned Rust SDK AAR, Velin binding extensions, typed adapter. |
 | `:core:network` | Backend | HTTP, required headers, WebSocket event bus, protocol errors. |
-| `:core:database` | Backend | Room with SQLCipher, per-account keys, sync cursors. |
+| `:core:database` | Backend | Planned for M8: SQLCipher with a search index. Until then, `:core:data` keeps one encrypted file per account with sync cursors ([M4-SYNC.md](backend/M4-SYNC.md)). |
 | `:core:data` | Backend | Repository implementations, mail workflows, offline reconciliation, search. |
 | `:core:notifications` | Backend | SSE connection, background lifecycle, notification data. |
 
@@ -56,7 +56,7 @@ HTML sanitizing belongs to the data layer. Upstream uses DOMPurify in TypeScript
 ## Security rules
 
 - Never weaken the end-to-end encryption model to simplify code.
-- Keep credentials and database keys in Android Keystore-protected storage. Keep no clear keys in Room entities.
+- Keep credentials and database keys in Android Keystore-protected storage. Keep no clear keys in the offline store.
 - Exclude all app data from cloud backup and device transfer (`data_extraction_rules.xml`).
 - Report decryption and authentication failures as typed results. Never show an empty body instead.
 - Send the upstream client version (`cv`) and model version (`v`). Do not replace them with Velin's version.

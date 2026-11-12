@@ -16,6 +16,8 @@ interface MailReadSource {
     suspend fun setLabels(account: AccountId, ids: List<MailId>, labels: List<LabelId>): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)
     suspend fun currentFolders(account: AccountId, ids: List<MailId>): Outcome<Map<MailId, FolderId>> = Outcome.Failed(Failure.Unsupported)
     suspend fun delete(account: AccountId, ids: List<MailId>): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)
+    /** A null value means the server no longer has that mail. */
+    suspend fun locate(account: AccountId, ids: List<MailId>): Outcome<Map<MailId, LocatedMail?>> = Outcome.Failed(Failure.Unsupported)
     suspend fun mailbox(account: AccountId): Outcome<MailboxSnapshot>
     suspend fun page(account: AccountId, folder: FolderId, cursor: PageCursor?): Outcome<MailPage>
     suspend fun conversation(account: AccountId, id: ConversationId): Outcome<List<MailSummary>>
@@ -23,5 +25,8 @@ interface MailReadSource {
     suspend fun body(account: AccountId, id: MailId): Outcome<String>
     suspend fun attachment(account: AccountId, id: AttachmentId): Outcome<AttachmentContent>
 }
-data class MailboxSnapshot(val folders: List<Folder>, val labels: List<Label>, val senders: List<SenderAlias>)
+/** [entryLists] maps the MailSetEntry list of each folder and label to that mail set. */
+data class MailboxSnapshot(val folders: List<Folder>, val labels: List<Label>, val senders: List<SenderAlias>,
+    val entryLists: Map<String, EntityId> = emptyMap())
+data class LocatedMail(val summary: MailSummary, val folder: FolderId?)
 data class AttachmentContent(val metadata: Attachment, val bytes: ByteArray)

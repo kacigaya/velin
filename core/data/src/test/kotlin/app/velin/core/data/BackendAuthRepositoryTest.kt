@@ -39,6 +39,9 @@ class BackendAuthRepositoryTest {
         var beforeTotp: suspend () -> Unit = {}
         var beforeLoad: suspend () -> Unit = {}
         var loadError: Exception? = null
+        var savedMail = false
+        val forgotten = mutableListOf<AccountId>()
+        val retry = ChannelGate()
         val transport = BinaryTransport { request ->
             requests += request
             if (request.url.endsWith("sessionservice")) beforeCreate()
@@ -61,7 +64,8 @@ class BackendAuthRepositoryTest {
         val repo = BackendAuthRepository(AuthService("https://example.invalid", transport), store,
             SessionLoader { beforeLoad(); loadError?.let { throw it }; loaded++; AutoCloseable { closed++ } }, scope,
             derive = { password, _, algorithm -> selected = algorithm; password.fill('\u0000'); ByteArray(if (algorithm == KdfAlgorithm.Bcrypt128) 16 else 32) },
-            pollDelay = { poll.waitNext() })
+            pollDelay = { poll.waitNext() }, hasSavedMail = { savedMail }, forgetSavedMail = { forgotten += it },
+            retryDelay = { retry.waitNext() })
         suspend fun login(): CharArray = "secret".toCharArray().also { repo.signIn("  A@EXAMPLE.INVALID ", it) }
         fun close() { scope.cancel() }
     }
@@ -191,6 +195,30 @@ class BackendAuthRepositoryTest {
             assertTrue(revoke.url.contains("/rest/sys/Session/O0yKEOU-1B-0/jlv3AEmnv8rvtZe38u2dk-U1kzxpkMXWNusNz-NhnMI"))
             f.login(); assertEquals(Outcome.Success(Unit), f.repo.removeSavedAccount(account))
             assertTrue(f.store.all().isEmpty())
+        } finally { f.close() }
+    }
+    @Test fun offlineResumeOpensSavedMailUntilSessionLoads() = runBlocking {
+        val f = Fixture()
+        try {
+            f.login()
+            val account = (f.repo.state.value as AuthState.Active).account.id
+            f.loadError = SdkException(SdkFailure.Network)
+            f.repo.resume(account)
+            assertEquals(AuthError.Offline, (f.repo.state.value as AuthState.Credentials).error)
+            f.savedMail = true
+            f.repo.resume(account)
+            assertEquals(account, (f.repo.state.value as AuthState.Active).account.id)
+            assertEquals(Outcome.Failed(Failure.Offline), f.repo.read(account) { Outcome.Success(Unit) })
+            f.retry.advance()
+            assertTrue(f.repo.state.value is AuthState.Active)
+            assertEquals(1, f.loaded)
+            f.loadError = null
+            f.retry.advance()
+            assertEquals(2, f.loaded)
+            assertEquals(account, (f.repo.state.value as AuthState.Active).account.id)
+            assertTrue(f.forgotten.isEmpty())
+            assertEquals(Outcome.Success(Unit), f.repo.signOut(account))
+            assertEquals(listOf(account), f.forgotten)
         } finally { f.close() }
     }
     @Test fun cancelledCreateResponseCannotBecomeActive() = runBlocking {

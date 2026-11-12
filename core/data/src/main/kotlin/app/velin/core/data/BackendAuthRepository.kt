@@ -22,6 +22,11 @@ internal class BackendAuthRepository(
     private val scope: CoroutineScope,
     private val derive: (CharArray, ByteArray, KdfAlgorithm) -> ByteArray = KeyDerivation::derive,
     private val pollDelay: suspend () -> Unit = { delay(1_000) },
+    /** True when saved mail for the account can open without a session. */
+    private val hasSavedMail: (AccountId) -> Boolean = { false },
+    /** Deletes saved mail after the account is removed from this device. */
+    private val forgetSavedMail: suspend (AccountId) -> Unit = {},
+    private val retryDelay: suspend (Long) -> Unit = { delay(it) },
 ) : AuthRepository, SessionReadAccess {
     private val mutableState = MutableStateFlow<AuthState>(AuthState.Credentials(emptyList(), busy = true))
     override val state: StateFlow<AuthState> = mutableState.asStateFlow()
@@ -36,7 +41,9 @@ internal class BackendAuthRepository(
     override suspend fun <T> read(account: AccountId, operation: suspend (SdkMailReader) -> Outcome<T>): Outcome<T> = mutex.withLock {
         val active = mutableState.value as? AuthState.Active
         val loaded = session as? ActiveSdkSession
-        if (active?.account?.id != account || loaded == null) Outcome.Failed(Failure.Unauthorized)
+        if (active?.account?.id != account) Outcome.Failed(Failure.Unauthorized)
+        // Active without a session: saved mail opened offline, and the session still loads.
+        else if (loaded == null) Outcome.Failed(Failure.Offline)
         else operation(loaded.mail)
     }
 
@@ -214,21 +221,50 @@ internal class BackendAuthRepository(
     }
     override suspend fun resume(account: AccountId) = withContext(Dispatchers.IO) {
         val ticket = begin()
+        var saved: SavedCredentials? = null
         try {
             val c = mutex.withLock {
                 if (generation != ticket) return@withContext
                 resuming = account
                 store.all().first { it.user == account.value.value }
             }
+            saved = c
             activate(ticket, c)
         } catch (e: CancellationException) { withContext(NonCancellable) { abandon(ticket, null) }; throw e
         } catch (e: Exception) {
             mutex.withLock { if (generation == ticket) {
+                val c = saved
                 if (e is SdkException && e.failure == SdkFailure.InvalidAccessToken) mutableState.value = AuthState.Expired(account)
+                else if (c != null && authError(e) == AuthError.Offline && hasSavedMail(account)) {
+                    mutableState.value = AuthState.Active(account(c))
+                    retryResume(ticket, c)
+                }
                 else credentialsError(authError(e))
             } }
         }
     }
+    /** Keeps the offline account active and loads its session when the network returns. */
+    private fun retryResume(ticket: Long, c: SavedCredentials) {
+        polling = scope.launch {
+            var wait = 2_000L
+            while (isActive) {
+                retryDelay(wait)
+                try { activate(ticket, c); return@launch }
+                catch (e: CancellationException) { throw e }
+                catch (e: Exception) {
+                    if (authError(e) == AuthError.Offline) { wait = (wait * 2).coerceAtMost(60_000); continue }
+                    mutex.withLock { if (generation == ticket) {
+                        polling = null
+                        reset()
+                        if (e is SdkException && e.failure == SdkFailure.InvalidAccessToken) mutableState.value = AuthState.Expired(account(c).id)
+                        else credentialsError(authError(e))
+                    } }
+                    return@launch
+                }
+            }
+        }
+    }
+    // Saved mail is deleted outside the lock: reads hold their own lock while they call read().
     override suspend fun removeSavedAccount(account: AccountId): Outcome<Unit> = withContext(Dispatchers.IO) {
         mutex.withLock {
             try {
@@ -237,7 +273,7 @@ internal class BackendAuthRepository(
                 if (mutableState.value !is AuthState.Active && pending == null) credentials()
                 Outcome.Success(Unit)
             } catch (_: Exception) { Outcome.Failed(Failure.Decryption) }
-        }
+        }.also { if (it is Outcome.Success) forgetSavedMail(account) }
     }
     override suspend fun signOut(account: AccountId): Outcome<Unit> = withContext(Dispatchers.IO) {
         // Keep credentials on network failure so the user can retry server revocation.
@@ -255,7 +291,7 @@ internal class BackendAuthRepository(
                 AuthError.InvalidSoftwareVersion -> Failure.InvalidSoftwareVersion
                 else -> Failure.Protocol(0)
             }) }
-        }
+        }.also { if (it is Outcome.Success) forgetSavedMail(account) }
     }
 }
 internal fun authError(e: Exception, code: Boolean = false): AuthError = when (e) {
@@ -275,14 +311,14 @@ internal fun authError(e: Exception, code: Boolean = false): AuthError = when (e
 }
 
 internal class ActiveSdkSession(val session: SdkSession, private val engine: SdkEngine,
-    private val counters: app.velin.core.network.CounterEvents? = null,
-    private val counterJob: Job? = null) : AutoCloseable {
+    private val events: app.velin.core.network.EventBus? = null,
+    private val eventJob: Job? = null) : AutoCloseable {
     val mail: SdkMailReader = object : SdkMailReader by session.mail {
-        override suspend fun unread(folder: ReadFolder): Long = counters?.unread(folder.ownerGroup, folder.id.element) ?: 0
+        override suspend fun unread(folder: ReadFolder): Long = events?.unread(folder.ownerGroup, folder.id.element) ?: 0
     }
     override fun close() {
-        counterJob?.cancel()
-        counters?.close()
+        eventJob?.cancel()
+        events?.close()
         try { session.close() } finally { engine.close() }
     }
 }

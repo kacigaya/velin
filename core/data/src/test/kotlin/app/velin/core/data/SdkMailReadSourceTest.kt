@@ -82,8 +82,10 @@ class SdkMailReadSourceTest {
         var conversationMails: List<ReadId> = emptyList()
         override suspend fun message(id: ReadId): ReadMessage = loadedMessage ?: throw SdkException(SdkFailure.InvalidKey)
         override suspend fun conversation(id: ReadId): List<ReadId> = conversationMails
+        var missing = emptySet<ReadId>()
         override suspend fun summary(id: ReadId): ReadSummary {
             summaryFailure?.let { throw SdkException(it) }
+            if (id in missing) throw SdkException(SdkFailure.NotFound)
             return ReadSummary(id, ReadId("conversations", id.element),
             "sender@example.invalid", "Sender", "Subject", if (id.element == "one") 1700000000000 else 1700000000001, true, false, true, 1,
             memberships[id] ?: membership)
@@ -97,6 +99,23 @@ class SdkMailReadSourceTest {
         listOf(Recipient(Address("to@example.invalid", "To"), RecipientType.Unknown)), emptyList(), emptyList(),
         "Subject", "a < b & c\nnext", true, emptyList(), null)
 
+    @Test fun locateReportsFolderAndDeletedMailAndMailboxMapsEntryLists() = runBlocking {
+        val gone = ReadId("mail", "gone")
+        val moved = ReadId("mail", "moved")
+        val reader = Reader().apply {
+            sets = listOf(inbox, child, label)
+            memberships = mapOf(moved to listOf(child.id, label.id))
+            missing = setOf(gone)
+        }
+        val located = (source(reader).locate(account, listOf(MailId(moved.domain()), MailId(gone.domain()))) as Outcome.Success).value
+        assertEquals(FolderId(child.id.domain()), located.getValue(MailId(moved.domain()))!!.folder)
+        assertEquals(listOf("Work"), located.getValue(MailId(moved.domain()))!!.summary.labels.map { it.name })
+        assertNull(located.getValue(MailId(gone.domain())))
+        reader.summaryFailure = SdkFailure.Network
+        assertEquals(Outcome.Failed(Failure.Offline), source(reader).locate(account, listOf(MailId(moved.domain()))))
+        val mailbox = (source(reader).mailbox(account) as Outcome.Success).value
+        assertEquals(mapOf("entries" to inbox.id.domain(), "childEntries" to child.id.domain(), "labels" to label.id.domain()), mailbox.entryLists)
+    }
     @Test fun repeatedSavesKeepReturnedDraftIdAndEscapePlainText() = runBlocking {
         val reader = Reader()
         val source = source(reader)

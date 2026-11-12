@@ -127,7 +127,18 @@ internal class SdkMailReadSource(private val sessions: SessionReadAccess) : Mail
             Folder(FolderId(it.id.domain()), it.name, folderKind(it.kind), unreadOrZero(sdk, it),
                 it.parent?.let { p -> FolderId(p.domain()) })
         }
-        MailboxSnapshot(folders, labels, sdk.senders().map { SenderAlias(it.address(), enabled = true) })
+        MailboxSnapshot(folders, labels, sdk.senders().map { SenderAlias(it.address(), enabled = true) },
+            sets.filter { it.kind != 7L }.associate { it.entries to it.id.domain() })
+    }
+    override suspend fun locate(account: AccountId, ids: List<MailId>): Outcome<Map<MailId, LocatedMail?>> = read(account) { sdk ->
+        val sets = sdk.folders()
+        val folders = sets.filter { it.kind != 7L && it.kind != 8L }
+        ids.distinct().associateWith { id ->
+            val mail = try { sdk.summary(id.value.readId()) }
+            catch (e: SdkException) { if (e.failure == SdkFailure.NotFound) return@associateWith null else throw e }
+            require(mail.id == id.value.readId())
+            LocatedMail(summary(mail, sets), folders.singleOrNull { it.id in mail.sets }?.let { FolderId(it.id.domain()) })
+        }
     }
     /**
      * Upstream receives unread counts over the event bus (WebsocketCounterData, MailModel.ts:455-478),
@@ -204,6 +215,7 @@ internal class SdkMailReadSource(private val sessions: SessionReadAccess) : Mail
                 SdkFailure.RecipientRateLimited -> Failure.RecipientResolution(RecipientResolutionReason.RateLimited)
                 SdkFailure.RecipientInvalidKey -> Failure.RecipientResolution(RecipientResolutionReason.InvalidKeyData)
                 SdkFailure.Network -> Failure.Offline
+                SdkFailure.NotFound -> Failure.Protocol(404)
                 SdkFailure.InvalidAccessToken -> Failure.Unauthorized
                 SdkFailure.InvalidSoftwareVersion -> Failure.InvalidSoftwareVersion
                 SdkFailure.InvalidKey -> Failure.Decryption

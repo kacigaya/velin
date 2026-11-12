@@ -45,7 +45,7 @@ It uses a native Android interface with gesture navigation, adaptive layouts for
 - **Native cryptographic core:** Pinned upstream Rust SDK compiled to native shared libraries (`arm64-v8a` and `x86_64`) with UniFFI Kotlin bindings for entity cryptography and key derivation.
 - **Tuta end-to-end encryption:** Unaltered cryptographic model. Argon2id and bcrypt KDF, TOTP/2FA support, and session keys protected by Android Keystore (AES-GCM).
 - **Privacy-first HTML email rendering:** Strict HTML sanitization powered by jsoup. Strips executable scripts, dangerous tags, and external CSS. Remote tracking pixels and external images are blocked by default until explicit per-view consent.
-- **Offline-ready architecture:** Decoupled repository layer with Room and SQLCipher for local encrypted caching.
+- **Offline-ready architecture:** Saved mail is encrypted with a Keystore key. Event replay keeps it current after a reconnect.
 - **No tracking:** No analytics, crash telemetry, or third-party network pings.
 
 ## Status
@@ -58,7 +58,7 @@ The project is under active development across sequential milestones. See [docs/
 | **M1** | Native Rust SDK AAR build (`arm64-v8a`, `x86_64`), `:core:sdk` adapter, REST transport | **Done** |
 | **M2** | Authentication: Argon2id/bcrypt KDF, session lifecycle, Keystore credential storage, TOTP | **Done** (live check pending) |
 | **M3** | Read path: mailbox folders, message list paging, decryption pipeline, HTML sanitizer, inline images | **In progress** (pipeline, sanitizer & UI done) |
-| **M4** | Sync & offline: WebSocket event bus, Room + SQLCipher local store, durable sync cursors | Planned |
+| **M4** | Sync & offline: WebSocket event bus, encrypted local store, durable sync cursors | **Done** |
 | **M5** | Mail actions: read state, archive, move, trash, labels, spam reporting | Planned |
 | **M6** | Compose & send: drafts, attachment encryption/upload, internal confidential and external mail | Planned |
 | **M7** | Background sync: SSE push notifications, quick actions, background lifecycle | Planned |
@@ -109,7 +109,7 @@ Velin combines the upstream Rust core with a native Android interface:
 | [`:core:network`](core/network/) | HTTP engine, required headers (`cv`/`v`), session interceptors, SSE connection |
 | [`:feature:auth`](feature/auth/) | Sign-in screen, two-factor authentication (TOTP), saved account selection |
 | [`:feature:mail`](feature/mail/) | Mailbox list, folder drawer, conversation view, plain-text composer |
-| `:core:database` *(planned)* | Room with SQLCipher, per-account encrypted key storage, sync cursors |
+| `:core:database` *(planned)* | SQLCipher store with a search index (M8) |
 | `:core:notifications` *(planned)* | SSE notification listener, background worker, system notification channels |
 
 ## Develop
