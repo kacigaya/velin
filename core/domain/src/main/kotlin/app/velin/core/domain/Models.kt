@@ -52,7 +52,8 @@ sealed interface BodyState {
 }
 // Upstream src/platform-kit/app-env/TutanotaConstants.ts:375 defines the wire status.
 enum class MailAuthentication { Authenticated, HardFail, SoftFail, InvalidMailFrom, MissingMailFrom, Unknown }
-enum class MailFinding { Phishing, AuthenticationFailed, AuthenticationUncertain, DeprecatedSenderKey }
+/** [SenderKeyMismatch]: the TutaCrypt sender key failed the check against the pinned identity. */
+enum class MailFinding { Phishing, SenderKeyMismatch, AuthenticationFailed, AuthenticationUncertain, DeprecatedSenderKey }
 data class MailMessage(val id: MailId, val from: Address, val to: List<Address>,
     val cc: List<Address>, val bcc: List<Address>, val replyTo: List<Address>,
     val subject: String, val sentAt: Instant, val confidential: Boolean, val unread: Boolean,

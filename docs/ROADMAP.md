@@ -17,10 +17,29 @@ Each milestone is small and can be tested alone. A milestone is complete when it
 | M8 | Search, contact suggestions, settings (signatures, aliases, inbox rules), multi-account | Both | planned | Feature parity rows below are checked. |
 | M9 | Hardening: security review, performance, accessibility audit, parity review against the official app | Both | planned | No open high-severity findings. |
 
+## Release plan to v1.0.0
+
+v1.0.0 means: you can use Velin every day in place of the official Tuta Android app for normal mail. It shows sender and recipient trust correctly. It has no open high-severity findings.
+
+| Release | Theme | Scope | Exit check |
+|---|---|---|---|
+| 0.5.0-alpha | Trust and finish reading | Check the sender key of received TutaCrypt mail against the pinned identity, as upstream does, and warn when the check fails. Velin shows no "verified" mark, so a trust-on-first-use result is not over-trusted. Screen to check a recipient's key by hand. Spam and phishing reports. Encrypted entity update in Rust, then the replied and forwarded state. Live check of unread counters. | M3 and M5 done. A mail with a mismatched sender key shows a warning. |
+| 0.6.0-alpha | Attachments out | Encrypted attachment upload. Attach files in compose. Forward with the original files. Inline images in quotes. | A file sent from Velin opens in the official client. |
+| 0.7.0-alpha | Mail to everyone | Send to external addresses without and with a password (port from TS). Scheduled send and undo send. | M6 done. Mail arrives at a Tuta and a non-Tuta address. |
+| 0.8.0-beta | Notifications | Background push service, new-mail notifications, quick actions. Releases are beta from here: Velin is usable every day. | M7 done. New mail notifies with the app in the background. |
+| 0.9.0-beta | Search and contacts | Replace the encrypted file store with SQLCipher and migrate saved data. Local search index. Contact suggestions. SQLCipher is a new production dependency and needs owner approval. | Search finds mail offline. An update from 0.8 keeps saved mail. |
+| 0.10.0-beta | Settings and accounts | Signatures, alias and sender names, inbox rules, multi-account. | M8 done. All feature parity rows are checked. |
+| 1.0.0-rc.1 | Hardening | External security review, performance and battery check, accessibility audit, parity review. Updates tested from every earlier release. A written process to follow upstream client versions (HTTP 474). | M9 done. No open high-severity findings. |
+| 1.0.0 | Release | Fixes from the rc phase only. | The rc ran for two weeks or more with no new high-severity bug. |
+
+Order: trust comes before new features. Upload comes before external send, because external mail with files uses it. The store migration gets its own release because it has the highest risk of data loss.
+
+Out of scope for 1.0: security key sign-in (blocked upstream, see risk 4) and rich-text editing (risk 8). Every release checks the SDK pin, the dependency advisories and a live device pass before the tag.
+
 ## Blockers and risks
 
 1. **Live checks.** The owner provided a test account. Sign-in, session revoke, folders, labels, inbox paging and received mail bodies work against production. The signed v0.1.0-alpha release APK signs in and runs on a real device. On 2026-11-09 the debug APK passed a full pass on Android 15 in a container (phone and tablet layouts): sign-in, session resume, read, unread, archive with undo, labels, drafts and confidential send to a Tuta address. See [DEVICE-TESTING.md](DEVICE-TESTING.md). Pin Velin to a published Tuta release, never master: master can be ahead of the deployed models and the server then rejects requests with HTTP 400.
-2. **Rust SDK gaps.** `create_session` is not production ready. bcrypt key derivation panics. The mail bucket-key path has no sender authentication. External confidential mail is unimplemented in Rust. Velin must fix or port these before it claims authenticated reading or external confidential sending.
+2. **Rust SDK gaps.** `create_session` is not production ready. bcrypt key derivation panics. The release SDK authenticates a TutaCrypt sender only against the server's key. Velin's overlay also checks that key against the pinned identity (2026-11-12). External confidential mail is unimplemented in Rust. Velin must fix or port these before it claims authenticated reading or external confidential sending.
 3. **Native build on aarch64.** Solved: host clang and lld build the SDK against NDK sysroots (`tools/backend/build-sdk.sh`). The APK ships arm64-v8a and x86_64 only.
 4. **Security keys (WebAuthn/U2F).** Upstream uses a browser callback bound to its own app. Server acceptance of Velin's package is unverified. Hardware-key-only accounts can be blocked.
 5. **Client version enforcement.** The server rejects old clients with HTTP 474. The policy for a third-party client is unverified. Velin must track upstream versions (see research §7).

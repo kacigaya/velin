@@ -435,6 +435,9 @@ private fun MailBanner(banner: MailBannerUi, messageId: String, onEvent: (Conver
         MailBannerUi.AuthenticationUncertain -> Spec(
             VelinIcons.Warning, stringResource(R.string.banner_auth_uncertain), colors.tertiaryContainer, colors.onTertiaryContainer, null,
         )
+        MailBannerUi.SenderKeyMismatch -> Spec(
+            VelinIcons.Key, stringResource(R.string.banner_sender_key_mismatch), colors.errorContainer, colors.onErrorContainer, null,
+        )
         MailBannerUi.DeprecatedSenderKey -> Spec(
             VelinIcons.Key, stringResource(R.string.banner_deprecated_key), colors.tertiaryContainer, colors.onTertiaryContainer, null,
         )

@@ -62,16 +62,18 @@ interface SdkMailReader {
 }
 
 internal class NativeMailReader(private val facade: MailFacade, private val trust: SdkIdentityTrustStore? = null) : SdkMailReader, AutoCloseable {
-    init {
-        if (trust != null) facade.velinSetIdentityTrustStore(object : VelinIdentityTrustStore {
+    /** One store for recipient lookup and for the sender check of received mail. */
+    val nativeTrust: VelinIdentityTrustStore? = trust?.let { store ->
+        object : VelinIdentityTrustStore {
             private fun TrustedIdentity.native() = VelinTrustedIdentity(key, version, manual)
-            override suspend fun load(address: String): VelinTrustedIdentity? = try { trust.load(address)?.native() }
+            override suspend fun load(address: String): VelinTrustedIdentity? = try { store.load(address)?.native() }
             catch (_: SdkException) { throw ApiCallException.InternalSdkException("Identity trust storage failed") }
             override suspend fun trustOnFirstUse(address: String, identity: VelinTrustedIdentity): VelinTrustedIdentity = try {
-                trust.trustOnFirstUse(address, TrustedIdentity(identity.key, identity.version, identity.manual)).native()
+                store.trustOnFirstUse(address, TrustedIdentity(identity.key, identity.version, identity.manual)).native()
             } catch (_: SdkException) { throw ApiCallException.InternalSdkException("Identity trust storage failed") }
-        })
+        }
     }
+    init { nativeTrust?.let(facade::velinSetIdentityTrustStore) }
     private fun TrustedIdentity.fingerprint(): String {
         require(key.size == 32 && version in 0..255)
         return java.security.MessageDigest.getInstance("SHA-256").digest(byteArrayOf(version.toByte(), 0) + key)

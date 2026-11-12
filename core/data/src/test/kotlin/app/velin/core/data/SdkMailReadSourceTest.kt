@@ -246,6 +246,17 @@ class SdkMailReadSourceTest {
         assertTrue(draft.isDraft)
         assertEquals(MailFinding.DeprecatedSenderKey, draft.finding)
     }
+    @Test fun failedSenderKeyCheckWarnsOnlyForConfidentialMail() = runBlocking {
+        val id = ReadId("mails", "one")
+        val reader = Reader().apply { loadedMessage = readMessage(id).copy(confidential = true, encryptionAuth = 2, mailAuthStatus = 1) }
+        suspend fun finding() = (source(reader).message(account, MailId(id.domain())) as Outcome.Success).value.finding
+        // A forged TutaCrypt sender outranks a failed SPF or DKIM check.
+        assertEquals(MailFinding.SenderKeyMismatch, finding())
+        reader.loadedMessage = readMessage(id).copy(confidential = true, encryptionAuth = 1)
+        assertEquals(null, finding())
+        reader.loadedMessage = readMessage(id).copy(confidential = false, encryptionAuth = 2)
+        assertEquals(null, finding())
+    }
     @Test fun onlyRealSignalsProduceFindings() = runBlocking {
         val id = ReadId("mails", "one")
         val reader = Reader()
@@ -266,6 +277,17 @@ class SdkMailReadSourceTest {
         assertEquals(listOf("one", "two"), result.value.map { it.id.value.element.value })
         assertTrue(result.value.all { it.conversationId == id })
         assertEquals(Outcome.Failed(Failure.Unauthorized), source(reader, false).conversation(account, id))
+    }
+    @Test fun conversationLeavesOutDeletedMailAndFailsOnlyWhenNoneIsLeft() = runBlocking {
+        val gone = ReadId("mails", "two")
+        val reader = Reader().apply { conversationMails = listOf(ReadId("mails", "one"), gone); missing = setOf(gone) }
+        val id = ConversationId(ReadId("conversation", "entry").domain())
+        assertEquals(listOf("one"), (source(reader).conversation(account, id) as Outcome.Success).value.map { it.id.value.element.value })
+        reader.missing = setOf(gone, ReadId("mails", "one"))
+        assertEquals(Outcome.Failed(Failure.Protocol(404)), source(reader).conversation(account, id))
+        reader.missing = emptySet()
+        reader.summaryFailure = SdkFailure.Network
+        assertEquals(Outcome.Failed(Failure.Offline), source(reader).conversation(account, id))
     }
     @Test fun attachmentsPreserveMetadataAndDoNotBlockBody() = runBlocking {
         val id = ReadId("mails", "one")

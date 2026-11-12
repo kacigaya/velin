@@ -73,6 +73,7 @@ class SdkEngine(baseUrl: String, transport: BinaryTransport, store: SdkContentSt
 
 class SdkSession internal constructor(private val delegate: LoggedInSdk, trust: SdkIdentityTrustStore? = null) : AutoCloseable {
     private val reader = NativeMailReader(delegate.mailFacade(), trust)
+    init { reader.nativeTrust?.let(delegate::velinSetSenderTrustStore) }
     val mail: SdkMailReader get() = reader
     override fun close() { try { reader.close() } finally { delegate.close() } }
 }

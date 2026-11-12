@@ -20,6 +20,7 @@ python3 "$root/tools/backend/overlay/compose-source.py" "$out/source"
 python3 "$root/tools/backend/overlay/session-source.py" "$out/source"
 python3 "$root/tools/backend/overlay/draft_source.py" "$out/source"
 python3 "$root/tools/backend/overlay/recipient_source.py" "$out/source"
+python3 "$root/tools/backend/overlay/sender_source.py" "$out/source"
 if [[ ! -f "$out/ndk.zip" ]]; then
   curl -fL --retry 3 https://dl.google.com/android/repository/android-ndk-r29-linux.zip -o "$out/ndk.zip"
 fi

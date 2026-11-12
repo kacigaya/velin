@@ -20,7 +20,7 @@ pub struct VelinRecipient {
     pub key_state: i64,
 }
 
-fn velin_public_key_message(key: &crate::entities::generated::sys::PublicKeyGetOut) -> Result<Vec<u8>, ApiCallError> {
+pub(crate) fn velin_public_key_message(key: &crate::entities::generated::sys::PublicKeyGetOut) -> Result<Vec<u8>, ApiCallError> {
     let invalid = || ApiCallError::VelinRecipientInvalidKey;
     let version = u8::try_from(key.pubKeyVersion).map_err(|_| invalid())?;
     let (kind, first, second): (u8, &[u8], &[u8]) = match (&key.pubRsaKey, &key.pubEccKey, &key.pubKyberKey) {
@@ -44,7 +44,7 @@ fn velin_public_key_message(key: &crate::entities::generated::sys::PublicKeyGetO
     Ok(message)
 }
 
-fn velin_verify_recipient_key(
+pub(crate) fn velin_verify_recipient_key(
     key: &crate::entities::generated::sys::PublicKeyGetOut,
     identity: Option<&crate::entities::generated::sys::IdentityKeyGetOut>,
 ) -> Result<i64, ApiCallError> {

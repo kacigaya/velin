@@ -160,8 +160,13 @@ internal class SdkMailReadSource(private val sessions: SessionReadAccess) : Mail
     }
     override suspend fun conversation(account: AccountId, id: ConversationId): Outcome<List<MailSummary>> = read(account) { sdk ->
         val sets = sdk.folders()
-        sdk.conversation(id.value.readId()).map { summary(sdk.summary(it), sets).copy(conversationId = id) }
-            .distinctBy { it.id }.sortedBy { it.receivedAt }
+        // ConversationViewModel.ts:276 uses loadMultiple, which leaves out mail deleted since. One
+        // permanently deleted reply must not make the whole conversation fail.
+        sdk.conversation(id.value.readId()).mapNotNull { mail ->
+            val read = try { sdk.summary(mail) }
+            catch (e: SdkException) { if (e.failure == SdkFailure.NotFound) return@mapNotNull null else throw e }
+            summary(read, sets).copy(conversationId = id)
+        }.distinctBy { it.id }.sortedBy { it.receivedAt }.ifEmpty { throw SdkException(SdkFailure.NotFound) }
     }
     override suspend fun message(account: AccountId, id: MailId): Outcome<MailMessage> = read(account) { sdk ->
         val mail = sdk.message(id.value.readId())
@@ -172,10 +177,12 @@ internal class SdkMailReadSource(private val sessions: SessionReadAccess) : Mail
             BodyState.Loading, mail.attachments.map { it.domainAttachment() }, MailAuthentication.Unknown,
             when {
                 mail.phishing == 1L -> MailFinding.Phishing
+                // EncryptionAuthStatus TUTACRYPT_AUTHENTICATION_FAILED. Upstream shows no banner for it.
+                // Velin warns, because the SDK checks the sender key against the pinned identity.
+                mail.confidential && mail.encryptionAuth == 2L -> MailFinding.SenderKeyMismatch
                 mail.mailAuthStatus in listOf(1L, 3L, 4L) -> MailFinding.AuthenticationFailed
                 mail.encryptionAuth == 5L -> MailFinding.DeprecatedSenderKey
-                // MailViewerViewModel.ts:427-442: only SOFT_FAIL (2) is "uncertain". Missing sender-key
-                // verification is Velin's own gap, so it must not put a warning on every mail.
+                // MailViewerViewModel.ts:427-442: only SOFT_FAIL (2) is "uncertain".
                 mail.mailAuthStatus == 2L -> MailFinding.AuthenticationUncertain
                 else -> null
             }, mail.scheduledMillis?.let(Instant::ofEpochMilli), received = mail.state == MAIL_STATE_RECEIVED)

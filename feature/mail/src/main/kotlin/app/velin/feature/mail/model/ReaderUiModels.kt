@@ -33,6 +33,7 @@ sealed interface MailBannerUi {
     data object AuthenticationFailed : MailBannerUi
     data object AuthenticationUncertain : MailBannerUi
     data object DeprecatedSenderKey : MailBannerUi
+    data object SenderKeyMismatch : MailBannerUi
     data object ExternalContentBlocked : MailBannerUi
     data class ScheduledSend(val sendAt: Instant) : MailBannerUi
 }

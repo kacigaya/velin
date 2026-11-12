@@ -82,6 +82,7 @@ internal fun MailMessage.toUi(): MessageUi {
             MailFinding.AuthenticationFailed -> add(MailBannerUi.AuthenticationFailed)
             MailFinding.AuthenticationUncertain -> add(MailBannerUi.AuthenticationUncertain)
             MailFinding.DeprecatedSenderKey -> add(MailBannerUi.DeprecatedSenderKey)
+            MailFinding.SenderKeyMismatch -> add(MailBannerUi.SenderKeyMismatch)
             null -> Unit
         }
         val loaded = body as? BodyState.Loaded
