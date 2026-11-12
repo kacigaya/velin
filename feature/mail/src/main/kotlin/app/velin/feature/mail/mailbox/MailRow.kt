@@ -54,6 +54,8 @@ data class MailRowActions(
     val onArchive: () -> Unit,
     val onTrash: () -> Unit,
     val onToggleRead: () -> Unit,
+    /** In Trash and Spam, [onTrash] deletes permanently after a confirmation. */
+    val trashDeletes: Boolean = false,
 )
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -71,7 +73,7 @@ fun MailRow(
     val container = if (selected) colors.secondaryContainer else Color.Transparent
     val description = mailDescription(mail)
     val archiveLabel = stringResource(R.string.action_archive)
-    val trashLabel = stringResource(R.string.action_trash)
+    val trashLabel = stringResource(if (actions.trashDeletes) R.string.action_delete_forever else R.string.action_trash)
     val readLabel = stringResource(if (mail.unread) R.string.action_mark_read else R.string.action_mark_unread)
 
     Row(

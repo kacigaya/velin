@@ -118,6 +118,7 @@
     <!-- Actions -->
     <string name="action_archive">Archive</string>
     <string name="action_trash">Move to trash</string>
+    <string name="action_delete_forever">Delete permanently</string>
     <string name="action_delete">Delete</string>
     <string name="action_move">Move</string>
     <string name="action_label">Label</string>

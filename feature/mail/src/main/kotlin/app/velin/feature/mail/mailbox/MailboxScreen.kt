@@ -245,6 +245,7 @@ private fun SwipeableMailRow(
         onArchive = { onEvent(archiveEvent) },
         onTrash = { onEvent(MailboxEvent.Trash(ids)) },
         onToggleRead = { onEvent(MailboxEvent.SetUnread(ids, !mail.unread)) },
+        trashDeletes = folderKind == FolderKind.Trash || folderKind == FolderKind.Spam,
     )
     val swipeState = rememberSwipeToDismissBoxState()
     val scope = rememberCoroutineScope()
@@ -372,7 +373,9 @@ private fun SelectionTopBar(state: MailboxUiState, onEvent: (MailboxEvent) -> Un
                 Icon(painterResource(VelinIcons.Archive), stringResource(R.string.action_archive))
             }
             IconButton(onClick = { onEvent(MailboxEvent.Trash(ids)) }) {
-                Icon(painterResource(VelinIcons.Delete), stringResource(R.string.action_trash))
+                val deletes = state.folder?.kind.let { it == FolderKind.Trash || it == FolderKind.Spam }
+                Icon(painterResource(VelinIcons.Delete),
+                    stringResource(if (deletes) R.string.action_delete_forever else R.string.action_trash))
             }
             IconButton(onClick = { onEvent(MailboxEvent.SetUnread(ids, !anyUnread)) }) {
                 if (anyUnread) {
