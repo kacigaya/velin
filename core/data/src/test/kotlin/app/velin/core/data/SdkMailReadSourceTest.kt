@@ -59,6 +59,13 @@ class SdkMailReadSourceTest {
         override suspend fun move(ids: List<ReadId>, target: ReadFolder) { moves += ids to target }
         override suspend fun applyLabels(ids: List<ReadId>, added: List<ReadId>, removed: List<ReadId>) { labelsChanged += Triple(ids, added, removed) }
         override suspend fun delete(ids: List<ReadId>, folder: ReadId) { deleted += ids to folder }
+        var responded: ReadResponded? = null
+        val respondedSent = mutableListOf<ReadId>()
+        override suspend fun markResponded(sent: ReadId): ReadResponded? {
+            respondedSent += sent
+            failure?.let { throw it }
+            return responded
+        }
         var aliases = emptyList<ReadAddress>()
         var senderFailure: SdkFailure? = null
         override suspend fun senders(): List<ReadAddress> {
@@ -364,6 +371,18 @@ class SdkMailReadSourceTest {
         assertTrue(source(reader).setLabels(account, ids, labels.map { LabelId(it.id.domain()) }) is Outcome.Failed)
         assertTrue(reader.labelsChanged.isEmpty())
     }
+    @Test fun markRespondedReportsThePreviousMailAndItsNewState() = runBlocking {
+        val reader = Reader().apply { responded = ReadResponded(ReadId("mails", "previous"), 3) }
+        val source = source(reader)
+        val sent = MailId(ReadId("mails", "sent").domain())
+        val marked = (source.markResponded(account, sent) as Outcome.Success<RespondedMail?>).value
+        assertEquals(MailId(ReadId("mails", "previous").domain()), marked?.previous)
+        assertEquals(ReplyType.RepliedAndForwarded, marked?.replyType)
+        assertEquals(listOf(ReadId("mails", "sent")), reader.respondedSent)
+        reader.failure = SdkException(SdkFailure.Protocol)
+        assertTrue(source.markResponded(account, sent) is Outcome.Failed)
+    }
+
     @Test fun deletePreflightsTrashOrSpamAndUsesFolderFilter() = runBlocking {
         val trash = inbox.copy(id = ReadId("folders", "trash"), kind = 3)
         val spam = inbox.copy(id = ReadId("folders", "spam"), kind = 5)

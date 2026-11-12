@@ -116,13 +116,23 @@ internal class FakeMailRepo : MailRepository {
     var saveFailure: app.velin.core.domain.Failure? = null
     val savedDrafts = mutableListOf<Draft>()
     val sentDrafts = mutableListOf<DraftId>()
+    private val responseDrafts = mutableSetOf<MailId>()
     override suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<DraftId> {
         savedDrafts += draft
         saveGate?.await()
         saveFailure?.let { return Outcome.Failed(it) }
-        return Outcome.Success(draft.id ?: DraftId(MailId(eid("drafts", "d${savedDrafts.size}"))))
+        val id = draft.id ?: DraftId(MailId(eid("drafts", "d${savedDrafts.size}")))
+        if (draft.response != null) responseDrafts += id.value
+        return Outcome.Success(id)
     }
     var sendOutcome: Outcome<Unit> = Outcome.Success(Unit)
+    val responded = mutableListOf<MailId>()
+    var respondGate: kotlinx.coroutines.CompletableDeferred<Unit>? = null
+    override suspend fun markResponded(account: AccountId, sent: MailId): Outcome<Unit> {
+        respondGate?.await()
+        if (sent in responseDrafts) responded += sent
+        return Outcome.Success(Unit)
+    }
     override suspend fun sendDraft(account: AccountId, id: DraftId): Outcome<Unit> {
         sentDrafts += id
         return sendOutcome

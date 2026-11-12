@@ -359,13 +359,16 @@ class ComposerViewModel(
                 return@launch
             }
             val outcome = if (saved is Outcome.Success) mail.sendDraft(account.id, saved.value) else saved.toUnitOutcome()
-            sending.value = false
             when (outcome) {
                 is Outcome.Success -> {
+                    // Best effort, like the automatic mark-read: the mail is already sent. Sending stays on until the
+                    // composer closes, so the sent draft cannot be sent again meanwhile.
+                    if (saved is Outcome.Success) mail.markResponded(account.id, saved.value.value)
                     effectChannel.send(ComposerEffect.Sent)
                     effectChannel.send(ComposerEffect.Close)
                 }
                 is Outcome.Failed -> {
+                    sending.value = false
                     (outcome.failure as? Failure.SendBlocked)?.let(::markBlocked)
                     effectChannel.send(ComposerEffect.Failed(outcome.failure))
                 }

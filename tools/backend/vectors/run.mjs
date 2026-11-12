@@ -18,7 +18,7 @@ const alias = Object.fromEntries(Object.entries(paths).map(([key, value]) => [ke
 alias['@release'] = root
 const temp = mkdtempSync(join(tmpdir(), 'velin-vectors-'))
 try {
-  for (const name of ['drafts', 'sends']) {
+  for (const name of ['drafts', 'sends', 'patches']) {
   const bundle = await rolldown({
     input: fileURLToPath(new URL(`./${name}.ts`, import.meta.url)), platform: 'node',
     resolve: { alias, extensions: ['.ts', '.js', '.json'] },

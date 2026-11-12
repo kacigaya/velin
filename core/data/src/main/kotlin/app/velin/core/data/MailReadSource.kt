@@ -16,6 +16,8 @@ interface MailReadSource {
     suspend fun setLabels(account: AccountId, ids: List<MailId>, labels: List<LabelId>): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)
     suspend fun currentFolders(account: AccountId, ids: List<MailId>): Outcome<Map<MailId, FolderId>> = Outcome.Failed(Failure.Unsupported)
     suspend fun delete(account: AccountId, ids: List<MailId>): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)
+    /** Marks the mail a sent reply or forward answers. Null when the sent mail answers nothing. */
+    suspend fun markResponded(account: AccountId, sent: MailId): Outcome<RespondedMail?> = Outcome.Failed(Failure.Unsupported)
     /** A null value means the server no longer has that mail. */
     suspend fun locate(account: AccountId, ids: List<MailId>): Outcome<Map<MailId, LocatedMail?>> = Outcome.Failed(Failure.Unsupported)
     suspend fun mailbox(account: AccountId): Outcome<MailboxSnapshot>
@@ -29,4 +31,5 @@ interface MailReadSource {
 data class MailboxSnapshot(val folders: List<Folder>, val labels: List<Label>, val senders: List<SenderAlias>,
     val entryLists: Map<String, EntityId> = emptyMap())
 data class LocatedMail(val summary: MailSummary, val folder: FolderId?)
+data class RespondedMail(val previous: MailId, val replyType: ReplyType)
 data class AttachmentContent(val metadata: Attachment, val bytes: ByteArray)

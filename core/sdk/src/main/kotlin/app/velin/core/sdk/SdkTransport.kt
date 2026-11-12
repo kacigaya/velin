@@ -2,7 +2,7 @@ package app.velin.core.sdk
 
 import de.tutao.tutasdk.*
 
-enum class RequestMethod { GET, POST, PUT, DELETE }
+enum class RequestMethod { GET, POST, PUT, DELETE, PATCH }
 data class BinaryRequest(val url: String, val method: RequestMethod,
     val headers: Map<String, String>, val body: ByteArray?, val trustedBlobServer: Boolean = false)
 data class BinaryResponse(val status: Int, val headers: Map<String, String>, val body: ByteArray?)

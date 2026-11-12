@@ -98,3 +98,22 @@ the Ed25519 signature over the release's canonical key bytes. These fixtures
 cover signed RSA recipients. They do not cover deterministic TutaCrypt
 encapsulation or the release Ed25519 WASM. See `docs/backend/M6B-REPORT.md`
 for the native random-source limit and remaining live checks.
+
+## Entity patch vectors
+
+`patches.json` holds four mail updates that set `replyType`, as
+`SendMailModel.updatePreviousMail` does after a reply or forward. Each runs the
+release's `EntityRestClient.update` offline: a fake REST client records the
+PATCH path, headers and body. The cases cover CBC and AEAD accounts, each with
+a 256-bit and a legacy 128-bit session key. The stored mail uses the session
+key for every value, as delivered mail does.
+
+The runner records the random offset before each attribute encryption. It
+keeps the one whose ciphertext the PATCH carries, as `valueRandomOffset`.
+Rust starts the same stream there and must produce the same bytes. Patch and
+list IDs are random. Rust checks their length, not their bytes.
+
+`patchedMail` is the stored mail with the patched value. The release pipeline
+must read it back with the new `replyType` and the old subject. The AEAD
+cases use a 32-byte KDF nonce on the mail, so they do not cover the
+`UpdateKdfNonceService` call. A Rust mock test covers that request.

@@ -41,6 +41,12 @@ class BackendReadRepositoryTest {
         val label = Label(LabelId(entity("label")), "Work", null)
         var sendCalls = 0
         override suspend fun sendDraft(account: AccountId, id: DraftId): Outcome<Unit> { sendCalls++; return actionResult() }
+        var responded: RespondedMail? = null
+        val marked = mutableListOf<MailId>()
+        override suspend fun markResponded(account: AccountId, sent: MailId): Outcome<RespondedMail?> {
+            marked += sent
+            return if (actionFailure) Outcome.Failed(Failure.Offline) else Outcome.Success(responded)
+        }
         override suspend fun setUnread(account: AccountId, ids: List<MailId>, unread: Boolean) = actionResult()
         override suspend fun move(account: AccountId, ids: List<MailId>, target: FolderId): Outcome<Unit> {
             if (!actionFailure) currentFolder = target
@@ -111,6 +117,27 @@ class BackendReadRepositoryTest {
             assertEquals(Outcome.Success(Unit), repo.sendDraft(account, id))
             withTimeout(5000) { while (pages.last().mails.isNotEmpty()) yield() }
             assertEquals(2, source.sendCalls)
+            collector.cancelAndJoin()
+        } finally { cache.deleteRecursively() }
+    }
+    @Test fun markRespondedUpdatesTheLoadedPage() = runBlocking {
+        val source = Source()
+        val cache = Files.createTempDirectory("mail-responded").toFile()
+        try {
+            val repo = BackendReadRepository(source, cache)
+            repo.sync(account)
+            val pages = mutableListOf<MailPage>()
+            val collector = launch(start = CoroutineStart.UNDISPATCHED) { repo.messages(account, folder).toList(pages) }
+            withTimeout(5000) { while (pages.isEmpty()) yield() }
+            val previous = MailId(entity("new"))
+            source.responded = RespondedMail(previous, ReplyType.Replied)
+            source.actionFailure = true
+            assertEquals(Outcome.Failed(Failure.Offline), repo.markResponded(account, MailId(entity("sent"))))
+            assertEquals(ReplyType.None, pages.last().mails.single { it.id == previous }.replyType)
+            source.actionFailure = false
+            assertEquals(Outcome.Success(Unit), repo.markResponded(account, MailId(entity("sent"))))
+            withTimeout(5000) { while (pages.last().mails.single { it.id == previous }.replyType != ReplyType.Replied) yield() }
+            assertEquals(listOf(MailId(entity("sent")), MailId(entity("sent"))), source.marked)
             collector.cancelAndJoin()
         } finally { cache.deleteRecursively() }
     }

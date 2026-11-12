@@ -17,6 +17,10 @@ class SdkTransportTest {
         assertEquals(474u, response.status)
         Unit
     }
+    // Entity updates use PATCH. A method the transport lacks would fail every such request.
+    @Test fun everySdkMethodHasATransportMethod() {
+        HttpMethod.entries.forEach { assertEquals(it.name, RequestMethod.valueOf(it.name).name) }
+    }
     @Test fun networkFailureBecomesSdkCallbackFailure() = runBlocking {
         val client = SdkRestClient(BinaryTransport { throw TransportException(TransportFailure.Network) })
         try {

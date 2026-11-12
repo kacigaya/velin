@@ -134,6 +134,30 @@ draft for `Reply`, `ReplyAll` or `Forward`. It follows
    previous entry and unknown types stay unsupported.
 8. An untouched response closes without a draft. The first edit creates it.
    A failed body load fails the response, so a quote is never silently empty.
+9. After a send, `velin_mark_responded` follows the sent mail's conversation
+   entry to the previous entry and mail, then updates the previous mail's
+   `replyType`. It merges None, Replied, Forwarded and RepliedAndForwarded the
+   way `SendMailModel.updatePreviousMail` does. The UI treats it as best effort,
+   because the mail is already sent when it runs; a failed update only leaves
+   the old marker until the next successful send. The composer keeps its
+   sending state until it closes, so the sent draft cannot be sent twice.
+10. The update is a PATCH with one REPLACE, as `EntityRestClient.update` sends.
+    The release SDK only has a PUT, which the server refuses. `replyType` is
+    encrypted. A CBC account encrypts it with the mail's session key. An AEAD
+    account encrypts it with the owner group's current key and the mail's KDF
+    nonce. A mail without a nonce first gets one from `UpdateKdfNonceService`,
+    and Velin uses the nonce that the server returns. The headers carry `v` of
+    the tutanota model and `dv` of the sys model, because the body is a sys
+    `PatchList`. `tools/backend/vectors/patches.json` holds four upstream
+    vectors: CBC and AEAD, with 256-bit and legacy 128-bit session keys.
+    Rust matches every patched value byte and the wire JSON.
+11. After an AEAD patch, a mail mixes session-key values with one instance-key
+    value. The release SDK decrypts every value with the session key and fails
+    the whole mail on the MAC check. Velin now decrypts top-level
+    instance-key values first, with the group key version in the ciphertext,
+    then lets the release decrypt the rest. A value that fails its check stays
+    in place, so the mail still fails closed. Nested instance-key values are
+    not read yet; no Velin write produces them.
 
 Live check on 2026-11-12, Android 15 in a container, against production:
 
@@ -148,10 +172,7 @@ Limits:
 
 1. Forwarding does not copy attachments. Attachment upload is not built yet.
    The composer tells the user how many files it left out.
-2. Velin does not set the replied or forwarded state on the previous mail.
-   Upstream updates the Mail entity after send. The Rust SDK has no encrypted
-   entity update yet.
-3. Inline images in the quote are not carried. The quote keeps text only.
+2. Inline images in the quote are not carried. The quote keeps text only.
 
 ## Owner live checks: UNVERIFIED
 

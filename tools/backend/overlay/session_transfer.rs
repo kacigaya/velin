@@ -38,7 +38,7 @@ impl Path {
 }
 
 fn invalid() -> ApiCallError { ApiCallError::internal("Invalid session transfer encryption".into()) }
-fn canonical_context(model: &TypeModel, target: bool) -> String {
+pub(crate) fn canonical_context(model: &TypeModel, target: bool) -> String {
     let id = if target { model.target_type_id.map_or(String::from(model.id), |id| id.to_string()) }
         else { String::from(model.id) };
     let id = if model.app.to_string() == "tutanota" && id == "1290" { "1298" } else { &id };
@@ -178,7 +178,7 @@ fn transform(
     Ok(output)
 }
 
-fn binary(kind: &ValueType, value: &ElementValue) -> Result<Vec<u8>, ApiCallError> {
+pub(crate) fn binary(kind: &ValueType, value: &ElementValue) -> Result<Vec<u8>, ApiCallError> {
     match (kind, value) {
         (ValueType::Bytes, ElementValue::Bytes(bytes)) => Ok(bytes.clone()),
         (ValueType::String, ElementValue::String(s)) => Ok(s.as_bytes().to_vec()),

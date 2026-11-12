@@ -706,6 +706,19 @@ class BackendReadRepository internal constructor(private val source: MailReadSou
         }
         result
     }
+    override suspend fun markResponded(account: AccountId, sent: MailId): Outcome<Unit> = io(account, save = true) {
+        when (val result = source.markResponded(account, sent)) {
+            is Outcome.Failed -> Outcome.Failed(result.failure)
+            is Outcome.Success -> {
+                result.value?.let { marked ->
+                    val state = this.account(account)
+                    state.summaries[marked.previous]?.let { state.summaries[marked.previous] = it.copy(replyType = marked.replyType) }
+                    publish(state)
+                }
+                Outcome.Success(Unit)
+            }
+        }
+    }
     override fun search(account: AccountId, query: String): Flow<Outcome<List<MailSummary>>> = flowOf(unsupported())
     override fun suggestRecipients(account: AccountId, query: String): Flow<List<Recipient>> = flowOf(emptyList())
     private fun unsupported(): Outcome.Failed = Outcome.Failed(Failure.Unsupported)

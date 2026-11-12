@@ -45,6 +45,8 @@ interface MailRepository {
     suspend fun resolveRecipient(account: AccountId, address: String): Outcome<Recipient> = Outcome.Failed(Failure.Unsupported)
     suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<DraftId>
     suspend fun sendDraft(account: AccountId, id: DraftId): Outcome<Unit>
+    /** Marks the mail a sent reply or forward answers, as upstream does. Best effort; sending already happened. */
+    suspend fun markResponded(account: AccountId, sent: MailId): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)
     suspend fun downloadAttachment(account: AccountId, id: AttachmentId): Outcome<java.io.File>
     fun search(account: AccountId, query: String): Flow<Outcome<List<MailSummary>>>
     fun suggestRecipients(account: AccountId, query: String): Flow<List<Recipient>>

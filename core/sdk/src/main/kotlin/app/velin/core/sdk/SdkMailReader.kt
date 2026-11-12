@@ -11,6 +11,7 @@ data class ReadSummary(val id: ReadId, val conversationEntry: ReadId, val sender
     val senderName: String, val subject: String, val receivedMillis: Long, val unread: Boolean,
     val hasAttachments: Boolean, val confidential: Boolean, val replyType: Long, val sets: List<ReadId>)
 
+data class ReadResponded(val previous: ReadId, val replyType: Long)
 data class ReadAttachment(val id: ReadId, val name: String, val mimeType: String, val size: Long, val cid: String?)
 data class ReadAttachmentContent(val metadata: ReadAttachment, val bytes: ByteArray)
 
@@ -50,6 +51,8 @@ interface SdkMailReader {
     suspend fun move(ids: List<ReadId>, target: ReadFolder): Unit = throw SdkException(SdkFailure.Protocol)
     suspend fun applyLabels(ids: List<ReadId>, added: List<ReadId>, removed: List<ReadId>): Unit = throw SdkException(SdkFailure.Protocol)
     suspend fun delete(ids: List<ReadId>, folder: ReadId): Unit = throw SdkException(SdkFailure.Protocol)
+    /** Marks the mail that a sent reply or forward answers. Null when there is none. */
+    suspend fun markResponded(sent: ReadId): ReadResponded? = throw SdkException(SdkFailure.Protocol)
     suspend fun senders(): List<ReadAddress> = throw SdkException(SdkFailure.Protocol)
     suspend fun folders(): List<ReadFolder>
     suspend fun unread(folder: ReadFolder): Long
@@ -138,6 +141,9 @@ internal class NativeMailReader(private val facade: MailFacade, private val trus
     }
     override suspend fun delete(ids: List<ReadId>, folder: ReadId): Unit = api {
         facade.velinDelete(ids.map { it.native() }, folder.native())
+    }
+    override suspend fun markResponded(sent: ReadId): ReadResponded? = api {
+        facade.velinMarkResponded(sent.native())?.let { ReadResponded(it.previous.readId(), it.replyType) }
     }
     private val attachmentParents = LinkedHashMap<ReadId, ReadId>()
     override fun close() { synchronized(attachmentParents) { attachmentParents.clear() }; facade.close() }

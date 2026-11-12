@@ -103,6 +103,9 @@ internal class SdkMailReadSource(private val sessions: SessionReadAccess) : Mail
             }
         }
     }
+    override suspend fun markResponded(account: AccountId, sent: MailId): Outcome<RespondedMail?> = read(account) { sdk ->
+        sdk.markResponded(sent.value.readId())?.let { RespondedMail(MailId(it.previous.domain()), replyType(it.replyType)) }
+    }
     override suspend fun delete(account: AccountId, ids: List<MailId>): Outcome<Unit> = read(account) { sdk ->
         val folders = sdk.folders().filter { it.kind != 7L && it.kind != 8L }
         val locations = ids.distinct().map { id ->
@@ -249,10 +252,15 @@ internal fun ReadId.domain() = EntityId(ListId(list), ElementId(element))
 internal fun summary(mail: ReadSummary, sets: List<ReadFolder>): MailSummary = MailSummary(
     MailId(mail.id.domain()), ConversationId(mail.conversationEntry.domain()),
     listOf(Address(mail.senderAddress, mail.senderName)), mail.subject, Instant.ofEpochMilli(mail.receivedMillis),
-    mail.unread, mail.hasAttachments, mail.confidential, when (mail.replyType) {
-        0L -> ReplyType.None; 1L -> ReplyType.Replied; 2L -> ReplyType.Forwarded; 3L -> ReplyType.RepliedAndForwarded
-        else -> throw IllegalArgumentException("Unknown reply type")
-    }, sets.filter { it.kind == 8L && it.id in mail.sets }.map { Label(LabelId(it.id.domain()), it.name, it.color) }, 1)
+    mail.unread, mail.hasAttachments, mail.confidential, replyType(mail.replyType), sets.filter { it.kind == 8L && it.id in mail.sets }.map { Label(LabelId(it.id.domain()), it.name, it.color) }, 1)
+
+internal fun replyType(value: Long): ReplyType = when (value) {
+    0L -> ReplyType.None
+    1L -> ReplyType.Replied
+    2L -> ReplyType.Forwarded
+    3L -> ReplyType.RepliedAndForwarded
+    else -> throw IllegalArgumentException("Unknown reply type")
+}
 
 private fun EntityId.readId() = ReadId(list.value, element.value)
 private fun ReadAddress.address() = Address(address, name)

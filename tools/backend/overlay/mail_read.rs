@@ -356,6 +356,84 @@ impl MailFacade {
     }
 }
 
+#[derive(uniffi::Record)]
+pub struct VelinRespondedMail {
+    pub previous: IdTupleGenerated,
+    pub replyType: i64,
+}
+
+// SendMailModel.ts:1314-1328. A sent reply or forward marks the mail it answers. The sent mail's
+// conversation entry names both the conversation type and the previous entry.
+#[uniffi::export]
+impl MailFacade {
+    pub async fn velin_mark_responded(&self, sent: IdTupleGenerated) -> Result<Option<VelinRespondedMail>, ApiCallError> {
+        use crate::entities::generated::tutanota::ConversationEntry;
+        AssertUnwindSafe(async {
+            let mail: Mail = self.crypto_entity_client.load(&sent).await?;
+            if !mail._errors.is_empty() || mail._id.as_ref() != Some(&sent) {
+                return Err(ApiCallError::internal("Invalid sent mail".into()));
+            }
+            let entry: ConversationEntry = self.crypto_entity_client.load(&mail.conversationEntry).await?;
+            if entry.mail.as_ref() != Some(&sent) || !matches!(entry.conversationType, 1 | 2) {
+                return Ok(None);
+            }
+            let Some(previous_entry_id) = entry.previous else { return Ok(None) };
+            let previous_entry: ConversationEntry = self.crypto_entity_client.load(&previous_entry_id).await?;
+            let Some(previous_id) = previous_entry.mail else { return Ok(None) };
+            let mut previous: Mail = self.crypto_entity_client.load(&previous_id).await?;
+            if !previous._errors.is_empty() || previous._id.as_ref() != Some(&previous_id) {
+                return Ok(None);
+            }
+            let Some(reply_type) = velin_reply_type(previous.replyType, entry.conversationType)? else {
+                return Ok(None);
+            };
+            previous.replyType = reply_type;
+            // EntityRestClient.ts:749-770 picks the account's scheme. AEAD needs a KDF nonce on the instance first.
+            let aead = self.velin_service_encryption_scheme().await? == crate::user_facade::VelinEncryptionScheme::Aead;
+            let random = crypto_primitives::randomizer_facade::RandomizerFacade::from_core(rand_core::OsRng);
+            if aead && previous._kdfNonce.is_none() {
+                previous._kdfNonce = Some(self.velin_kdf_nonce(&previous_id, &random).await?);
+            }
+            self.crypto_entity_client.velin_patch_value(previous, "replyType", aead, &random).await?;
+            Ok(Some(VelinRespondedMail { previous: previous_id, replyType: reply_type }))
+        })
+        .catch_unwind()
+        .await
+        .unwrap_or_else(|_| Err(ApiCallError::internal("Mail reply state update failed".into())))
+    }
+}
+
+impl MailFacade {
+    // EntityRestClient.ts:887-910. The server keeps the first nonce it stores, so use the one it returns.
+    async fn velin_kdf_nonce(&self, mail: &IdTupleGenerated, random: &crypto_primitives::randomizer_facade::RandomizerFacade)
+        -> Result<Vec<u8>, ApiCallError> {
+        use crate::entities::generated::sys::{InstanceKdfNonce, TypeInfo, UpdateKdfNoncePostIn};
+        use crate::services::generated::sys::UpdateKdfNonceService;
+        let input = UpdateKdfNoncePostIn { _format: 0, instanceKdfNonce: InstanceKdfNonce {
+            _id: Some(velin_aggregate_id()), instanceList: Some(mail.list_id.clone()), instanceId: Some(mail.element_id.clone()),
+            kdfNonce: random.generate_random_array::<{ crate::velin_entity_patch::KDF_NONCE_LENGTH }>().to_vec(),
+            instanceCustomId: None,
+            // MailTypeRef is tutanota/97; only mail is patched here.
+            typeInfo: TypeInfo { _id: Some(velin_aggregate_id()), application: "tutanota".into(), typeId: 97 },
+        } };
+        let nonce = self.service_executor.post::<UpdateKdfNonceService>(input, Default::default()).await?.kdfNonce;
+        if nonce.len() != crate::velin_entity_patch::KDF_NONCE_LENGTH {
+            return Err(ApiCallError::internal("Invalid KDF nonce".into()));
+        }
+        Ok(nonce)
+    }
+}
+
+fn velin_reply_type(current: i64, conversation_type: i64) -> Result<Option<i64>, ApiCallError> {
+    match (current, conversation_type) {
+        (0, 1) => Ok(Some(1)),
+        (0, 2) => Ok(Some(2)),
+        (1, 2) | (2, 1) => Ok(Some(3)),
+        (1, 1) | (2, 2) | (3, 1) | (3, 2) => Ok(None),
+        _ => Err(ApiCallError::internal("Invalid mail reply state".into())),
+    }
+}
+
 fn velin_action_batch(mails: &[IdTupleGenerated]) -> Result<(), ApiCallError> {
     if mails.is_empty() || mails.len() > MAX_MAIL_UPDATE_LIMIT || mails.iter().any(|id| id.list_id != mails[0].list_id) {
         return Err(ApiCallError::internal("Invalid mail action batch".into()));
@@ -376,6 +454,19 @@ mod velin_action_tests {
         assert!(velin_action_batch(&[id("a", "m"), id("b", "m")]).is_err());
     }
     #[test]
+    fn velin_reply_type_follows_upstream() {
+        assert_eq!(velin_reply_type(0, 1).unwrap(), Some(1));
+        assert_eq!(velin_reply_type(0, 2).unwrap(), Some(2));
+        assert_eq!(velin_reply_type(1, 2).unwrap(), Some(3));
+        assert_eq!(velin_reply_type(2, 1).unwrap(), Some(3));
+        assert_eq!(velin_reply_type(1, 1).unwrap(), None);
+        assert_eq!(velin_reply_type(2, 2).unwrap(), None);
+        assert_eq!(velin_reply_type(3, 1).unwrap(), None);
+        assert_eq!(velin_reply_type(3, 2).unwrap(), None);
+        assert!(velin_reply_type(4, 1).is_err());
+        assert!(velin_reply_type(0, 0).is_err());
+    }
+    #[test]
     fn velin_action_numeric_payloads() {
         let mails = vec![id("bag", "mail")];
         let target = id("sets", "target");
@@ -392,5 +483,129 @@ mod velin_action_tests {
         let deleted = serde_json::to_value(DeleteMailData { _format: 0, mails, folder: Some(target) }).unwrap();
         assert_eq!(deleted["421"][0]["element_id"], "mail");
         assert_eq!(deleted["724"]["element_id"], "target");
+    }
+}
+
+#[cfg(test)]
+mod velin_responded_tests {
+    use super::*;
+    use crate::crypto_entity_client::MockCryptoEntityClient;
+    use crate::entities::generated::tutanota::ConversationEntry;
+    use crate::services::service_executor::MockResolvingServiceExecutor;
+    use crate::user_facade::MockUserFacade;
+    use crate::util::test_utils::create_test_entity;
+
+    fn id(list: &str, element: &str) -> IdTupleGenerated {
+        IdTupleGenerated::new(list.to_owned().into(), element.to_owned().into())
+    }
+
+    fn forward_client(sent: &IdTupleGenerated) -> MockCryptoEntityClient {
+        let mut client = MockCryptoEntityClient::default();
+        let sent_for_mail = sent.clone();
+        client.expect_load::<Mail, IdTupleGenerated>().returning(move |loaded| {
+            if loaded == &sent_for_mail {
+                Ok(Mail {
+                    _id: Some(sent_for_mail.clone()),
+                    conversationEntry: id("entries", "forward"),
+                    ..create_test_entity()
+                })
+            } else {
+                Ok(Mail { _id: Some(id("mails", "original")), replyType: 1, ..create_test_entity() })
+            }
+        });
+        let sent_for_entry = sent.clone();
+        client.expect_load::<ConversationEntry, IdTupleGenerated>().returning(move |loaded| {
+            if loaded.element_id.as_str() == "forward" {
+                Ok(ConversationEntry {
+                    _id: Some(id("entries", "forward")),
+                    mail: Some(sent_for_entry.clone()),
+                    conversationType: 2,
+                    previous: Some(id("entries", "original")),
+                    ..create_test_entity()
+                })
+            } else {
+                Ok(ConversationEntry {
+                    _id: Some(id("entries", "original")),
+                    mail: Some(id("mails", "original")),
+                    ..create_test_entity()
+                })
+            }
+        });
+        client
+    }
+
+    fn user(scheme: crate::user_facade::VelinEncryptionScheme) -> MockUserFacade {
+        let mut user = MockUserFacade::default();
+        user.expect_velin_encryption_scheme().return_const(Some(scheme));
+        user
+    }
+
+    #[tokio::test]
+    async fn velin_marks_the_previous_mail_of_a_forward() {
+        let sent = id("mails", "sent");
+        let mut client = forward_client(&sent);
+        client.expect_velin_patch_value::<Mail>()
+            .withf(|mail, attribute, aead, _| mail.replyType == 3 && attribute.to_string() == "replyType" && !*aead && mail._kdfNonce.is_none())
+            .times(1).returning(|_, _, _, _| Ok(()));
+        let facade = MailFacade::new(Arc::new(client), Arc::new(user(crate::user_facade::VelinEncryptionScheme::AesCbc)),
+            Arc::new(MockResolvingServiceExecutor::default()));
+        let marked = facade.velin_mark_responded(sent).await.unwrap().unwrap();
+        assert_eq!(marked.previous, id("mails", "original"));
+        assert_eq!(marked.replyType, 3);
+    }
+
+    // EntityRestClient.ts:887-910: an AEAD account first stores a KDF nonce for the instance.
+    #[tokio::test]
+    async fn velin_aead_patch_uses_the_nonce_the_server_keeps() {
+        use crate::entities::generated::sys::UpdateKdfNoncePostOut;
+        use crate::services::generated::sys::UpdateKdfNonceService;
+        for (returned, patched) in [(vec![7; 32], true), (vec![7; 16], false)] {
+            let sent = id("mails", "sent");
+            let mut client = forward_client(&sent);
+            client.expect_velin_patch_value::<Mail>()
+                .withf(|mail, _, aead, _| *aead && mail._kdfNonce == Some(vec![7; 32]))
+                .times(usize::from(patched)).returning(|_, _, _, _| Ok(()));
+            let mut executor = MockResolvingServiceExecutor::default();
+            executor.expect_post::<UpdateKdfNonceService>()
+                .withf(|input, _| {
+                    let nonce = &input.instanceKdfNonce;
+                    nonce.instanceList.as_ref().map(|id| id.as_str()) == Some("mails")
+                        && nonce.instanceId.as_ref().map(|id| id.as_str()) == Some("original")
+                        && nonce.kdfNonce.len() == 32 && nonce.instanceCustomId.is_none()
+                        && nonce.typeInfo.application == "tutanota" && nonce.typeInfo.typeId == 97
+                })
+                .times(1).returning(move |_, _| Ok(UpdateKdfNoncePostOut { _format: 0, kdfNonce: returned.clone() }));
+            let facade = MailFacade::new(Arc::new(client), Arc::new(user(crate::user_facade::VelinEncryptionScheme::Aead)), Arc::new(executor));
+            assert_eq!(facade.velin_mark_responded(sent).await.is_ok(), patched);
+        }
+    }
+
+    #[tokio::test]
+    async fn velin_ignores_mail_that_does_not_answer_another() {
+        let sent = id("mails", "new");
+        let mut client = MockCryptoEntityClient::default();
+        let sent_for_mail = sent.clone();
+        client.expect_load::<Mail, IdTupleGenerated>().returning(move |_| {
+            Ok(Mail {
+                _id: Some(sent_for_mail.clone()),
+                conversationEntry: id("entries", "new"),
+                ..create_test_entity()
+            })
+        });
+        let sent_for_entry = sent.clone();
+        client.expect_load::<ConversationEntry, IdTupleGenerated>().returning(move |_| {
+            Ok(ConversationEntry {
+                _id: Some(id("entries", "new")),
+                mail: Some(sent_for_entry.clone()),
+                conversationType: 0,
+                ..create_test_entity()
+            })
+        });
+        let facade = MailFacade::new(
+            Arc::new(client),
+            Arc::new(MockUserFacade::default()),
+            Arc::new(MockResolvingServiceExecutor::default()),
+        );
+        assert!(facade.velin_mark_responded(sent).await.unwrap().is_none());
     }
 }

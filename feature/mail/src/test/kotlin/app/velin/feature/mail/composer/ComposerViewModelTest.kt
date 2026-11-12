@@ -121,6 +121,25 @@ class ComposerViewModelTest {
         runCurrent()
         assertEquals("Hi", repo.savedDrafts.last().subject)
         assertEquals(1, repo.sentDrafts.size)
+        assertTrue("a new mail answers nothing", repo.responded.isEmpty())
+    }
+
+    @Test
+    fun aSentDraftCannotBeSentAgainWhileItsAnswerIsMarked() = runTest {
+        val gate = kotlinx.coroutines.CompletableDeferred<Unit>()
+        repo.respondGate = gate
+        val vm = viewModel()
+        vm.onEvent(ComposerEvent.AddRecipient(RecipientField.To, RecipientUi("", "lena@tuta.com")))
+        edit { vm.subject.setTextAndPlaceCursorAtEnd("Hi") }
+        vm.onEvent(ComposerEvent.Send)
+        runCurrent()
+        assertTrue(vm.state.value.sending)
+        vm.onEvent(ComposerEvent.Send)
+        runCurrent()
+        assertEquals(1, repo.sentDrafts.size)
+        gate.complete(Unit)
+        runCurrent()
+        assertEquals(1, repo.sentDrafts.size)
     }
 
     @Test
@@ -182,6 +201,7 @@ class ComposerViewModelTest {
         runCurrent()
         assertEquals(null, repo.savedDrafts.last().response)
         assertEquals(repo.sentDrafts.single(), repo.savedDrafts.last().id)
+        assertEquals(listOf(MailId(eid("drafts", "d1"))), repo.responded)
     }
 
     @Test
