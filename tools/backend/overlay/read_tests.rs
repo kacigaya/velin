@@ -81,6 +81,8 @@ mod velin_provider_tests {
     #[tokio::test]
     async fn velin_file_decrypts_and_rejects_tampering_and_size_mismatch() {
         assert_eq!(file_content(false, 16).await.unwrap(), b"attachment bytes");
+        // Files of external mail carry the encrypted size: version byte, IV, padded data and MAC.
+        assert_eq!(file_content(false, 1 + 16 + 32 + 32).await.unwrap(), b"attachment bytes");
         assert!(file_content(true, 16).await.is_err());
         assert!(file_content(false, 15).await.is_err());
         assert!(file_content(false, 20 * 1024 * 1024 + 1).await.is_err());

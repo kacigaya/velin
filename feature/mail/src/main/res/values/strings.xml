@@ -71,6 +71,7 @@
     <string name="composer_confidential">End-to-end encryption</string>
     <string name="composer_send">Send</string>
     <string name="composer_sent">Mail sent</string>
+    <string name="reader_no_viewer">No app on this device can open this file</string>
     <plurals name="composer_attachments_not_forwarded">
         <item quantity="one">Velin cannot forward %d attachment yet</item>
         <item quantity="other">Velin cannot forward %d attachments yet</item>

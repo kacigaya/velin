@@ -9,7 +9,7 @@ Each milestone is small and can be tested alone. A milestone is complete when it
 | M0 | Project scaffold, theme, UI screens with sample data | UI | done | Debug APK builds. Unit and screenshot tests pass in light and dark. |
 | M1 | Native core: Rust SDK AAR builds for arm64 and x86_64, `:core:sdk` adapter, REST transport with `cv`/`v` headers | Backend | done | AAR builds from a pinned upstream commit with checksums. Adapter unit tests pass. |
 | M2 | Sign-in: salt, Argon2id and bcrypt KDF, session creation, TOTP, Keystore credential storage, session resume | Backend, then UI wiring | done, verified live and on a device 2026-11-08 | Upstream KDF test vectors pass. Live sign-in with a test account. |
-| M3 | Read path: folders, mail list paging, decryption, mail body, HTML sanitizer, attachment download | Backend, then UI wiring | in progress: folders, labels, inbox paging and received mail bodies verified live 2026-11-08; attachments and unread counters not yet verified live | Live list and body load. Sanitizer tests pass. |
+| M3 | Read path: folders, mail list paging, decryption, mail body, HTML sanitizer, attachment download | Backend, then UI wiring | in progress: folders, labels, inbox paging and received mail bodies verified live 2026-11-08; attachment list and download verified live 2026-11-12 (PDF from external mail, after a restart); unread counters not yet verified live | Live list and body load. Sanitizer tests pass. |
 | M4 | Sync and offline: event bus WebSocket, encrypted offline store, durable cursors | Backend | done, verified live on a device 2026-11-12: offline cold start shows saved mail, and a move from a second client replays after reconnect (see [M4-SYNC.md](backend/M4-SYNC.md)) | Offline cold start shows saved mail. Missed events replay after reconnect. |
 | M5 | Mail actions: read state, move, archive, trash, labels, spam report | Backend, then UI wiring | in progress: read state, moves with undo and labels verified live 2026-11-08; permanent delete from Trash verified live 2026-11-12; spam/phishing reports not implemented | Actions reflect on the server and in a second client. |
 | M6 | Compose and send: drafts, attachment upload, internal confidential, external non-confidential, scheduled send | Backend, then UI wiring | in progress: sender aliases and drafts done; draft create, update in place, reload and discard to Trash verified live 2026-11-09; recipient lookup with key trust and confidential send to a Tuta address verified live 2026-11-09 (self-send); reply, reply all and forward done, reply send verified live 2026-11-12 (self-send, threaded); external send, attachments and scheduled send not implemented | Mail arrives at a Tuta and a non-Tuta address. Drafts survive process death. |
@@ -42,7 +42,7 @@ Source status comes from research §6. "UI" shows the Velin screen state.
 | Folders and labels list | Done, verified live (unread counts need the event bus) | done, wired |
 | Mail list, paging, unread state | Done, verified live | done, wired |
 | Conversation view | Port from TS | done (sample data) |
-| Mail body and attachments | Port from TS | done (sample data) |
+| Mail body and attachments | Body and attachment download verified live | done, wired; attachments open in another app |
 | Remote content blocking | Sanitizer and consent done | done, wired |
 | Phishing and authentication banners | Data from server and TS logic | done (sample data) |
 | Read state, archive, trash | Verified live | done, wired |

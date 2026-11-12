@@ -23,7 +23,7 @@ interface MailReadSource {
     suspend fun conversation(account: AccountId, id: ConversationId): Outcome<List<MailSummary>>
     suspend fun message(account: AccountId, id: MailId): Outcome<MailMessage>
     suspend fun body(account: AccountId, id: MailId): Outcome<String>
-    suspend fun attachment(account: AccountId, id: AttachmentId): Outcome<AttachmentContent>
+    suspend fun attachment(account: AccountId, id: AttachmentId, mail: MailId? = null): Outcome<AttachmentContent>
 }
 /** [entryLists] maps the MailSetEntry list of each folder and label to that mail set. */
 data class MailboxSnapshot(val folders: List<Folder>, val labels: List<Label>, val senders: List<SenderAlias>,

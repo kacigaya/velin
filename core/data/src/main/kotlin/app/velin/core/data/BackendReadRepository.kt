@@ -45,17 +45,25 @@ class BackendReadRepository internal constructor(private val source: MailReadSou
     }
     // Flow creation can occur on the main thread. Mutations below hold mutex as well.
     private fun account(id: AccountId): AccountCache = synchronized(accounts) { accounts.getOrPut(id) { AccountCache() } }
-    suspend fun open(account: AccountId) = withContext(Dispatchers.IO) { mutex.withLock { openAccount = account } }
+    /** Also removes old downloads, so a file opened before an app restart does not stay. */
+    suspend fun open(account: AccountId) = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            openAccount = account
+            deleteDownloads(olderThan = now().minus(DOWNLOAD_LIFETIME))
+        }
+    }
     /** Deletes saved mail of an account removed from this device. */
     suspend fun forget(account: AccountId) = withContext(Dispatchers.IO) {
         mutex.withLock {
             if (openAccount == account) openAccount = null
             try { store?.delete(account) } catch (_: Exception) {}
+            deleteDownloads()
         }
     }
     suspend fun clear() = withContext(Dispatchers.IO) {
         mutex.withLock {
             openAccount = null
+            deleteDownloads()
             synchronized(accounts) {
                 accounts.values.forEach { state ->
                     state.mailbox.value = MailboxSnapshot(emptyList(), emptyList(), emptyList())
@@ -259,26 +267,36 @@ class BackendReadRepository internal constructor(private val source: MailReadSou
         }
         Outcome.Success(Unit)
     }
-    override suspend fun inlineImage(account: AccountId, id: AttachmentId): Outcome<InlineImage> = io {
-        when (val result = source.attachment(account, id)) {
+    override suspend fun inlineImage(account: AccountId, id: AttachmentId): Outcome<InlineImage> = io(account) {
+        when (val result = source.attachment(account, id, parentOf(account, id))) {
             is Outcome.Failed -> result
             is Outcome.Success -> if (result.value.metadata.id != id) Outcome.Failed(Failure.Protocol(502))
                 else validateInlineImage(result.value)
         }
     }
-    override suspend fun downloadAttachment(account: AccountId, id: AttachmentId): Outcome<File> = io {
-        when (val result = source.attachment(account, id)) {
+    override suspend fun downloadAttachment(account: AccountId, id: AttachmentId): Outcome<File> = io(account) {
+        when (val result = source.attachment(account, id, parentOf(account, id))) {
             is Outcome.Failed -> result
             is Outcome.Success -> {
-                if (result.value.metadata.id != id || result.value.bytes.size.toLong() != result.value.metadata.sizeBytes) return@io Outcome.Failed(Failure.Protocol(502))
-                // Never use a sender-controlled filename or ID as a path component.
+                if (result.value.metadata.id != id || result.value.bytes.size.toLong() > result.value.metadata.sizeBytes) return@io Outcome.Failed(Failure.Protocol(502))
                 if (!cache.isDirectory && !cache.mkdirs()) return@io Outcome.Failed(Failure.Offline)
-                val file = File.createTempFile("attachment-", ".bin", cache)
+                // Decrypted files stay only while a viewer app may still read them.
+                deleteDownloads(olderThan = now().minus(DOWNLOAD_LIFETIME))
+                // A random folder keeps the cleaned sender name from reaching any other path.
+                val folder = java.nio.file.Files.createTempDirectory(cache.toPath(), "attachment-").toFile()
+                val file = File(folder, downloadName(result.value.metadata.name))
                 try { file.outputStream().use { it.write(result.value.bytes) } }
-                catch (e: Exception) { file.delete(); throw e }
+                catch (e: Exception) { folder.deleteRecursively(); throw e }
                 Outcome.Success(file)
             }
         }
+    }
+    /** The cached mail that lists [id]. The SDK needs it after a restart restored the mail. */
+    private fun parentOf(account: AccountId, id: AttachmentId): MailId? =
+        this.account(account).messages.values.firstOrNull { message -> message.attachments.any { it.id == id } }?.id
+    private fun deleteDownloads(olderThan: Instant? = null) {
+        cache.listFiles()?.filter { olderThan == null || it.lastModified() < olderThan.toEpochMilli() }
+            ?.forEach { it.deleteRecursively() }
     }
     /** With [account], saved data loads first. With [save], the cache is saved after [block]. */
     private suspend fun <T> io(account: AccountId? = null, save: Boolean = false, block: suspend () -> Outcome<T>): Outcome<T> = withContext(Dispatchers.IO) {
@@ -666,6 +684,29 @@ class BackendReadRepository internal constructor(private val source: MailReadSou
     private fun unsupported(): Outcome.Failed = Outcome.Failed(Failure.Unsupported)
 }
 
+/** A file name without path parts or hidden-file dots, so a viewer app shows a readable name. */
+internal fun downloadName(name: String): String {
+    val clean = name.replace(Regex("[^\\p{L}\\p{N}._ -]"), "_").trim().trimStart('.').ifBlank { "attachment" }
+    // File systems limit names to 255 bytes, not characters. Keep a short extension for the viewer app.
+    val dot = clean.lastIndexOf('.')
+    val extension = if (dot > 0 && clean.length - dot <= MAX_EXTENSION_CHARS) clean.substring(dot) else ""
+    val base = clean.dropLast(extension.length)
+    var bytes = extension.toByteArray().size
+    val kept = StringBuilder()
+    var index = 0
+    while (index < base.length) {
+        val codePoint = base.codePointAt(index)
+        val size = String(Character.toChars(codePoint)).toByteArray().size
+        if (bytes + size > MAX_NAME_BYTES) break
+        kept.appendCodePoint(codePoint)
+        bytes += size
+        index += Character.charCount(codePoint)
+    }
+    return kept.toString().ifBlank { "attachment" } + extension
+}
+private const val MAX_NAME_BYTES = 200
+private const val MAX_EXTENSION_CHARS = 16
+private val DOWNLOAD_LIFETIME = Duration.ofHours(1)
 // tutanota.json type IDs: Mail 97, MailBox 125, MailSet 429, MailSetEntry 1450.
 private const val MAIL_TYPE = 97L
 private const val MAIL_BOX_TYPE = 125L
@@ -724,6 +765,6 @@ internal fun validateInlineImage(content: AttachmentContent): Outcome<InlineImag
         "image/webp" -> bytes.size >= 12 && String(bytes, 0, 4, Charsets.US_ASCII) == "RIFF" && String(bytes, 8, 4, Charsets.US_ASCII) == "WEBP"
         else -> false
     }
-    return if (bytes.size in 1..10 * 1024 * 1024 && bytes.size.toLong() == content.metadata.sizeBytes && valid) Outcome.Success(InlineImage(bytes.copyOf(), mime))
+    return if (bytes.size in 1..10 * 1024 * 1024 && bytes.size.toLong() <= content.metadata.sizeBytes && valid) Outcome.Success(InlineImage(bytes.copyOf(), mime))
         else Outcome.Failed(Failure.Unsupported)
 }

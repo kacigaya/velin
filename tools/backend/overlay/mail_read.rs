@@ -286,7 +286,7 @@ mod velin_details_tests {
 
 /// Request aggregates need a random 4-byte base64url id, like upstream entity_facade.rs:578 and
 /// blob_access_token_facade.rs:56. `None` fails serialization before the request is sent.
-fn velin_aggregate_id() -> crate::CustomId {
+pub(crate) fn velin_aggregate_id() -> crate::CustomId {
     use base64::Engine;
     let bytes = crypto_primitives::randomizer_facade::RandomizerFacade::from_core(rand_core::OsRng)
         .generate_random_array::<4>();

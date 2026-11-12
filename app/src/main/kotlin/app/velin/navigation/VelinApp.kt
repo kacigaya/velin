@@ -108,6 +108,7 @@ private fun MailApp(account: Account, auth: AuthRepository, mailbox: MailboxRepo
     var deleteRequest by remember { mutableStateOf<Set<String>?>(null) }
     val tooManyLabels = stringResource(MailR.string.too_many_labels)
     val mailSent = stringResource(MailR.string.composer_sent)
+    val noViewer = stringResource(MailR.string.reader_no_viewer)
 
     LaunchedEffect(mailboxViewModel) {
         mailboxViewModel.effects.collect { effect ->
@@ -229,6 +230,9 @@ private fun MailApp(account: Account, auth: AuthRepository, mailbox: MailboxRepo
                                 is ConversationEffect.Forward ->
                                     backStack.add(ComposerRoute(respondTo = effect.messageId, kind = ResponseKind.Forward))
                                 is ConversationEffect.OpenLink -> openLink(context, effect.uri)
+                                is ConversationEffect.OpenAttachment -> if (!openAttachment(context, effect.file, effect.mimeType)) {
+                                    scope.launch { snackbar.showSnackbar(noViewer) }
+                                }
                                 is ConversationEffect.ActionFailed -> scope.launch { snackbar.showSnackbar(actionFailed) }
                                 else -> scope.launch { snackbar.showSnackbar(notAvailable) }
                             }

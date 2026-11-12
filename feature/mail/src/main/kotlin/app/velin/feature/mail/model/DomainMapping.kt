@@ -105,8 +105,15 @@ internal fun MailMessage.toUi(): MessageUi {
             is BodyState.Failed -> BodyUi.Failed
         },
         attachments = attachments
-            // Inline images render inside the body; listing them again only adds noise.
-            .filter { it.contentId == null }
+            // Hide only images the body shows. Some senders give every file a Content-ID, so a
+            // Content-ID alone does not make a file inline. Until the body loads, hide them to avoid a flash.
+            .filter { attachment ->
+                when (val state = body) {
+                    is BodyState.Loaded -> attachment.id !in state.inlineImages.values
+                    BodyState.Loading -> attachment.contentId == null
+                    is BodyState.Failed -> true
+                }
+            }
             .map { it.toUi() }
             .toImmutableList(),
         banners = banners.toImmutableList(),

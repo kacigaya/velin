@@ -5,6 +5,7 @@ import app.velin.core.domain.AttachmentId
 import app.velin.core.domain.BodyState
 import app.velin.core.domain.Conversation
 import app.velin.core.domain.ConversationId
+import app.velin.core.domain.Failure
 import app.velin.core.domain.FolderKind
 import app.velin.core.domain.InlineImage
 import app.velin.core.domain.MailAuthentication
@@ -15,6 +16,7 @@ import app.velin.feature.mail.FakeMailRepo
 import app.velin.feature.mail.FakeMailbox
 import app.velin.feature.mail.eid
 import app.velin.feature.mail.folder
+import app.velin.feature.mail.model.AttachmentUi
 import app.velin.feature.mail.model.BodyUi
 import app.velin.feature.mail.testAccount
 import java.time.Instant
@@ -71,6 +73,21 @@ class ConversationViewModelTest {
         vm.onEvent(ConversationEvent.ShowRemoteContent("mails/m1"))
         assertEquals(listOf(MailId(eid("mails", "m1"))), repo.consents)
         assertTrue("mails/m1" in (vm.state.value as ConversationUiState.Loaded).remoteContentAllowed)
+    }
+
+    @Test
+    fun openingAnAttachmentDownloadsItFirst() = runTest {
+        val vm = viewModel()
+        val attachment = AttachmentUi("files/f2", "a.pdf", "application/pdf", 3)
+        val effects = mutableListOf<ConversationEffect>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.effects.collect { effects += it } }
+        vm.onEvent(ConversationEvent.OpenAttachment("mails/m1", attachment))
+        assertEquals(listOf(ConversationEffect.ActionFailed(Failure.Unsupported)), effects)
+        val file = java.io.File("a.pdf")
+        repo.download = Outcome.Success(file)
+        vm.onEvent(ConversationEvent.OpenAttachment("mails/m1", attachment))
+        assertEquals(ConversationEffect.OpenAttachment(file, "application/pdf"), effects.last())
+        assertEquals(List(2) { AttachmentId(eid("files", "f2")) }, repo.downloads)
     }
 
     @Test

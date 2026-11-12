@@ -54,6 +54,8 @@
             if plain.len() > LIMIT - output.len() { return Err(ApiCallError::internal("Attachment exceeds limit".into())); }
             output.extend_from_slice(&plain);
         }
-        if output.len() as i64 != file.size { return Err(ApiCallError::internal("Invalid attachment size".into())); }
+        // File.size can be the encrypted size: files of external mail carry their blob size. Upstream does not
+        // compare at all. Plaintext is never larger than either size, so keep only that bound.
+        if output.len() as i64 > file.size { return Err(ApiCallError::internal("Invalid attachment size".into())); }
         Ok(output)
     }

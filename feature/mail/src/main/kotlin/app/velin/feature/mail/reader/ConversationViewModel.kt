@@ -35,7 +35,8 @@ sealed interface ConversationEffect {
     data class Forward(val messageId: String) : ConversationEffect
     data class EditDraft(val messageId: String) : ConversationEffect
     data class OpenLink(val uri: android.net.Uri) : ConversationEffect
-    data class OpenAttachment(val attachmentId: String) : ConversationEffect
+    /** A downloaded attachment. [mimeType] comes from the sender; the app checks it before use. */
+    data class OpenAttachment(val file: java.io.File, val mimeType: String) : ConversationEffect
     data object PickFolder : ConversationEffect
     data object PickLabels : ConversationEffect
     data class ActionFailed(val failure: Failure) : ConversationEffect
@@ -98,7 +99,12 @@ class ConversationViewModel(
             is ConversationEvent.Forward -> effectChannel.trySend(ConversationEffect.Forward(event.messageId))
             is ConversationEvent.EditDraft -> effectChannel.trySend(ConversationEffect.EditDraft(event.messageId))
             is ConversationEvent.OpenLink -> effectChannel.trySend(ConversationEffect.OpenLink(event.uri))
-            is ConversationEvent.OpenAttachment -> effectChannel.trySend(ConversationEffect.OpenAttachment(event.attachment.id))
+            is ConversationEvent.OpenAttachment -> viewModelScope.launch {
+                when (val file = mail.downloadAttachment(account.id, AttachmentId(entityIdOf(event.attachment.id)))) {
+                    is Outcome.Success -> effectChannel.send(ConversationEffect.OpenAttachment(file.value, event.attachment.mimeType))
+                    is Outcome.Failed -> effectChannel.send(ConversationEffect.ActionFailed(file.failure))
+                }
+            }
             // Per message and per view. The data layer re-sends the body with remote images kept.
             is ConversationEvent.ShowRemoteContent -> viewModelScope.launch {
                 val outcome = mail.allowExternalContent(account.id, MailId(entityIdOf(event.messageId)))

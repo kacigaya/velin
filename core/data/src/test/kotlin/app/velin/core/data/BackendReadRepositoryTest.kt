@@ -4,6 +4,7 @@ import app.velin.core.domain.*
 import app.velin.core.network.EntityChange
 import app.velin.core.network.EntityOperation
 import app.velin.core.network.SyncEvent
+import java.io.File
 import java.nio.file.Files
 import java.time.Duration
 import java.time.Instant
@@ -77,8 +78,11 @@ class BackendReadRepositoryTest {
             return if (failure) Outcome.Failed(Failure.Decryption)
                 else Outcome.Success("<p style='color:red'>body</p><img src='https://example.invalid/pixel'><img src='cid:logo'>")
         }
-        override suspend fun attachment(account: AccountId, id: AttachmentId) = Outcome.Success(AttachmentContent(
-            attachment, byteArrayOf(137.toByte(), 80, 78, 71, 13, 10, 26, 10)))
+        val attachmentParents = mutableListOf<MailId?>()
+        override suspend fun attachment(account: AccountId, id: AttachmentId, mail: MailId?): Outcome<AttachmentContent> {
+            attachmentParents += mail
+            return Outcome.Success(AttachmentContent(attachment, byteArrayOf(137.toByte(), 80, 78, 71, 13, 10, 26, 10)))
+        }
     }
     @Test fun failedSendKeepsDraftAndSuccessfulSendInvalidatesPage() = runBlocking {
         val source = Source()
@@ -186,10 +190,58 @@ class BackendReadRepositoryTest {
         try {
             val repo = BackendReadRepository(Source(), cache)
             val result = repo.downloadAttachment(account, attachment.id) as Outcome.Success
-            assertEquals(cache.canonicalFile, result.value.canonicalFile.parentFile)
-            assertTrue(result.value.name.startsWith("attachment-"))
+            // The cleaned name sits in a fresh folder directly under the cache.
+            assertEquals(cache.canonicalFile, result.value.canonicalFile.parentFile.parentFile)
+            assertTrue(result.value.parentFile.name.startsWith("attachment-"))
+            assertEquals("_.._outside", result.value.name)
             assertEquals(8L, result.value.length())
+            val second = repo.downloadAttachment(account, attachment.id) as Outcome.Success
+            assertTrue("each download gets its own folder", second.value.parentFile != result.value.parentFile)
+            repo.clear()
+            assertTrue("sign-out deletes decrypted files", cache.listFiles().isNullOrEmpty())
+        } finally { cache.deleteRecursively() }
+    }
+    @Test fun attachmentReadsNameTheCachedParentMail() = runBlocking {
+        val source = Source()
+        val cache = Files.createTempDirectory("mail-read").toFile()
+        try {
+            val repo = BackendReadRepository(source, cache)
+            repo.downloadAttachment(account, attachment.id)
+            val parent = MailId(entity("old"))
+            repo.load(account, parent)
+            repo.downloadAttachment(account, attachment.id)
+            repo.inlineImage(account, attachment.id)
+            // A restored mail was never loaded by this SDK session, so the parent comes from the cache.
+            assertEquals(listOf(null, parent, parent), source.attachmentParents)
             assertTrue(repo.inlineImage(account, attachment.id) is Outcome.Success)
+        } finally { cache.deleteRecursively() }
+    }
+    @Test fun downloadNamesKeepOnlySafeCharacters() {
+        assertEquals("T_C_Customer-Promotions-FR.pdf", downloadName("T&C_Customer-Promotions-FR.pdf"))
+        assertEquals("a_b_c.txt", downloadName("a/b\\c.txt"))
+        assertEquals("hidden", downloadName("..hidden"))
+        assertEquals("Été 2026.pdf", downloadName("Été 2026.pdf"))
+        assertEquals("attachment", downloadName("  "))
+        assertEquals(200, downloadName("x".repeat(500)).length)
+        // 100 CJK characters are 300 UTF-8 bytes. The name stays under the 255-byte file system limit.
+        val cjk = downloadName("報".repeat(100) + ".pdf")
+        assertTrue(cjk.toByteArray().size <= 200 && cjk.endsWith(".pdf") && cjk.startsWith("報"))
+        // U+20000 is a letter of four UTF-8 bytes. The cut never splits it.
+        assertEquals("\uD840\uDC00".repeat(49) + ".png", downloadName("\uD840\uDC00".repeat(80) + ".png"))
+    }
+    @Test fun oldDownloadsAreDeletedOnTheNextDownload() = runBlocking {
+        val cache = Files.createTempDirectory("mail-read").toFile()
+        try {
+            var time = Instant.parse("2026-11-12T10:00:00Z")
+            val repo = BackendReadRepository(Source(), cache, null) { time }
+            val old = File(cache, "attachment-old").apply { mkdirs(); setLastModified(time.minusSeconds(7200).toEpochMilli()) }
+            val recent = File(cache, "attachment-recent").apply { mkdirs(); setLastModified(time.minusSeconds(60).toEpochMilli()) }
+            repo.downloadAttachment(account, attachment.id)
+            assertTrue(!old.exists() && recent.exists())
+            // An app restart or sign-in sweeps too, without a new download.
+            time = Instant.now().plusSeconds(7200)
+            repo.open(account)
+            assertTrue(cache.listFiles().isNullOrEmpty())
         } finally { cache.deleteRecursively() }
     }
     @Test fun inlineValidationRejectsSpoofedMimeSvgAndOversize() {

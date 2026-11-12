@@ -127,7 +127,9 @@ internal class FakeMailRepo : MailRepository {
     val resolved = mutableMapOf<String, Recipient>()
     override suspend fun resolveRecipient(account: AccountId, address: String): Outcome<Recipient> =
         resolved[address.lowercase()]?.let { Outcome.Success(it) } ?: Outcome.Failed(app.velin.core.domain.Failure.Unsupported)
-    override suspend fun downloadAttachment(account: AccountId, id: AttachmentId): Outcome<File> = Outcome.Failed(app.velin.core.domain.Failure.Unsupported)
+    var download: Outcome<File> = Outcome.Failed(app.velin.core.domain.Failure.Unsupported)
+    val downloads = mutableListOf<AttachmentId>()
+    override suspend fun downloadAttachment(account: AccountId, id: AttachmentId): Outcome<File> = download.also { downloads += id }
     override fun search(account: AccountId, query: String): Flow<Outcome<List<MailSummary>>> = flowOf(Outcome.Success(emptyList()))
     override fun suggestRecipients(account: AccountId, query: String): Flow<List<Recipient>> = flowOf(emptyList())
 }

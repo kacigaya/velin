@@ -37,13 +37,10 @@ impl EntityClient {
 impl EntityClient {
     pub async fn velin_file_blobs(&self, blobs: Vec<crate::entities::generated::sys::Blob>,
         access: crate::entities::generated::storage::BlobServerAccessInfo) -> Result<Vec<Vec<u8>>, ApiCallError> {
-        use crate::entities::generated::storage::{BlobGetIn, BlobId};
+        use crate::entities::generated::storage::BlobGetIn;
         if blobs.is_empty() { return Ok(vec![]); }
-        let archive = &blobs[0].archiveId;
-        if blobs.iter().any(|b| &b.archiveId != archive) { return Err(ApiCallError::internal("Mixed blob archives".into())); }
         // BlobFacade.ts:1027-1040; service_executor.rs:277 uses _body for GET.
-        let input = BlobGetIn { _format: 0, archiveId: archive.clone(), blobId: None,
-            blobIds: blobs.iter().map(|b| BlobId { _id: None, blobId: b.blobId.clone() }).collect() };
+        let input = velin_blob_get_in(&blobs)?;
         let mapper = crate::instance_mapper::InstanceMapper::new(self.type_model_provider.clone());
         let parsed = mapper.serialize_entity(input).map_err(|_| ApiCallError::internal("Invalid blob request".into()))?;
         let raw = self.json_serializer.serialize(&BlobGetIn::type_ref(), parsed)?;
@@ -61,6 +58,16 @@ impl EntityClient {
         }
         Err(ApiCallError::internal("Blob download failed".into()))
     }
+}
+
+/// Each BlobId is an aggregate. It needs its own random ID, or serialization fails before the request.
+fn velin_blob_get_in(blobs: &[crate::entities::generated::sys::Blob])
+    -> Result<crate::entities::generated::storage::BlobGetIn, ApiCallError> {
+    use crate::entities::generated::storage::{BlobGetIn, BlobId};
+    let archive = &blobs[0].archiveId;
+    if blobs.iter().any(|b| &b.archiveId != archive) { return Err(ApiCallError::internal("Mixed blob archives".into())); }
+    Ok(BlobGetIn { _format: 0, archiveId: archive.clone(), blobId: None,
+        blobIds: blobs.iter().map(|b| BlobId { _id: Some(crate::mail_facade::velin_aggregate_id()), blobId: b.blobId.clone() }).collect() })
 }
 
 fn velin_parse_blobs(bytes: &[u8], blobs: &[crate::entities::generated::sys::Blob]) -> Result<Vec<Vec<u8>>, ApiCallError> {
@@ -106,6 +113,17 @@ mod velin_blob_tests {
         response.pop();
         response[19..23].copy_from_slice(&u32::MAX.to_be_bytes());
         assert!(velin_parse_blobs(&response, &[blob]).is_err());
+    }
+    #[test]
+    fn velin_blob_request_serializes_and_rejects_mixed_archives() {
+        use crate::entities::generated::{storage::BlobGetIn, sys::Blob};
+        let blob = |archive: &str, id: &str| Blob { _id: None, archiveId: archive.to_owned().into(), size: 3, blobId: id.to_owned().into() };
+        let input = velin_blob_get_in(&[blob("archive", "------------"), blob("archive", "-----------0")]).unwrap();
+        assert!(input.blobIds[0]._id.is_some() && input.blobIds[0]._id != input.blobIds[1]._id);
+        let models = crate::velin_session_transfer::velin_session_transfer_tests::provider(false);
+        let parsed = crate::instance_mapper::InstanceMapper::new(models.clone()).serialize_entity(input).unwrap();
+        crate::json_serializer::JsonSerializer::new(models).serialize(&BlobGetIn::type_ref(), parsed).unwrap();
+        assert!(velin_blob_get_in(&[blob("archive", "------------"), blob("other", "-----------0")]).is_err());
     }
     #[test]
     fn velin_blob_framing_rejects_truncation_and_extra_data() {

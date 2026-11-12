@@ -56,7 +56,8 @@ interface SdkMailReader {
     suspend fun entries(list: String, cursor: String?): List<ReadEntry>
     suspend fun summary(id: ReadId): ReadSummary
     suspend fun message(id: ReadId): ReadMessage = throw SdkException(SdkFailure.InvalidKey)
-    suspend fun attachment(id: ReadId): ReadAttachmentContent = throw SdkException(SdkFailure.AttachmentsUnsupported)
+    /** [mail] names the parent when this session did not load it. The SDK checks that it lists [id]. */
+    suspend fun attachment(id: ReadId, mail: ReadId? = null): ReadAttachmentContent = throw SdkException(SdkFailure.AttachmentsUnsupported)
     suspend fun conversation(id: ReadId): List<ReadId> = throw SdkException(SdkFailure.Protocol)
 }
 
@@ -142,14 +143,16 @@ internal class NativeMailReader(private val facade: MailFacade, private val trus
         if (errors.isNotEmpty() || size < 0) throw SdkException(SdkFailure.InvalidKey)
         return ReadAttachment(requireNotNull(id).readId(), name, mimeType ?: "application/octet-stream", size, cid)
     }
-    override suspend fun attachment(id: ReadId): ReadAttachmentContent = api {
-        val parent = synchronized(attachmentParents) { attachmentParents[id] }
+    override suspend fun attachment(id: ReadId, mail: ReadId?): ReadAttachmentContent = api {
+        // Mail restored from the offline store was never loaded in this session.
+        val parent = mail ?: synchronized(attachmentParents) { attachmentParents[id] }
             ?: throw SdkException(SdkFailure.Protocol)
         val file = facade.velinAttachment(IdTupleGenerated(parent.list, parent.element), IdTupleGenerated(id.list, id.element))
         val metadata = file.metadata()
         require(metadata.id == id && metadata.size <= 20 * 1024 * 1024)
         val bytes = facade.velinAttachmentContent(IdTupleGenerated(parent.list, parent.element), IdTupleGenerated(id.list, id.element))
-        require(bytes.size.toLong() == metadata.size)
+        // metadata.size can be the encrypted size, so it only bounds the plaintext.
+        require(bytes.size.toLong() <= metadata.size)
         ReadAttachmentContent(metadata, bytes)
     }
     override suspend fun senders(): List<ReadAddress> = api {

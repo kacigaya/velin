@@ -4,6 +4,7 @@ import app.velin.core.domain.Address
 import app.velin.core.domain.Attachment
 import app.velin.core.domain.AttachmentId
 import app.velin.core.domain.BodyState
+import app.velin.core.domain.Failure
 import app.velin.core.domain.MailAuthentication
 import app.velin.core.domain.MailFinding
 import app.velin.core.domain.MailId
@@ -49,8 +50,13 @@ class DomainMappingTest {
     }
 
     @Test
-    fun hidesInlineImagesFromAttachmentList() {
-        val ui = message(null, BodyState.Loading).toUi()
-        assertEquals(listOf("a.pdf"), ui.attachments.map { it.name })
+    fun hidesOnlyImagesTheBodyShows() {
+        assertEquals(listOf("a.pdf"), message(null, BodyState.Loading).toUi().attachments.map { it.name })
+        val shown = BodyState.Loaded("<img>", false, false, mapOf("velin-inline:1" to AttachmentId(eid("files", "f2"))))
+        assertEquals(listOf("a.pdf"), message(null, shown).toUi().attachments.map { it.name })
+        // Gmail gives plain files a Content-ID too. A file the body does not show stays in the list.
+        val unreferenced = BodyState.Loaded("<p>x</p>", false, false, emptyMap())
+        assertEquals(listOf("a.pdf", "logo.png"), message(null, unreferenced).toUi().attachments.map { it.name })
+        assertEquals(listOf("a.pdf", "logo.png"), message(null, BodyState.Failed(Failure.Offline)).toUi().attachments.map { it.name })
     }
 }

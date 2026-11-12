@@ -183,9 +183,9 @@ internal class SdkMailReadSource(private val sessions: SessionReadAccess) : Mail
     override suspend fun body(account: AccountId, id: MailId): Outcome<String> = read(account) { sdk ->
         sdk.message(id.value.readId()).also { require(it.id.domain() == id.value) }.body
     }
-    override suspend fun attachment(account: AccountId, id: AttachmentId): Outcome<AttachmentContent> = read(account) { sdk ->
-        val content = sdk.attachment(id.value.readId())
-        require(content.metadata.id.domain() == id.value && content.metadata.size == content.bytes.size.toLong())
+    override suspend fun attachment(account: AccountId, id: AttachmentId, mail: MailId?): Outcome<AttachmentContent> = read(account) { sdk ->
+        val content = sdk.attachment(id.value.readId(), mail?.value?.readId())
+        require(content.metadata.id.domain() == id.value && content.bytes.size.toLong() <= content.metadata.size)
         AttachmentContent(content.metadata.domainAttachment(), content.bytes)
     }
 
