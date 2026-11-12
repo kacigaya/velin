@@ -141,9 +141,8 @@ internal class SdkMailReadSource(private val sessions: SessionReadAccess) : Mail
         }
     }
     /**
-     * Upstream receives unread counts over the event bus (WebsocketCounterData, MailModel.ts:455-478),
-     * not from CounterService GET, which the server rejects with 400 for mail folders.
-     * Counts remain best effort during connection setup and reconnect.
+     * Unread counts come over the event bus (MailModel.ts:455-478); CounterService GET returns 400
+     * for mail folders. Counts stay best effort while the connection starts or reconnects.
      */
     private suspend fun unreadOrZero(sdk: SdkMailReader, folder: ReadFolder): Int = try {
         sdk.unread(folder).takeIf { it in 0..Int.MAX_VALUE.toLong() }?.toInt() ?: 0

@@ -77,7 +77,7 @@ class ShellScreenshotTest {
     @Config(sdk = [35], qualifiers = "w1280dp-h800dp-mdpi")
     fun tablet() = capture("shell_tablet")
 
-    /** What a signed-in user sees until the mail backend exists. */
+    /** What a signed-in user sees without a mail backend. */
     @Test
     @Config(sdk = [35], qualifiers = "w411dp-h891dp-xxhdpi")
     fun signedInWithoutMail() = capture("shell_signed_in_no_mail", object : AppGraph {

@@ -49,7 +49,7 @@ internal fun apiDiagnostic(error: ApiCallException): String = when (error) {
     }
 }
 
-/** Resumes existing internal accounts only. New session orchestration belongs to M2. */
+/** Resumes existing internal accounts only. :core:data AuthService creates new sessions. */
 class SdkEngine(baseUrl: String, transport: BinaryTransport, store: SdkContentStore, private val trust: SdkIdentityTrustStore? = null) : AutoCloseable {
     private val sdk = Sdk(baseUrl, SdkRestClient(transport), object : FileClient {
         override suspend fun persistContent(name: String, content: ByteArray) {

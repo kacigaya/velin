@@ -21,8 +21,7 @@ import java.io.ByteArrayInputStream
 /**
  * Renders an already sanitized HTML mail body.
  *
- * A WebView is the only practical renderer for arbitrary HTML mail; native text views cannot lay
- * out sender HTML and CSS. It is locked down as a passive document viewer:
+ * Arbitrary HTML and CSS need a WebView. It is locked down as a passive document viewer:
  * - JavaScript, file and content access are off.
  * - A Content-Security-Policy blocks every remote load unless [allowRemoteContent] is true.
  *   Request interception enforces the same rule as a second layer.

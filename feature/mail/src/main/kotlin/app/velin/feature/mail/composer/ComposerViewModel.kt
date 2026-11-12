@@ -130,9 +130,8 @@ class ComposerViewModel(
                     is Outcome.Failed -> effectChannel.send(ComposerEffect.Failed(loaded.failure))
                 }
             }
-            // Autosave starts after loading, so reopening a draft never saves it unchanged. Any later
-            // edit restarts the timer; the first emission is the loaded state, not an edit. Only the
-            // addresses count, so a finished key lookup is not an edit.
+            // The first emission is the loaded draft, so reopening never saves it unchanged.
+            // Only addresses count: a finished key lookup is not an edit.
             combine(
                 snapshotFlow { subject.text.toString() to body.text.toString() },
                 recipients.map { fields -> fields.mapValues { (_, list) -> list.map { it.address } } }.distinctUntilChanged(),

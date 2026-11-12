@@ -197,9 +197,8 @@ internal class BackendAuthRepository(
         token?.let { discard(it) }
     }
     /**
-     * Ends a session that was created but will not be used. Cancelling the second factor only
-     * removes a session that still waits for it; a session without 2FA, or one that failed
-     * after activation, must be deleted explicitly or it stays open on the server.
+     * Ends a session that will not be used. Cancelling 2FA removes only a session that still waits
+     * for it; any other session must be deleted, or it stays open on the server.
      */
     private suspend fun discard(token: String) {
         runCatching { service.cancel(token) }

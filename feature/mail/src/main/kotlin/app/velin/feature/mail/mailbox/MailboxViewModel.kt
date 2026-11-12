@@ -171,7 +171,6 @@ class MailboxViewModel(
         }
     }
 
-    /** Moves to a folder chosen in a picker. */
     fun moveToFolder(mailIds: Set<String>, folderUiId: String) {
         val target = folders.value.firstOrNull { it.id.value.toUiId() == folderUiId } ?: return
         moveMails(mailIds, target)

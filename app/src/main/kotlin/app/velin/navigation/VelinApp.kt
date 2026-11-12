@@ -61,7 +61,7 @@ import kotlinx.coroutines.launch
 /** Backend entry points. :app builds the real graph; tests can pass fakes. */
 interface AppGraph {
     val auth: AuthRepository
-    /** Null until the mail backend exists (milestone M3). */
+    /** Null without a mail backend; the app then offers only sign-out. */
     val mailbox: MailboxRepository?
     val mail: MailRepository?
 }
@@ -285,7 +285,7 @@ private fun MailApp(account: Account, auth: AuthRepository, mailbox: MailboxRepo
     }
 }
 
-/** Interim screen after sign-in while the mail backend is missing; it still allows sign-out. */
+/** Screen after sign-in when the graph has no mail backend; it still allows sign-out. */
 @Composable
 private fun SignedInWithoutMail(account: Account, auth: AuthRepository) {
     val scope = rememberCoroutineScope()

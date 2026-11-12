@@ -69,9 +69,8 @@ fun MoveToSheet(
 data class LabelChoice(val label: LabelUi, val state: ToggleableState)
 
 /**
- * Tri-state label editor for one or many mails. A label the selected mails disagree on starts
- * as indeterminate and stays untouched unless the user changes it; [onApply] receives only the
- * labels to add to and remove from every selected mail.
+ * Tri-state label editor. A label the selected mails disagree on stays indeterminate until the user
+ * changes it; [onApply] receives only the labels to add and remove.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

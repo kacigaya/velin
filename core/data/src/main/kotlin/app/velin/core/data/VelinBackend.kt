@@ -73,7 +73,7 @@ class VelinBackend(context: Context, readSource: MailReadSource? = null) {
     }
 }
 
-/** M2 has no persistent SDK cache. Content stays private to each SDK instance. */
+/** No persistent SDK cache. Content stays in memory, private to each SDK instance. */
 internal class PrivateSdkContentStore : SdkContentStore {
     private val content = mutableMapOf<String, ByteArray>()
     override suspend fun write(name: String, content: ByteArray) {

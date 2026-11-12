@@ -663,8 +663,10 @@ private const val MAX_SAVED_PAGE = 200
 private const val MAX_SAVED_MESSAGES = 100
 private const val MAX_SAVED_BODY_CHARS = 4 * 1024 * 1024
 
-/** Generated IDs are base64ext. Its alphabet is in ASCII order, so equal-length IDs sort by time. */
-/** Milliseconds in the first 42 bits of a generated ID (EntityUtils.ts generatedIdToTimestamp), or null. */
+/**
+ * Milliseconds in the first 42 bits of a generated ID (EntityUtils.ts generatedIdToTimestamp), or null.
+ * Generated IDs are base64ext. Its alphabet is in ASCII order, so equal-length IDs sort by time.
+ */
 internal fun generatedIdTime(id: String): Long? {
     if (id.length != 12) return null
     var bits = 0L
