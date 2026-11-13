@@ -30,13 +30,23 @@ class OfflineStoreTest {
             Folder(FolderId(entity("child")), "Child", FolderKind.Custom, 0, FolderId(entity("inbox")))),
             listOf(label), listOf(SenderAlias(Address("me@example.invalid", "Me"), true)), mapOf("entries" to entity("inbox"))),
         mapOf(FolderId(entity("inbox")) to MailPage(listOf(summary), PageCursor(ElementId("next")))),
-        listOf(SavedMessage(message, "<p>body</p>", summary), SavedMessage(message.copy(id = MailId(entity("sent")), received = false), "")))
+        listOf(SavedMessage(message, "<p>body</p>", summary),
+            SavedMessage(message.copy(id = MailId(entity("sent")), received = false, finding = null, phishingReportable = true), "")))
 
     @Test fun draftRejectionsRoundTripAndOldFilesDefaultToEmpty() {
         val saved = state.copy(draftRejections = mapOf(message.id to setOf("to@example.invalid")))
         assertEquals(saved, decodeOffline(encodeOffline(saved)))
         val old = org.json.JSONObject(encodeOffline(state)).apply { remove("draftRejections") }
         assertTrue(decodeOffline(old.toString()).draftRejections.isEmpty())
+    }
+
+    // Saved mail is not reloaded, so files from before 0.5 derive the phishing action from what they kept.
+    @Test fun oldFilesDerivePhishingReportsFromDraftAndFinding() {
+        val old = org.json.JSONObject(encodeOffline(state))
+        val messages = old.getJSONArray("messages")
+        for (i in 0 until messages.length()) messages.getJSONObject(i).remove("phishingReportable")
+        val decoded = decodeOffline(old.toString()).messages.map { it.message.phishingReportable }
+        assertEquals("a phishing finding hides it; a plain mail offers it", listOf(false, true), decoded)
     }
 
     @Test fun roundTripKeepsEveryField() {

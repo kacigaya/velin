@@ -53,6 +53,8 @@ data class MessageUi(
     val body: BodyUi = BodyUi.Loading,
     val attachments: ImmutableList<AttachmentUi> = persistentListOf(),
     val banners: ImmutableList<MailBannerUi> = persistentListOf(),
+    /** Not a draft, not Tuta team mail, and no phishing status yet. */
+    val phishingReportable: Boolean = false,
 )
 
 @Immutable

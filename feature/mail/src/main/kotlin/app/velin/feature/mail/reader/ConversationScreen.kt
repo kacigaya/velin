@@ -101,6 +101,7 @@ sealed interface ConversationEvent {
     data object Move : ConversationEvent
     data object Label : ConversationEvent
     data object ReportSpam : ConversationEvent
+    data object ReportPhishing : ConversationEvent
     data class Reply(val messageId: String) : ConversationEvent
     data class ReplyAll(val messageId: String) : ConversationEvent
     data class Forward(val messageId: String) : ConversationEvent
@@ -203,7 +204,9 @@ private fun ConversationActions(conversation: ConversationUi, onEvent: (Conversa
             OverflowAction(stringResource(R.string.action_move), VelinIcons.Move) { onEvent(ConversationEvent.Move) },
             OverflowAction(stringResource(R.string.action_label), VelinIcons.Label) { onEvent(ConversationEvent.Label) },
             OverflowAction(stringResource(R.string.action_report_spam), VelinIcons.Report) { onEvent(ConversationEvent.ReportSpam) },
-        ),
+        ) + if (conversation.messages.any { it.phishingReportable }) {
+            listOf(OverflowAction(stringResource(R.string.action_report_phishing), VelinIcons.Warning) { onEvent(ConversationEvent.ReportPhishing) })
+        } else emptyList(),
     )
 }
 

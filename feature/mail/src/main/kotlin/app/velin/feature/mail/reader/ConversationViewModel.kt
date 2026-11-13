@@ -8,6 +8,7 @@ import app.velin.core.domain.ConversationId
 import app.velin.core.domain.Failure
 import app.velin.core.domain.FolderKind
 import app.velin.core.domain.MailId
+import app.velin.core.domain.MailReportType
 import app.velin.core.domain.MailRepository
 import app.velin.core.domain.MailboxRepository
 import app.velin.core.domain.Outcome
@@ -40,6 +41,10 @@ sealed interface ConversationEffect {
     data object PickFolder : ConversationEffect
     data object PickLabels : ConversationEffect
     data class ActionFailed(val failure: Failure) : ConversationEffect
+    /** A move to Spam can also report the mails to Tuta; the host asks, then calls [ConversationViewModel.moveToSpam]. */
+    data object ConfirmSpamReport : ConversationEffect
+    /** The host asks, then calls [ConversationViewModel.reportPhishing]. */
+    data object ConfirmPhishingReport : ConversationEffect
 }
 
 class ConversationViewModel(
@@ -91,7 +96,8 @@ class ConversationViewModel(
             ConversationEvent.Back -> effectChannel.trySend(ConversationEffect.Close)
             ConversationEvent.Archive -> moveAll(FolderKind.Archive, close = true)
             ConversationEvent.Trash -> moveAll(FolderKind.Trash, close = true)
-            ConversationEvent.ReportSpam -> moveAll(FolderKind.Spam, close = true)
+            ConversationEvent.ReportSpam -> effectChannel.trySend(ConversationEffect.ConfirmSpamReport)
+            ConversationEvent.ReportPhishing -> if (phishingTarget() != null) effectChannel.trySend(ConversationEffect.ConfirmPhishingReport)
             ConversationEvent.MarkUnread -> act(close = true) { ids -> mail.setUnread(account.id, ids.takeLast(1), true) }
             ConversationEvent.Move -> effectChannel.trySend(ConversationEffect.PickFolder)
             ConversationEvent.Label -> effectChannel.trySend(ConversationEffect.PickLabels)
@@ -144,8 +150,43 @@ class ConversationViewModel(
     /** Moves every message of the conversation to a folder chosen in a picker, then closes. */
     fun moveToFolder(folderUiId: String) {
         val target = folders.value.firstOrNull { it.id.value.toUiId() == folderUiId } ?: return
+        if (target.kind == FolderKind.Spam) {
+            effectChannel.trySend(ConversationEffect.ConfirmSpamReport)
+            return
+        }
         act(close = true) { ids -> mail.move(account.id, ids, target.id) }
     }
+
+    /**
+     * Moves the conversation to Spam. With [sendReport] it also reports each mail to Tuta, which sends the mail's
+     * session key (MailReportDialog.ts). Dismissing the question cancels the move.
+     */
+    fun moveToSpam(sendReport: Boolean) {
+        val target = folders.value.firstOrNull { it.kind == FolderKind.Spam } ?: return
+        act(close = true) { ids ->
+            val moved = mail.move(account.id, ids, target.id)
+            if (moved is Outcome.Success && sendReport) mail.report(account.id, ids, MailReportType.Spam) else moved
+        }
+    }
+
+    /**
+     * MailViewerViewModel.ts:631-639: marks the newest reportable mail as phishing, moves it to Spam and reports it.
+     * There is no undo.
+     */
+    fun reportPhishing() {
+        val target = phishingTarget() ?: return
+        val spam = folders.value.firstOrNull { it.kind == FolderKind.Spam } ?: return
+        val id = MailId(entityIdOf(target))
+        viewModelScope.launch {
+            val outcome = mail.markPhishing(account.id, id).then { mail.move(account.id, listOf(id), spam.id) }
+                .then { mail.report(account.id, listOf(id), MailReportType.Phishing) }
+            report(outcome)
+            if (outcome is Outcome.Success) effectChannel.trySend(ConversationEffect.Close)
+        }
+    }
+
+    private fun phishingTarget(): String? =
+        (state.value as? ConversationUiState.Loaded)?.conversation?.messages?.lastOrNull { it.phishingReportable }?.id
 
     private fun moveAll(kind: FolderKind, close: Boolean) {
         val target = folders.value.firstOrNull { it.kind == kind } ?: return
@@ -165,6 +206,8 @@ class ConversationViewModel(
     private fun report(outcome: Outcome<*>) {
         if (outcome is Outcome.Failed) effectChannel.trySend(ConversationEffect.ActionFailed(outcome.failure))
     }
+
+    private inline fun Outcome<Unit>.then(next: () -> Outcome<Unit>): Outcome<Unit> = if (this is Outcome.Success) next() else this
 
     private companion object {
         const val STOP_TIMEOUT_MS = 5_000L

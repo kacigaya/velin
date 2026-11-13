@@ -38,15 +38,24 @@ All links use release commit `332e57461cdc4fe4a4ad9bdc8555f56df02931c0`.
 4. [Permanent delete](https://github.com/tutao/tutanota/blob/332e57461cdc4fe4a4ad9bdc8555f56df02931c0/src/applications/common/api/worker/facades/lazy/MailFacade.ts#L657): MailService DELETE takes `mails` and nullable `folder`. Group by mailbag, then split at 50. Velin always supplies the folder filter. [The official client checks Trash, Spam, and their descendants](https://github.com/tutao/tutanota/blob/332e57461cdc4fe4a4ad9bdc8555f56df02931c0/src/applications/mail-app/mail/view/MailViewModel.ts#L870).
 5. Generated release models and service descriptors supply numeric field IDs, service paths, and model versions. New request records have no aggregate child objects. No aggregate IDs are needed for these payloads.
 
-## Spam and phishing reporting: NOT IMPLEMENTED
+## Spam and phishing reporting
 
-Moving to Spam is implemented. It does not submit a report or mark a mail as phishing.
+A report sends the mail's session key to Tuta, so Tuta can read that mail. Velin asks every time. It does not
+read or save the "remember decision" mailbox setting of the official client.
 
-[The official spam path](https://github.com/tutao/tutanota/blob/332e57461cdc4fe4a4ad9bdc8555f56df02931c0/src/applications/mail-app/mail/view/MailGuiUtils.ts#L300) moves first. It checks the reporting preference or asks for consent. It waits for the undo period, skips reporting after undo, and excludes Tuta team mail. [ReportMailService POST](https://github.com/tutao/tutanota/blob/332e57461cdc4fe4a4ad9bdc8555f56df02931c0/src/applications/common/api/worker/facades/lazy/MailFacade.ts#L647) receives `mailId`, the resolved plaintext `mailSessionKey`, and `reportType`. [The report types](https://github.com/tutao/tutanota/blob/332e57461cdc4fe4a4ad9bdc8555f56df02931c0/src/entities/tutanota/Utils.ts#L220) are phishing 0 and spam 1.
+[ReportMailService POST](https://github.com/tutao/tutanota/blob/332e57461cdc4fe4a4ad9bdc8555f56df02931c0/src/applications/common/api/worker/facades/lazy/MailFacade.ts#L647) receives `mailId`, the resolved plaintext `mailSessionKey`, and `reportType`. [The report types](https://github.com/tutao/tutanota/blob/332e57461cdc4fe4a4ad9bdc8555f56df02931c0/src/entities/tutanota/Utils.ts#L220) are phishing 0 and spam 1. `velin_report_mail` resolves the key inside Rust and posts it. It skips Tuta team and system mail, as `isTutaTeamMail` does. A mail that was deleted meanwhile (404) is skipped, as `MailModel.reportMails` does.
 
-[The official phishing path](https://github.com/tutao/tutanota/blob/332e57461cdc4fe4a4ad9bdc8555f56df02931c0/src/applications/mail-app/mail/view/MailViewerViewModel.ts#L630) also writes the suspicious phishing status before moving and reporting. It does not offer undo.
+Spam, as [the official spam path](https://github.com/tutao/tutanota/blob/332e57461cdc4fe4a4ad9bdc8555f56df02931c0/src/applications/mail-app/mail/view/MailGuiUtils.ts#L300):
 
-Velin has no report-consent/preference contract, delayed-report lifecycle, or native report operation that keeps the resolved key inside Rust. Reporting needs those pieces before it can match the release. Ordinary `move` must remain reversible and must not disclose a session key. No mail key or content is sent to a reporting endpoint by this implementation. Do not present a Spam move as a submitted report. Phishing status updates and report submission remain unimplemented.
+1. Every move to Spam asks first: "Report spam" and a move picker that targets Spam. "Move only" moves without a report. Dismissing the dialog cancels the move. Upstream asks after the move, so there a dismissal keeps the mails moved. A Velin conversation move has no undo, so a dismissal must not move.
+2. In the list, the mails move at once. The undo snackbar says that Velin reports them. The report goes out only when the snackbar ends without undo.
+3. In a conversation, the move closes the conversation and has no undo, so the report follows the move.
+
+Phishing, as [the official phishing path](https://github.com/tutao/tutanota/blob/332e57461cdc4fe4a4ad9bdc8555f56df02931c0/src/applications/mail-app/mail/view/MailViewerViewModel.ts#L630):
+
+1. "Report phishing" is in the conversation menu when a mail has phishing status UNKNOWN, is not a draft, and is not Tuta team mail.
+2. Velin asks with the upstream warning. On confirm it patches `phishingStatus` to SUSPICIOUS (an unencrypted value), moves that mail to Spam, then reports it. There is no undo.
+3. The newest reportable mail in the conversation is the one reported. Upstream reports the mail shown in its viewer.
 
 ## Owner live checks: UNVERIFIED
 
@@ -54,7 +63,7 @@ Use a test account and compare each result in the official client.
 
 1. Select more than 50 mails. Mark read, then unread. Check every mail in both clients. Reopen a conversation and check read state.
 2. Move individual mails to Inbox, Archive, Trash, Spam, and a custom folder. Check list removal and the server folder. Check that a different mail in the same conversation stays put.
-3. Save `currentFolders` before a mixed-folder move. Undo by original folder. Check each mail returns to its original folder. Confirm moving to Spam submits no report.
+3. Save `currentFolders` before a mixed-folder move. Undo by original folder. Check each mail returns to its original folder. Move to Spam with "Report", then undo: check that no report goes out.
 4. Assign different starting labels to two mails. Replace both with one label. Remove all labels with an empty list. Check each mail and the conversation label union. Check rejection above five labels.
 5. Try permanent delete from Inbox and a custom folder. Check rejection and no server delete request. Delete test mails directly from Trash and Spam. Check their absence in both clients. Move a selected mail out with a second client before deletion. Check the folder filter prevents deleting it from its new folder.
 6. Disable the network before each action. Check typed failure and unchanged local state. Restore the network and sync. Check server truth replaces the cached pages and active conversation.

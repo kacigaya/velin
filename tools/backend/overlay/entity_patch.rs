@@ -42,11 +42,27 @@ fn instance_sub_keys(model: &TypeModel, group_key: &VersionedAesKey, kdf_nonce: 
         &crate::velin_session_transfer::canonical_context(model, false)))
 }
 
-/// CryptoMapper.ts encryptValue for one top-level value that may change (final values are never patched).
-pub(crate) fn encrypt_value(model: &TypeModel, attribute: &str, value: &ElementValue, key: &VelinValueKey,
+/// Whether the top-level value is encrypted, so a patch of it needs a key.
+pub(crate) fn is_encrypted(model: &TypeModel, attribute: &str) -> Result<bool, ApiCallError> {
+    Ok(value_model(model, attribute)?.encrypted)
+}
+
+/// The patch value of one top-level value that may change; final values are never patched (PatchGenerator.ts:91).
+/// CryptoMapper.ts encryptValue gives encrypted values as standard base64. Unencrypted values keep their
+/// string form; only numbers are needed here.
+pub(crate) fn patch_value(model: &TypeModel, attribute: &str, value: &ElementValue, key: Option<&VelinValueKey>,
+    random: &RandomizerFacade) -> Result<String, ApiCallError> {
+    let value_model = value_model(model, attribute)?;
+    if value_model.is_final || matches!(value, ElementValue::Null) { return Err(invalid()) }
+    if !value_model.encrypted {
+        return match value { ElementValue::Number(number) => Ok(number.to_string()), _ => Err(invalid()) };
+    }
+    Ok(BASE64_STANDARD.encode(encrypt_value(model, attribute, value, key.ok_or_else(invalid)?, random)?))
+}
+
+fn encrypt_value(model: &TypeModel, attribute: &str, value: &ElementValue, key: &VelinValueKey,
     random: &RandomizerFacade) -> Result<Vec<u8>, ApiCallError> {
     let value_model = value_model(model, attribute)?;
-    if !value_model.encrypted || value_model.is_final || matches!(value, ElementValue::Null) { return Err(invalid()) }
     let plain = crate::velin_session_transfer::binary(&value_model.value_type, value)?;
     match key {
         VelinValueKey::Session(key) => key.encrypt_data(&plain, InitializationVector::generate(random)).map_err(|_| invalid()),
@@ -112,8 +128,8 @@ fn aggregate_id(random: &RandomizerFacade) -> crate::CustomId {
     crate::CustomId(BASE64_URL_SAFE_NO_PAD.encode(random.generate_random_array::<4>()))
 }
 
-/// PatchGenerator.ts: one REPLACE of a top-level value, its ciphertext in standard base64.
-pub(crate) fn patch_list(attribute: &str, ciphertext: &[u8], random: &RandomizerFacade) -> PatchList {
+/// PatchGenerator.ts: one REPLACE of a top-level value.
+pub(crate) fn patch_list(attribute: &str, value: String, random: &RandomizerFacade) -> PatchList {
     PatchList { _id: Some(aggregate_id(random)), patches: vec![Patch { _id: Some(aggregate_id(random)),
-        patchOperation: PATCH_REPLACE, attributePath: attribute.to_owned(), value: Some(BASE64_STANDARD.encode(ciphertext)) }] }
+        patchOperation: PATCH_REPLACE, attributePath: attribute.to_owned(), value: Some(value) }] }
 }

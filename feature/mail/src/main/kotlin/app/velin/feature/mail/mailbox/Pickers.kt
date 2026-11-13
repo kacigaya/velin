@@ -192,3 +192,37 @@ fun DeleteForeverDialog(count: Int, onConfirm: () -> Unit, onDismiss: () -> Unit
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }
+
+/**
+ * Asks whether a move to Spam also reports the mails to Tuta (MailReportDialog.ts). A report sends each mail's
+ * session key, so Tuta can read it. Upstream asks after the move, so dismissing keeps the mails moved. Velin asks
+ * before it, and a conversation move has no undo, so dismissing cancels the move.
+ */
+@Composable
+fun SpamReportDialog(count: Int, onAnswer: (report: Boolean) -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(painterResource(VelinIcons.Report), contentDescription = null) },
+        title = { Text(stringResource(R.string.spam_report_title)) },
+        text = { Text(pluralStringResource(R.plurals.spam_report_body, count)) },
+        confirmButton = { TextButton(onClick = { onAnswer(true) }) { Text(stringResource(R.string.action_report)) } },
+        dismissButton = { TextButton(onClick = { onAnswer(false) }) { Text(stringResource(R.string.action_move_only)) } },
+    )
+}
+
+/** Asks before a phishing report (MailViewerUtils.ts showReportPhishingMailDialog). There is no undo. */
+@Composable
+fun PhishingReportDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(painterResource(VelinIcons.Warning), contentDescription = null) },
+        title = { Text(stringResource(R.string.phishing_report_title)) },
+        text = { Text(stringResource(R.string.phishing_report_body)) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(stringResource(R.string.action_report_phishing), color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
+    )
+}

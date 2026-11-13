@@ -103,6 +103,14 @@ internal class SdkMailReadSource(private val sessions: SessionReadAccess) : Mail
             }
         }
     }
+    // MailReportType: PHISHING 0, SPAM 1.
+    override suspend fun report(account: AccountId, ids: List<MailId>, type: MailReportType): Outcome<Unit> = read(account) { sdk ->
+        ids.distinct().forEach { sdk.reportMail(it.value.readId(), if (type == MailReportType.Phishing) 0L else 1L) }
+    }
+    override suspend fun markPhishing(account: AccountId, id: MailId): Outcome<Unit> = read(account) { sdk ->
+        sdk.markPhishing(id.value.readId())
+        Unit
+    }
     override suspend fun markResponded(account: AccountId, sent: MailId): Outcome<RespondedMail?> = read(account) { sdk ->
         sdk.markResponded(sent.value.readId())?.let { RespondedMail(MailId(it.previous.domain()), replyType(it.replyType)) }
     }
@@ -188,7 +196,9 @@ internal class SdkMailReadSource(private val sessions: SessionReadAccess) : Mail
                 // MailViewerViewModel.ts:427-442: only SOFT_FAIL (2) is "uncertain".
                 mail.mailAuthStatus == 2L -> MailFinding.AuthenticationUncertain
                 else -> null
-            }, mail.scheduledMillis?.let(Instant::ofEpochMilli), received = mail.state == MAIL_STATE_RECEIVED)
+            }, mail.scheduledMillis?.let(Instant::ofEpochMilli), received = mail.state == MAIL_STATE_RECEIVED,
+            // MailViewerViewModel.ts:728-732. MailPhishingStatus UNKNOWN is 0.
+            phishingReportable = mail.phishing == 0L && !mail.draft && !isTutaTeamMail(mail))
     }
     override suspend fun body(account: AccountId, id: MailId): Outcome<String> = read(account) { sdk ->
         sdk.message(id.value.readId()).also { require(it.id.domain() == id.value) }.body
@@ -253,6 +263,13 @@ internal fun summary(mail: ReadSummary, sets: List<ReadFolder>): MailSummary = M
     MailId(mail.id.domain()), ConversationId(mail.conversationEntry.domain()),
     listOf(Address(mail.senderAddress, mail.senderName)), mail.subject, Instant.ofEpochMilli(mail.receivedMillis),
     mail.unread, mail.hasAttachments, mail.confidential, replyType(mail.replyType), sets.filter { it.kind == 8L && it.id in mail.sets }.map { Label(LabelId(it.id.domain()), it.name, it.color) }, 1)
+
+// SharedMailUtils.ts:225-261. EncryptionAuthStatus null, RSA_NO_AUTHENTICATION, SUCCEEDED and TUTACRYPT_SENDER count.
+private fun isTutaTeamMail(mail: ReadMessage): Boolean {
+    val address = mail.sender.address
+    return mail.confidential && mail.state == MAIL_STATE_RECEIVED && mail.encryptionAuth in setOf(null, 0L, 1L, 4L) &&
+        (address == "system@tutanota.de" || address.endsWith("@tutao.de") || address == "no-reply@tutanota.de")
+}
 
 internal fun replyType(value: Long): ReplyType = when (value) {
     0L -> ReplyType.None

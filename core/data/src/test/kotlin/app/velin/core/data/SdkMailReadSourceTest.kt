@@ -59,6 +59,10 @@ class SdkMailReadSourceTest {
         override suspend fun move(ids: List<ReadId>, target: ReadFolder) { moves += ids to target }
         override suspend fun applyLabels(ids: List<ReadId>, added: List<ReadId>, removed: List<ReadId>) { labelsChanged += Triple(ids, added, removed) }
         override suspend fun delete(ids: List<ReadId>, folder: ReadId) { deleted += ids to folder }
+        val reported = mutableListOf<Pair<ReadId, Long>>()
+        val phishingMarked = mutableListOf<ReadId>()
+        override suspend fun reportMail(id: ReadId, type: Long): Boolean { reported += id to type; return true }
+        override suspend fun markPhishing(id: ReadId): Boolean { phishingMarked += id; return true }
         var responded: ReadResponded? = null
         val respondedSent = mutableListOf<ReadId>()
         override suspend fun markResponded(sent: ReadId): ReadResponded? {
@@ -371,6 +375,40 @@ class SdkMailReadSourceTest {
         assertTrue(source(reader).setLabels(account, ids, labels.map { LabelId(it.id.domain()) }) is Outcome.Failed)
         assertTrue(reader.labelsChanged.isEmpty())
     }
+    // MailReportType: PHISHING 0, SPAM 1. Each mail is reported once.
+    @Test fun reportsMapTheTypeAndSendEachMailOnce() = runBlocking {
+        val reader = Reader()
+        val source = source(reader)
+        val a = MailId(ReadId("mails", "a").domain())
+        val b = MailId(ReadId("mails", "b").domain())
+        assertEquals(Outcome.Success(Unit), source.report(account, listOf(a, b, a), MailReportType.Spam))
+        assertEquals(Outcome.Success(Unit), source.report(account, listOf(b), MailReportType.Phishing))
+        assertEquals(listOf(ReadId("mails", "a") to 1L, ReadId("mails", "b") to 1L, ReadId("mails", "b") to 0L), reader.reported)
+        assertEquals(Outcome.Success(Unit), source.markPhishing(account, a))
+        assertEquals(listOf(ReadId("mails", "a")), reader.phishingMarked)
+    }
+
+    // MailViewerViewModel.ts:728-732 with SharedMailUtils.ts isTutaTeamMail.
+    @Test fun phishingReportsAreOfferedOnlyForUnknownStatusOutsideTutaTeamMail() = runBlocking {
+        val id = ReadId("mails", "m")
+        val reader = Reader()
+        val source = source(reader)
+        suspend fun reportable(message: ReadMessage): Boolean {
+            reader.loadedMessage = message
+            return (source.message(account, MailId(id.domain())) as Outcome.Success).value.phishingReportable
+        }
+        val received = readMessage(id).copy(state = 2, encryptionAuth = 1)
+        assertTrue(reportable(received))
+        assertFalse("already marked", reportable(received.copy(phishing = 1)))
+        assertFalse("whitelisted", reportable(received.copy(phishing = 2)))
+        assertFalse("draft", reportable(received.copy(draft = true)))
+        for (address in listOf("system@tutanota.de", "team@tutao.de", "no-reply@tutanota.de")) {
+            assertFalse(address, reportable(received.copy(sender = ReadAddress(address, "Tuta"))))
+            // A failed sender check makes it ordinary mail again, as upstream.
+            assertTrue(address, reportable(received.copy(sender = ReadAddress(address, "Tuta"), encryptionAuth = 2)))
+        }
+    }
+
     @Test fun markRespondedReportsThePreviousMailAndItsNewState() = runBlocking {
         val reader = Reader().apply { responded = ReadResponded(ReadId("mails", "previous"), 3) }
         val source = source(reader)

@@ -45,6 +45,13 @@ interface MailRepository {
     suspend fun resolveRecipient(account: AccountId, address: String): Outcome<Recipient> = Outcome.Failed(Failure.Unsupported)
     suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<DraftId>
     suspend fun sendDraft(account: AccountId, id: DraftId): Outcome<Unit>
+    /**
+     * Reports mails to Tuta. Each report sends that mail's session key, so the server can read the mail: ask the
+     * user first. Tuta team mail and mail deleted meanwhile are skipped.
+     */
+    suspend fun report(account: AccountId, ids: List<MailId>, type: MailReportType): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)
+    /** Marks a mail as phishing, as upstream does before it moves and reports it. */
+    suspend fun markPhishing(account: AccountId, id: MailId): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)
     /** Marks the mail a sent reply or forward answers, as upstream does. Best effort; sending already happened. */
     suspend fun markResponded(account: AccountId, sent: MailId): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)
     suspend fun downloadAttachment(account: AccountId, id: AttachmentId): Outcome<java.io.File>

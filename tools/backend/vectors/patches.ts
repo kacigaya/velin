@@ -44,17 +44,20 @@ for (const [app, clientModel, version] of [['tutanota', tutanota, 117], ['sys', 
 const resolver = new ClientOnlyTypeModelResolver(modelInfo)
 const hex = (b: Uint8Array) => Buffer.from(b).toString('hex')
 
-// SendMailModel.ts:1314-1328 marks the answered mail. EntityRestClient.ts:690-720 sends the PATCH.
+// SendMailModel.ts:1314-1328 marks the answered mail (encrypted replyType, 466). MailViewerViewModel.ts:609-620
+// marks a reported mail as phishing (plain phishingStatus, 1021). EntityRestClient.ts:690-720 sends the PATCH.
 const cases = [
-  { scheme: SymmetricEncryptionScheme.AesCbc, sessionKeyBytes: 32, from: '0', to: '1' },
-  { scheme: SymmetricEncryptionScheme.AesCbc, sessionKeyBytes: 16, from: '2', to: '3' },
-  { scheme: SymmetricEncryptionScheme.Aead, sessionKeyBytes: 32, from: '0', to: '2' },
-  { scheme: SymmetricEncryptionScheme.Aead, sessionKeyBytes: 16, from: '1', to: '3' },
-]
+  { scheme: SymmetricEncryptionScheme.AesCbc, sessionKeyBytes: 32, field: 'replyType', from: '0', to: '1' },
+  { scheme: SymmetricEncryptionScheme.AesCbc, sessionKeyBytes: 16, field: 'replyType', from: '2', to: '3' },
+  { scheme: SymmetricEncryptionScheme.Aead, sessionKeyBytes: 32, field: 'replyType', from: '0', to: '2' },
+  { scheme: SymmetricEncryptionScheme.Aead, sessionKeyBytes: 16, field: 'replyType', from: '1', to: '3' },
+  { scheme: SymmetricEncryptionScheme.Aead, sessionKeyBytes: 32, field: 'phishingStatus', from: '0', to: '1' },
+] as const
+const attributes = { replyType: '466', phishingStatus: '1021' }
 const vectors = []
 for (const c of cases) {
   const name = c.scheme === SymmetricEncryptionScheme.AesCbc ? 'aes-cbc' : 'aead'
-  const seed = `velin-patch-${name}-${c.sessionKeyBytes}-v1`
+  const seed = c.field === 'replyType' ? `velin-patch-${name}-${c.sessionKeyBytes}-v1` : `velin-patch-${c.field}-${name}-v1`
   const random = new TestRandomizer(seed)
   const utils = new SymmetricCipherUtils(random)
   const cipher = new SymmetricCipherFacade(new AesCbcFacade(), new AeadFacade(utils), new SymmetricKeyDeriver(), utils)
@@ -88,7 +91,8 @@ for (const c of cases) {
     _ownerGroup: 'test-mail-group', _ownerEncSessionKey: keyEncryption.encryptKey(historical.object, sessionKey),
     _ownerKeyVersion: String(historical.version), _kdfNonce: kdfNonce,
     subject: 'Original λ', receivedDate: new Date(1794492328000), state: '2', unread: false, confidential: true,
-    replyType: c.from, differentEnvelopeSender: null, listUnsubscribe: false, movedTime: null, phishingStatus: '0',
+    replyType: c.field === 'replyType' ? c.from : '0', differentEnvelopeSender: null, listUnsubscribe: false, movedTime: null,
+    phishingStatus: c.field === 'phishingStatus' ? c.from : '0',
     authStatus: null, method: '0', recipientCount: '1', encryptionAuthStatus: null, processingState: '0',
     processNeeded: false, sendAt: null, serverClassificationData: null,
     sender: address, attachments: [], conversationEntry: ['test-entry-list', 'test-entry'], firstRecipient: null,
@@ -99,7 +103,7 @@ for (const c of cases) {
   const stored = (await pipeline.mapAndEncrypt(types.MailTypeRef, mail, sessionKey)).getJsonRepresentation()
   const serverModel = await resolver.resolveServerTypeReference(types.MailTypeRef)
   const loaded = await pipeline.decryptAndMap<types.Mail>(IncomingServerJson.expectSingleInstance(stored, serverModel), sessionKey)
-  loaded.replyType = c.to
+  loaded[c.field] = c.to
 
   // Record each attribute encryption with the random offset before it, to find the patched value.
   const encryptions: { offset: number, ciphertext: string }[] = []
@@ -130,19 +134,22 @@ for (const c of cases) {
   const patches = body['2616']
   assert.equal(patches.length, 1)
   const [patch] = patches
-  assert.equal(patch['2570'], '466')
+  const attribute = attributes[c.field]
+  assert.equal(patch['2570'], attribute)
   assert.equal(patch['2569'], '2')
+  // An encrypted value comes from one recorded encryption; a plain one is sent as it is.
   const value = encryptions.find(e => e.ciphertext === patch['2571'])
-  assert.ok(value, 'patched value must come from one recorded encryption')
+  if (c.field === 'replyType') assert.ok(value, 'patched value must come from one recorded encryption')
+  else assert.equal(patch['2571'], c.to)
 
   // The server applies the patch. The release pipeline must read the result.
   const patched = JSON.parse(stored)
-  patched['466'] = patch['2571']
+  patched[attribute] = patch['2571']
   const reread = await pipeline.decryptAndMap<types.Mail>(IncomingServerJson.expectSingleInstance(JSON.stringify(patched), serverModel), sessionKey)
-  assert.equal(reread.replyType, c.to)
+  assert.equal(reread[c.field], c.to)
   assert.equal(reread.subject, mail.subject)
 
-  vectors.push({ scheme: name, seed, valueRandomOffset: value.offset, from: c.from, to: c.to,
+  vectors.push({ scheme: name, seed, field: c.field, attribute, valueRandomOffset: value?.offset ?? null, from: c.from, to: c.to,
     sessionKeyHex: hex(keyToUint8Array(sessionKey)), currentGroupKeyHex: hex(keyToUint8Array(current.object)),
     currentGroupKeyVersion: current.version, historicalGroupKeyHex: hex(keyToUint8Array(historical.object)),
     historicalGroupKeyVersion: historical.version, kdfNonceHex: kdfNonce == null ? null : hex(kdfNonce), keyCalls,

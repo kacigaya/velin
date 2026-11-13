@@ -49,6 +49,8 @@ import app.velin.feature.mail.mailbox.FolderPane
 import app.velin.feature.mail.mailbox.DeleteForeverDialog
 import app.velin.feature.mail.mailbox.LabelSheet
 import app.velin.feature.mail.mailbox.MoveToSheet
+import app.velin.feature.mail.mailbox.PhishingReportDialog
+import app.velin.feature.mail.mailbox.SpamReportDialog
 import app.velin.feature.mail.mailbox.folderName
 import app.velin.feature.mail.R as MailR
 import app.velin.feature.mail.mailbox.MailboxEffect
@@ -56,6 +58,7 @@ import app.velin.feature.mail.mailbox.MailboxScreen
 import app.velin.feature.mail.mailbox.MailboxViewModel
 import app.velin.feature.mail.reader.ConversationEffect
 import app.velin.feature.mail.reader.ConversationScreen
+import app.velin.feature.mail.reader.ConversationUiState
 import app.velin.feature.mail.reader.ConversationViewModel
 import kotlinx.coroutines.launch
 
@@ -106,6 +109,7 @@ private fun MailApp(account: Account, auth: AuthRepository, mailbox: MailboxRepo
     var moveRequest by remember { mutableStateOf<Set<String>?>(null) }
     var labelRequest by remember { mutableStateOf<Set<String>?>(null) }
     var deleteRequest by remember { mutableStateOf<Set<String>?>(null) }
+    var spamReportRequest by remember { mutableStateOf<Set<String>?>(null) }
     val tooManyLabels = stringResource(MailR.string.too_many_labels)
     val mailSent = stringResource(MailR.string.composer_sent)
     val noViewer = stringResource(MailR.string.reader_no_viewer)
@@ -120,14 +124,18 @@ private fun MailApp(account: Account, auth: AuthRepository, mailbox: MailboxRepo
                 is MailboxEffect.PickFolder -> moveRequest = effect.mailIds
                 is MailboxEffect.PickLabels -> labelRequest = effect.mailIds
                 is MailboxEffect.ConfirmDelete -> deleteRequest = effect.mailIds
+                is MailboxEffect.ConfirmSpamReport -> spamReportRequest = effect.mailIds
                 MailboxEffect.TooManyLabels -> scope.launch { snackbar.showSnackbar(tooManyLabels) }
                 is MailboxEffect.Moved -> scope.launch {
                     val resources = context.resources
-                    val text = resources.getQuantityString(
+                    val moved = resources.getQuantityString(
                         MailR.plurals.moved_to_folder, effect.count, effect.count, folderName(resources, effect.target),
                     )
+                    val text = if (effect.report.isEmpty()) moved
+                        else moved + " " + resources.getQuantityString(MailR.plurals.moved_will_report, effect.count)
                     val result = snackbar.showSnackbar(text, actionLabel = undoLabel, duration = SnackbarDuration.Long)
                     if (result == SnackbarResult.ActionPerformed) mailboxViewModel.undoLastMove()
+                    else mailboxViewModel.reportSpam(effect.report)
                 }
                 is MailboxEffect.ActionFailed -> scope.launch { snackbar.showSnackbar(actionFailed) }
                 MailboxEffect.OpenComposer -> backStack.add(ComposerRoute())
@@ -156,6 +164,16 @@ private fun MailApp(account: Account, auth: AuthRepository, mailbox: MailboxRepo
                 mailboxViewModel.deleteForever(ids)
             },
             onDismiss = { deleteRequest = null },
+        )
+    }
+    spamReportRequest?.let { ids ->
+        SpamReportDialog(
+            count = ids.size,
+            onAnswer = { report ->
+                spamReportRequest = null
+                mailboxViewModel.moveToSpam(ids, report)
+            },
+            onDismiss = { spamReportRequest = null },
         )
     }
     moveRequest?.let { ids ->
@@ -219,11 +237,15 @@ private fun MailApp(account: Account, auth: AuthRepository, mailbox: MailboxRepo
                     }
                     val state by viewModel.state.collectAsStateWithLifecycle()
                     var pickingFolder by remember { mutableStateOf(false) }
+                    var askingSpamReport by remember { mutableStateOf(false) }
+                    var askingPhishingReport by remember { mutableStateOf(false) }
                     LaunchedEffect(viewModel) {
                         viewModel.effects.collect { effect ->
                             when (effect) {
                                 ConversationEffect.Close -> backStack.remove(route)
                                 ConversationEffect.PickFolder -> pickingFolder = true
+                                ConversationEffect.ConfirmSpamReport -> askingSpamReport = true
+                                ConversationEffect.ConfirmPhishingReport -> askingPhishingReport = true
                                 is ConversationEffect.EditDraft -> backStack.add(ComposerRoute(effect.messageId))
                                 is ConversationEffect.Reply -> backStack.add(ComposerRoute(respondTo = effect.messageId,
                                     kind = if (effect.all) ResponseKind.ReplyAll else ResponseKind.Reply))
@@ -246,6 +268,26 @@ private fun MailApp(account: Account, auth: AuthRepository, mailbox: MailboxRepo
                                 viewModel.moveToFolder(folder.id)
                             },
                             onDismiss = { pickingFolder = false },
+                        )
+                    }
+                    if (askingSpamReport) {
+                        val count = (state as? ConversationUiState.Loaded)?.conversation?.messages?.size ?: 1
+                        SpamReportDialog(
+                            count = count,
+                            onAnswer = { report ->
+                                askingSpamReport = false
+                                viewModel.moveToSpam(report)
+                            },
+                            onDismiss = { askingSpamReport = false },
+                        )
+                    }
+                    if (askingPhishingReport) {
+                        PhishingReportDialog(
+                            onConfirm = {
+                                askingPhishingReport = false
+                                viewModel.reportPhishing()
+                            },
+                            onDismiss = { askingPhishingReport = false },
                         )
                     }
                     ConversationScreen(

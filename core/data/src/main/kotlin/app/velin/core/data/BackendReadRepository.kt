@@ -706,6 +706,18 @@ class BackendReadRepository internal constructor(private val source: MailReadSou
         }
         result
     }
+    override suspend fun report(account: AccountId, ids: List<MailId>, type: MailReportType): Outcome<Unit> = io(account) {
+        if (ids.isEmpty()) Outcome.Success(Unit) else source.report(account, ids, type)
+    }
+    override suspend fun markPhishing(account: AccountId, id: MailId): Outcome<Unit> = io(account, save = true) {
+        val result = source.markPhishing(account, id)
+        if (result is Outcome.Success) {
+            // The status is set now, so the action is not offered again for this mail.
+            val state = this.account(account)
+            state.messages[id]?.let { state.messages[id] = it.copy(phishingReportable = false) }
+        }
+        result
+    }
     override suspend fun markResponded(account: AccountId, sent: MailId): Outcome<Unit> = io(account, save = true) {
         when (val result = source.markResponded(account, sent)) {
             is Outcome.Failed -> Outcome.Failed(result.failure)

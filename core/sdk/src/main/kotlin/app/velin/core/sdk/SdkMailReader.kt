@@ -53,6 +53,10 @@ interface SdkMailReader {
     suspend fun delete(ids: List<ReadId>, folder: ReadId): Unit = throw SdkException(SdkFailure.Protocol)
     /** Marks the mail that a sent reply or forward answers. Null when there is none. */
     suspend fun markResponded(sent: ReadId): ReadResponded? = throw SdkException(SdkFailure.Protocol)
+    /** Reports one mail as phishing (0) or spam (1), with its session key. False when it is not reportable or gone. */
+    suspend fun reportMail(id: ReadId, type: Long): Boolean = throw SdkException(SdkFailure.Protocol)
+    /** Marks one mail as phishing before it is reported. False when its status was already set. */
+    suspend fun markPhishing(id: ReadId): Boolean = throw SdkException(SdkFailure.Protocol)
     suspend fun senders(): List<ReadAddress> = throw SdkException(SdkFailure.Protocol)
     suspend fun folders(): List<ReadFolder>
     suspend fun unread(folder: ReadFolder): Long
@@ -142,6 +146,8 @@ internal class NativeMailReader(private val facade: MailFacade, private val trus
     override suspend fun delete(ids: List<ReadId>, folder: ReadId): Unit = api {
         facade.velinDelete(ids.map { it.native() }, folder.native())
     }
+    override suspend fun reportMail(id: ReadId, type: Long): Boolean = api { facade.velinReportMail(id.native(), type) }
+    override suspend fun markPhishing(id: ReadId): Boolean = api { facade.velinMarkPhishing(id.native()) }
     override suspend fun markResponded(sent: ReadId): ReadResponded? = api {
         facade.velinMarkResponded(sent.native())?.let { ReadResponded(it.previous.readId(), it.replyType) }
     }

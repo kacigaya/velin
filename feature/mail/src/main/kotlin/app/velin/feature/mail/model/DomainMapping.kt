@@ -100,6 +100,7 @@ internal fun MailMessage.toUi(): MessageUi {
         confidential = confidential,
         unread = unread,
         isDraft = isDraft,
+        phishingReportable = phishingReportable,
         body = when (val state = body) {
             BodyState.Loading -> BodyUi.Loading
             is BodyState.Loaded -> BodyUi.Loaded(state.html, state.inlineImages.mapValues { it.value.value.toUiId() })

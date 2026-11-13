@@ -16,6 +16,8 @@ interface MailReadSource {
     suspend fun setLabels(account: AccountId, ids: List<MailId>, labels: List<LabelId>): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)
     suspend fun currentFolders(account: AccountId, ids: List<MailId>): Outcome<Map<MailId, FolderId>> = Outcome.Failed(Failure.Unsupported)
     suspend fun delete(account: AccountId, ids: List<MailId>): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)
+    suspend fun report(account: AccountId, ids: List<MailId>, type: MailReportType): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)
+    suspend fun markPhishing(account: AccountId, id: MailId): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)
     /** Marks the mail a sent reply or forward answers. Null when the sent mail answers nothing. */
     suspend fun markResponded(account: AccountId, sent: MailId): Outcome<RespondedMail?> = Outcome.Failed(Failure.Unsupported)
     /** A null value means the server no longer has that mail. */

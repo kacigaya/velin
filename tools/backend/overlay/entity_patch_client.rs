@@ -1,30 +1,44 @@
-    /// EntityRestClient.ts:690-720 for one changed value. With AEAD the instance must carry its KDF nonce:
-    /// MailFacade asks UpdateKdfNonceService for one first, as ensureKdfNonce does.
+    /// EntityRestClient.ts:690-720 for one changed value. An encrypted value with AEAD needs the instance's KDF
+    /// nonce: MailFacade asks UpdateKdfNonceService for one first, as ensureKdfNonce does.
     pub async fn velin_patch_value<Instance: Entity + Serialize>(&self, instance: Instance, attribute_name: &str, aead: bool,
         random: &crypto_primitives::randomizer_facade::RandomizerFacade) -> Result<(), ApiCallError> {
         use crate::element_value::ElementValue;
-        use crate::velin_entity_patch::{encrypt_value, patch_list, VelinValueKey};
+        use crate::velin_entity_patch::{is_encrypted, patch_list, patch_value, VelinValueKey};
         let invalid = || ApiCallError::internal("Invalid entity patch".into());
         let type_ref = Instance::type_ref();
         let model = self.entity_client.resolve_client_type_ref(&type_ref)?;
         let parsed = self.instance_mapper.serialize_entity(instance).map_err(|_| invalid())?;
         let field = |name: &str| model.get_attribute_id_by_attribute_name(name).map(|id| parsed.get(&id).cloned());
         let Some(ElementValue::IdTupleGeneratedElementId(id)) = field("_id")? else { return Err(invalid()) };
-        let key = if aead {
+        let attribute = model.get_attribute_id_by_attribute_name(attribute_name)?;
+        let key = if !is_encrypted(model, &attribute)? {
+            None
+        } else if aead {
             let (Some(ElementValue::IdGeneratedId(group)), Some(ElementValue::Bytes(kdf_nonce))) = (field("_ownerGroup")?, field("_kdfNonce")?)
                 else { return Err(invalid()) };
             let group_key = self.key_loader_facade.get_current_sym_group_key(&group).await
                 .map_err(|_| ApiCallError::internal("Group key load failed".into()))?;
-            VelinValueKey::Instance { group_key, kdf_nonce }
+            Some(VelinValueKey::Instance { group_key, kdf_nonce })
         } else {
-            let resolved = self.crypto_facade.resolve_session_key(&parsed, model).await
-                .map_err(|_| ApiCallError::internal("Session key resolution failed".into()))?
-                .ok_or_else(|| ApiCallError::internal("Session key resolution failed".into()))?;
-            VelinValueKey::Session(resolved.session_key)
+            Some(VelinValueKey::Session(self.velin_session_key(&parsed, model).await?))
         };
-        let attribute = model.get_attribute_id_by_attribute_name(attribute_name)?;
-        let ciphertext = encrypt_value(model, &attribute, parsed.get(&attribute).ok_or_else(invalid)?, &key, random)?;
-        self.entity_client.velin_patch(&type_ref, &id, patch_list(&attribute, &ciphertext, random)).await
+        let value = patch_value(model, &attribute, parsed.get(&attribute).ok_or_else(invalid)?, key.as_ref(), random)?;
+        self.entity_client.velin_patch(&type_ref, &id, patch_list(&attribute, value, random)).await
+    }
+
+    /// MailFacade.ts reportMail sends the mail's session key, so the server can read that one mail.
+    pub async fn velin_mail_session_key(&self, mail: Mail) -> Result<Vec<u8>, ApiCallError> {
+        let model = self.entity_client.resolve_client_type_ref(&Mail::type_ref())?;
+        let parsed = self.instance_mapper.serialize_entity(mail).map_err(|_| ApiCallError::internal("Invalid entity patch".into()))?;
+        Ok(self.velin_session_key(&parsed, model).await?.as_bytes().to_vec())
+    }
+
+    async fn velin_session_key(&self, parsed: &crate::element_value::ParsedEntity, model: &TypeModel)
+        -> Result<crypto_primitives::key::GenericAesKey, ApiCallError> {
+        self.crypto_facade.resolve_session_key(parsed, model).await
+            .map_err(|_| ApiCallError::internal("Session key resolution failed".into()))?
+            .map(|resolved| resolved.session_key)
+            .ok_or_else(|| ApiCallError::internal("Session key resolution failed".into()))
     }
 
     /// Values another client patched with the instance key. The rest of the instance keeps its session key.

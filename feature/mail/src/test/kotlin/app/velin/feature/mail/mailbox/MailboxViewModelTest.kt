@@ -2,10 +2,13 @@ package app.velin.feature.mail.mailbox
 
 import app.velin.core.domain.Failure
 import app.velin.core.domain.FolderKind
+import app.velin.core.domain.MailId
 import app.velin.core.domain.MailPage
+import app.velin.core.domain.MailReportType
 import app.velin.core.domain.Outcome
 import app.velin.feature.mail.FakeMailRepo
 import app.velin.feature.mail.FakeMailbox
+import app.velin.feature.mail.eid
 import app.velin.feature.mail.folder
 import app.velin.feature.mail.label
 import app.velin.feature.mail.summary
@@ -74,6 +77,42 @@ class MailboxViewModelTest {
         vm.onEvent(MailboxEvent.Archive(setOf("mails/m1")))
         vm.onEvent(MailboxEvent.Trash(setOf("mails/m2")))
         assertEquals(listOf(archive.id, trash.id), repo.moves.map { it.second })
+    }
+
+    // MailReportDialog.ts: a move to Spam asks first; a report sends the mail's session key to Tuta.
+    @Test
+    fun aMoveToSpamAsksBeforeItReports() = runTest {
+        val spam = folder("spam", FolderKind.Spam)
+        mailbox.folders.value = listOf(inbox, archive, trash, spam)
+        val vm = viewModel()
+        val effects = mutableListOf<MailboxEffect>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.effects.collect { effects += it } }
+        vm.onEvent(MailboxEvent.ReportSpam(setOf("mails/m1")))
+        vm.moveToFolder(setOf("mails/m2"), "folders/spam")
+        assertEquals(listOf(MailboxEffect.ConfirmSpamReport(setOf("mails/m1")), MailboxEffect.ConfirmSpamReport(setOf("mails/m2"))), effects)
+        assertTrue(repo.moves.isEmpty())
+        vm.moveToSpam(setOf("mails/m1"), sendReport = false)
+        assertEquals(listOf(listOf(MailId(eid("mails", "m1"))) to spam.id), repo.moves)
+        assertTrue("no consent, no report", repo.reports.isEmpty())
+        assertEquals(MailboxEffect.Moved(1, spam.toUi()), effects.last())
+        vm.moveToSpam(setOf("mails/m2"), sendReport = true)
+        // MailGuiUtils.ts:345-349: the report waits until the undo offer ends; the host then calls reportSpam.
+        assertEquals(MailboxEffect.Moved(1, spam.toUi(), setOf("mails/m2")), effects.last())
+        assertTrue(repo.reports.isEmpty())
+        vm.reportSpam((effects.last() as MailboxEffect.Moved).report)
+        assertEquals(listOf(listOf(MailId(eid("mails", "m2"))) to MailReportType.Spam), repo.reports)
+    }
+
+    @Test
+    fun aFailedMoveToSpamOffersNoReport() = runTest {
+        mailbox.folders.value = listOf(inbox, folder("spam", FolderKind.Spam))
+        repo.moveResult = Outcome.Failed(Failure.Offline)
+        val vm = viewModel()
+        val effects = mutableListOf<MailboxEffect>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.effects.collect { effects += it } }
+        vm.moveToSpam(setOf("mails/m1"), sendReport = true)
+        assertTrue(effects.none { it is MailboxEffect.Moved })
+        assertTrue(repo.reports.isEmpty())
     }
 
     @Test

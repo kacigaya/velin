@@ -12,6 +12,7 @@ import app.velin.core.domain.InlineImage
 import app.velin.core.domain.MailAuthentication
 import app.velin.core.domain.MailId
 import app.velin.core.domain.MailMessage
+import app.velin.core.domain.MailReportType
 import app.velin.core.domain.Outcome
 import app.velin.feature.mail.FakeMailRepo
 import app.velin.feature.mail.FakeMailbox
@@ -40,18 +41,20 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class ConversationViewModelTest {
     private val repo = FakeMailRepo()
-    private val mailbox = FakeMailbox(listOf(folder("inbox", FolderKind.Inbox), folder("trash", FolderKind.Trash)))
+    private val mailbox = FakeMailbox(listOf(folder("inbox", FolderKind.Inbox), folder("trash", FolderKind.Trash), folder("spam", FolderKind.Spam)))
+    private val spam = FolderId(eid("folders", "spam"))
     private val placeholder = "https://velin.invalid/inline/0"
 
     @Before fun setUp() = Dispatchers.setMain(UnconfinedTestDispatcher())
     @After fun tearDown() = Dispatchers.resetMain()
 
-    private fun message(id: String, unread: Boolean = false, draft: Boolean = false) = MailMessage(
+    private fun message(id: String, unread: Boolean = false, draft: Boolean = false, reportable: Boolean = false) = MailMessage(
         id = MailId(eid("mails", id)), from = Address("a@tuta.com"), to = emptyList(), cc = emptyList(),
         bcc = emptyList(), replyTo = emptyList(), subject = "s", sentAt = Instant.EPOCH, confidential = true,
         unread = unread, isDraft = draft,
         body = BodyState.Loaded("<img src=\"$placeholder\">", true, true, mapOf(placeholder to AttachmentId(eid("files", "f1")))),
         attachments = emptyList(), authentication = MailAuthentication.Unknown, finding = null, scheduledSendAt = null,
+        phishingReportable = reportable,
     )
 
     private fun TestScope.viewModel(messages: List<MailMessage> = listOf(message("m1"))): ConversationViewModel {
@@ -76,6 +79,55 @@ class ConversationViewModelTest {
         vm.onEvent(ConversationEvent.Trash)
         assertEquals(listOf(listOf(MailId(eid("mails", "m1")), MailId(eid("mails", "m2"))) to FolderId(eid("folders", "trash"))), repo.moves)
         assertEquals(listOf(ConversationEffect.Close), effects)
+    }
+
+    private fun mailId(id: String) = MailId(eid("mails", id))
+
+    // MailReportDialog.ts: Spam asks first; only consent sends the mails to Tuta. Dismissing still moves.
+    @Test
+    fun reportSpamAsksThenMovesAndReportsOnlyWithConsent() = runTest {
+        val vm = viewModel(listOf(message("m1"), message("m2")))
+        val effects = mutableListOf<ConversationEffect>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.effects.collect { effects += it } }
+        vm.onEvent(ConversationEvent.ReportSpam)
+        vm.moveToFolder("folders/spam")
+        assertEquals(listOf(ConversationEffect.ConfirmSpamReport, ConversationEffect.ConfirmSpamReport), effects)
+        assertTrue(repo.moves.isEmpty())
+        vm.moveToSpam(sendReport = false)
+        assertTrue(repo.reports.isEmpty())
+        vm.moveToSpam(sendReport = true)
+        assertEquals(List(2) { listOf(mailId("m1"), mailId("m2")) to spam }, repo.moves)
+        assertEquals(listOf(listOf(mailId("m1"), mailId("m2")) to MailReportType.Spam), repo.reports)
+        assertEquals(ConversationEffect.Close, effects.last())
+    }
+
+    // MailViewerViewModel.ts:631-639: mark, move only that mail, then report it.
+    @Test
+    fun reportPhishingMarksMovesAndReportsTheNewestReportableMail() = runTest {
+        val vm = viewModel(listOf(message("m1", reportable = true), message("m2", reportable = true), message("d", draft = true)))
+        val effects = mutableListOf<ConversationEffect>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.effects.collect { effects += it } }
+        vm.onEvent(ConversationEvent.ReportPhishing)
+        assertEquals(listOf(ConversationEffect.ConfirmPhishingReport), effects)
+        vm.reportPhishing()
+        assertEquals(listOf(mailId("m2")), repo.phishingMarks)
+        assertEquals(listOf(listOf(mailId("m2")) to spam), repo.moves)
+        assertEquals(listOf(listOf(mailId("m2")) to MailReportType.Phishing), repo.reports)
+        assertEquals(ConversationEffect.Close, effects.last())
+    }
+
+    @Test
+    fun phishingIsNotReportedWhenMarkingFailsOrNothingIsReportable() = runTest {
+        val vm = viewModel(listOf(message("m1")))
+        val effects = mutableListOf<ConversationEffect>()
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.effects.collect { effects += it } }
+        vm.onEvent(ConversationEvent.ReportPhishing)
+        vm.reportPhishing()
+        assertTrue(effects.isEmpty() && repo.phishingMarks.isEmpty())
+        val failing = viewModel(listOf(message("m1", reportable = true)))
+        repo.moveResult = Outcome.Failed(Failure.Offline)
+        failing.reportPhishing()
+        assertTrue(repo.moves.isEmpty() && repo.reports.isEmpty())
     }
 
     @Test

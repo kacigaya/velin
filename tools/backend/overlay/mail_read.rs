@@ -403,6 +403,65 @@ impl MailFacade {
     }
 }
 
+// MailModel.ts:408-416 and MailFacade.ts:647-655. A report sends the mail's session key, so the server can read
+// that one mail. The caller must have the user's consent. Tuta team and system mails are never reported.
+#[uniffi::export]
+impl MailFacade {
+    /// Reports one mail as phishing (0) or spam (1). False when the mail is not reportable or no longer exists.
+    pub async fn velin_report_mail(&self, mail: IdTupleGenerated, report_type: i64) -> Result<bool, ApiCallError> {
+        use crate::entities::generated::tutanota::ReportMailPostData;
+        use crate::services::generated::tutanota::ReportMailService;
+        AssertUnwindSafe(async {
+            if !matches!(report_type, 0 | 1) { return Err(ApiCallError::internal("Invalid mail report".into())) }
+            let Some(loaded) = velin_existing(self.crypto_entity_client.load::<Mail, _>(&mail).await)? else { return Ok(false) };
+            if !loaded._errors.is_empty() || loaded._id.as_ref() != Some(&mail) {
+                return Err(ApiCallError::internal("Mail decryption failed".into()));
+            }
+            if velin_is_team_mail(&loaded) { return Ok(false) }
+            let key = self.crypto_entity_client.velin_mail_session_key(loaded).await?;
+            let sent = self.service_executor.post::<ReportMailService>(ReportMailPostData {
+                _format: 0, mailSessionKey: key, reportType: report_type, mailId: mail,
+            }, Default::default()).await;
+            Ok(velin_existing(sent)?.is_some())
+        }).catch_unwind().await.unwrap_or_else(|_| Err(ApiCallError::internal("Mail report failed".into())))
+    }
+
+    /// MailViewerViewModel.ts:609-626 marks a mail as phishing (SUSPICIOUS) before it moves and reports it. Only
+    /// a received or sent mail with an unknown status that is not from the Tuta team. False when nothing changed.
+    pub async fn velin_mark_phishing(&self, mail: IdTupleGenerated) -> Result<bool, ApiCallError> {
+        AssertUnwindSafe(async {
+            let Some(mut loaded) = velin_existing(self.crypto_entity_client.load::<Mail, _>(&mail).await)? else { return Ok(false) };
+            if !loaded._errors.is_empty() || loaded._id.as_ref() != Some(&mail) {
+                return Err(ApiCallError::internal("Mail decryption failed".into()));
+            }
+            if loaded.phishingStatus != 0 || loaded.state == 0 || velin_is_team_mail(&loaded) { return Ok(false) }
+            loaded.phishingStatus = 1;
+            let random = crypto_primitives::randomizer_facade::RandomizerFacade::from_core(rand_core::OsRng);
+            // phishingStatus is not encrypted, so the account's scheme does not matter.
+            self.crypto_entity_client.velin_patch_value(loaded, "phishingStatus", false, &random).await?;
+            Ok(true)
+        }).catch_unwind().await.unwrap_or_else(|_| Err(ApiCallError::internal("Phishing mark failed".into())))
+    }
+}
+
+// MailModel.ts:414 ignores a mail that was deleted meanwhile.
+fn velin_existing<T>(result: Result<T, ApiCallError>) -> Result<Option<T>, ApiCallError> {
+    match result {
+        Ok(value) => Ok(Some(value)),
+        Err(ApiCallError::ServerResponseError { source: HttpError::NotFoundError }) => Ok(None),
+        Err(error) => Err(error),
+    }
+}
+
+// SharedMailUtils.ts:225-261 isTutaTeamMail.
+fn velin_is_team_mail(mail: &Mail) -> bool {
+    let address = mail.sender.address.as_str();
+    let trusted_auth = matches!(mail.encryptionAuthStatus, None | Some(0) | Some(1) | Some(4));
+    mail.confidential && mail.state == 2 && trusted_auth
+        && (address == crate::tutanota_constants::SYSTEM_GROUP_MAIL_ADDRESS || address.ends_with("@tutao.de")
+            || address == "no-reply@tutanota.de")
+}
+
 impl MailFacade {
     // EntityRestClient.ts:887-910. The server keeps the first nonce it stores, so use the one it returns.
     async fn velin_kdf_nonce(&self, mail: &IdTupleGenerated, random: &crypto_primitives::randomizer_facade::RandomizerFacade)
@@ -607,5 +666,74 @@ mod velin_responded_tests {
             Arc::new(MockResolvingServiceExecutor::default()),
         );
         assert!(facade.velin_mark_responded(sent).await.unwrap().is_none());
+    }
+}
+
+#[cfg(test)]
+mod velin_report_tests {
+    use super::*;
+    use crate::crypto_entity_client::MockCryptoEntityClient;
+    use crate::entities::generated::tutanota::{MailAddress, ReportMailPostData};
+    use crate::services::generated::tutanota::ReportMailService;
+    use crate::services::service_executor::MockResolvingServiceExecutor;
+    use crate::user_facade::MockUserFacade;
+    use crate::util::test_utils::create_test_entity;
+
+    fn id() -> IdTupleGenerated { IdTupleGenerated::new("mails".to_owned().into(), "reported".to_owned().into()) }
+    fn mail(address: &str, state: i64, phishing: i64) -> Mail {
+        Mail { _id: Some(id()), confidential: true, state, phishingStatus: phishing, encryptionAuthStatus: Some(1),
+            sender: MailAddress { address: address.into(), ..create_test_entity() }, ..create_test_entity() }
+    }
+    fn loading(mail: Mail) -> MockCryptoEntityClient {
+        let mut client = MockCryptoEntityClient::default();
+        client.expect_load::<Mail, IdTupleGenerated>().returning(move |_| Ok(mail.clone()));
+        client
+    }
+    fn facade(client: MockCryptoEntityClient, executor: MockResolvingServiceExecutor) -> MailFacade {
+        MailFacade::new(Arc::new(client), Arc::new(MockUserFacade::default()), Arc::new(executor))
+    }
+
+    #[tokio::test]
+    async fn velin_report_sends_the_session_key_of_that_mail() {
+        let mut client = loading(mail("sender@example.invalid", 2, 0));
+        client.expect_velin_mail_session_key().times(1).returning(|_| Ok(vec![9; 32]));
+        let mut executor = MockResolvingServiceExecutor::default();
+        executor.expect_post::<ReportMailService>()
+            .withf(|data: &ReportMailPostData, _| data.mailId == id() && data.mailSessionKey == vec![9; 32] && data.reportType == 1)
+            .times(1).returning(|_, _| Ok(()));
+        assert!(facade(client, executor).velin_report_mail(id(), 1).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn velin_report_skips_team_mail_invalid_types_and_deleted_mail() {
+        for address in ["system@tutanota.de", "someone@tutao.de", "no-reply@tutanota.de"] {
+            let mut client = loading(mail(address, 2, 0));
+            client.expect_velin_mail_session_key().never();
+            assert!(!facade(client, MockResolvingServiceExecutor::default()).velin_report_mail(id(), 1).await.unwrap());
+        }
+        let mut client = loading(mail("sender@example.invalid", 2, 0));
+        client.expect_velin_mail_session_key().never();
+        assert!(facade(client, MockResolvingServiceExecutor::default()).velin_report_mail(id(), 2).await.is_err());
+        let mut client = loading(mail("sender@example.invalid", 2, 0));
+        client.expect_velin_mail_session_key().returning(|_| Ok(vec![9; 32]));
+        let mut executor = MockResolvingServiceExecutor::default();
+        executor.expect_post::<ReportMailService>()
+            .returning(|_, _| Err(ApiCallError::ServerResponseError { source: HttpError::NotFoundError }));
+        assert!(!facade(client, executor).velin_report_mail(id(), 0).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn velin_phishing_mark_patches_only_an_unknown_status() {
+        let mut client = loading(mail("sender@example.invalid", 2, 0));
+        client.expect_velin_patch_value::<Mail>()
+            .withf(|mail, attribute, _, _| mail.phishingStatus == 1 && attribute.to_string() == "phishingStatus")
+            .times(1).returning(|_, _, _, _| Ok(()));
+        assert!(facade(client, MockResolvingServiceExecutor::default()).velin_mark_phishing(id()).await.unwrap());
+        // Already marked or whitelisted, a draft, or Tuta team mail: nothing changes.
+        for unchanged in [mail("sender@example.invalid", 2, 2), mail("sender@example.invalid", 0, 0), mail("system@tutanota.de", 2, 0)] {
+            let mut client = loading(unchanged);
+            client.expect_velin_patch_value::<Mail>().never();
+            assert!(!facade(client, MockResolvingServiceExecutor::default()).velin_mark_phishing(id()).await.unwrap());
+        }
     }
 }

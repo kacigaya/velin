@@ -10,6 +10,7 @@ import app.velin.core.domain.LabelId
 import app.velin.core.domain.FolderKind as DomainFolderKind
 import app.velin.core.domain.MailId
 import app.velin.core.domain.MailPage
+import app.velin.core.domain.MailReportType
 import app.velin.core.domain.MailRepository
 import app.velin.core.domain.MailboxRepository
 import app.velin.core.domain.Outcome
@@ -51,12 +52,17 @@ sealed interface MailboxEffect {
     data class PickFolder(val mailIds: Set<String>) : MailboxEffect
     data class PickLabels(val mailIds: Set<String>) : MailboxEffect
     data class ActionFailed(val failure: Failure) : MailboxEffect
-    /** Mails left the current folder; the host offers [MailboxViewModel.undoLastMove]. */
-    data class Moved(val count: Int, val target: FolderUi) : MailboxEffect
+    /**
+     * Mails left the current folder; the host offers [MailboxViewModel.undoLastMove]. When the offer ends without
+     * an undo, the host passes [report] to [MailboxViewModel.reportSpam] (MailGuiUtils.ts:323-350).
+     */
+    data class Moved(val count: Int, val target: FolderUi, val report: Set<String> = emptySet()) : MailboxEffect
     /** Trash or Spam: deleting is permanent, so the host asks before [MailboxViewModel.deleteForever]. */
     data class ConfirmDelete(val mailIds: Set<String>) : MailboxEffect
     /** A mail would end up with more labels than Tuta allows. */
     data object TooManyLabels : MailboxEffect
+    /** A move to Spam can also report the mails to Tuta; the host asks, then calls [MailboxViewModel.moveToSpam]. */
+    data class ConfirmSpamReport(val mailIds: Set<String>) : MailboxEffect
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -240,9 +246,29 @@ class MailboxViewModel(
         moveMails(mailIds, target)
     }
 
-    private fun moveMails(mailIds: Set<String>, target: Folder) {
+    /**
+     * Moves the mails to Spam. With [sendReport] it also reports each mail to Tuta, which sends the mail's session
+     * key (MailReportDialog.ts). Dismissing the question cancels the move.
+     */
+    fun moveToSpam(mailIds: Set<String>, sendReport: Boolean) {
+        val target = folders.value.firstOrNull { it.kind == DomainFolderKind.Spam } ?: return
+        moveMails(mailIds, target, sendReport)
+    }
+
+    /** Reports mails the user agreed to report, once their move to Spam can no longer be undone. */
+    fun reportSpam(mailIds: Set<String>) {
+        if (mailIds.isEmpty()) return
+        viewModelScope.launch { report(mail.report(account.id, mailIds.map { MailId(entityIdOf(it)) }, MailReportType.Spam)) }
+    }
+
+    /** [sendReport] is null until the user answered whether a move to Spam reports the mails. */
+    private fun moveMails(mailIds: Set<String>, target: Folder, sendReport: Boolean? = null) {
         val source = state.value.folder?.let { FolderId(entityIdOf(it.id)) } ?: return
         if (mailIds.isEmpty() || source == target.id) return
+        if (target.kind == DomainFolderKind.Spam && sendReport == null) {
+            effectChannel.trySend(MailboxEffect.ConfirmSpamReport(mailIds))
+            return
+        }
         val ids = mailIds.map { MailId(entityIdOf(it)) }
         selection.value = persistentSetOf()
         viewModelScope.launch {
@@ -250,7 +276,7 @@ class MailboxViewModel(
             report(outcome)
             if (outcome is Outcome.Success) {
                 lastMove = ids to source
-                effectChannel.trySend(MailboxEffect.Moved(ids.size, target.toUi()))
+                effectChannel.trySend(MailboxEffect.Moved(ids.size, target.toUi(), if (sendReport == true) mailIds else emptySet()))
             }
         }
     }

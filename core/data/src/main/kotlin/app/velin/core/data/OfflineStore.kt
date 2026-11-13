@@ -107,7 +107,8 @@ internal fun encodeOffline(state: OfflineState): String = JSONObject().apply {
                 JSONObject().put("id", a.id.value.json()).put("name", a.name).put("mime", a.mimeType)
                     .put("size", a.sizeBytes).put("cid", a.contentId)
             })).put("authentication", m.authentication.name).put("finding", m.finding?.name)
-            .put("scheduledAt", m.scheduledSendAt?.toEpochMilli()).put("received", m.received).put("body", body).put("summary", summary?.json())
+            .put("scheduledAt", m.scheduledSendAt?.toEpochMilli()).put("received", m.received)
+            .put("phishingReportable", m.phishingReportable).put("body", body).put("summary", summary?.json())
     }))
 }.toString()
 
@@ -138,7 +139,11 @@ internal fun decodeOffline(text: String): OfflineState {
             it.nullableString("finding")?.let(MailFinding::valueOf),
             if (it.has("scheduledAt")) Instant.ofEpochMilli(it.getLong("scheduledAt")) else null,
             // Files saved by v0.3 have no state. Most saved mail is received mail.
-            it.optBoolean("received", true)), it.getString("body"),
+            it.optBoolean("received", true),
+            // Files saved before 0.5 lack it. Saved mail is not reloaded, so derive it; the SDK still refuses
+            // to mark or report Tuta team mail.
+            if (it.has("phishingReportable")) it.getBoolean("phishingReportable")
+            else !it.getBoolean("draft") && it.nullableString("finding") != MailFinding.Phishing.name), it.getString("body"),
             it.optJSONObject("summary")?.summary())
     }
     val rejections = root.optJSONArray("draftRejections")?.objects()?.associate { entry ->

@@ -60,7 +60,11 @@ data class MailMessage(val id: MailId, val from: Address, val to: List<Address>,
     val isDraft: Boolean, val body: BodyState, val attachments: List<Attachment>,
     val authentication: MailAuthentication, val finding: MailFinding?, val scheduledSendAt: Instant?,
     /** The server delivered this mail to the user; false for sent mail and drafts. */
-    val received: Boolean = true)
+    val received: Boolean = true,
+    /** Upstream canReportPhishing: not a draft, not Tuta team mail, and no phishing status set yet. */
+    val phishingReportable: Boolean = false)
+/** MailReportType: what a report to Tuta claims. */
+enum class MailReportType { Phishing, Spam }
 data class Conversation(val id: ConversationId, val subject: String, val labels: List<Label>,
     val folderKind: FolderKind?, val messages: List<MailMessage>)
 data class Draft(val id: DraftId?, val sender: SenderAlias, val to: List<Recipient>,

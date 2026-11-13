@@ -95,6 +95,16 @@ internal class FakeMailRepo : MailRepository {
         moves += ids to target
         return moveResult
     }
+    val reports = mutableListOf<Pair<List<MailId>, app.velin.core.domain.MailReportType>>()
+    val phishingMarks = mutableListOf<MailId>()
+    override suspend fun report(account: AccountId, ids: List<MailId>, type: app.velin.core.domain.MailReportType): Outcome<Unit> {
+        reports += ids to type
+        return Outcome.Success(Unit)
+    }
+    override suspend fun markPhishing(account: AccountId, id: MailId): Outcome<Unit> {
+        phishingMarks += id
+        return moveResult
+    }
     val labelCalls = mutableListOf<Pair<Set<MailId>, Set<LabelId>>>()
     val deletes = mutableListOf<List<MailId>>()
     override suspend fun setLabels(account: AccountId, ids: List<MailId>, labels: List<LabelId>): Outcome<Unit> {

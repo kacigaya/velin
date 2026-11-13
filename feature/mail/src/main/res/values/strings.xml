@@ -130,6 +130,10 @@
         <item quantity="one">%1$d mail moved to %2$s</item>
         <item quantity="other">%1$d mails moved to %2$s</item>
     </plurals>
+    <plurals name="moved_will_report">
+        <item quantity="one">Velin reports it to Tuta in unencrypted form.</item>
+        <item quantity="other">Velin reports them to Tuta in unencrypted form.</item>
+    </plurals>
     <string name="too_many_labels">A mail can have up to 5 labels.</string>
     <string name="delete_forever_title">Delete permanently?</string>
     <plurals name="delete_forever_body">
@@ -148,6 +152,16 @@
     <string name="action_mark_unread">Mark as unread</string>
     <string name="action_report_spam">Report spam</string>
     <string name="action_not_spam">Not spam</string>
+    <string name="action_report_phishing">Report phishing</string>
+    <string name="action_report">Report</string>
+    <string name="action_move_only">Move only</string>
+    <string name="spam_report_title">Report to Tuta?</string>
+    <plurals name="spam_report_body">
+        <item quantity="one">Velin moves the mail to Spam. It can also send the mail to Tuta in unencrypted form, so that Tuta can improve spam protection. Do you want to send it?</item>
+        <item quantity="other">Velin moves the mails to Spam. It can also send the mails to Tuta in unencrypted form, so that Tuta can improve spam protection. Do you want to send them?</item>
+    </plurals>
+    <string name="phishing_report_title">Report phishing?</string>
+    <string name="phishing_report_body">Velin sends the contents of this mail to Tuta in unencrypted form, so that Tuta can improve phishing and spam protection. Then it moves the mail to Spam. You cannot undo this.</string>
     <string name="action_move_to_inbox">Move to inbox</string>
     <string name="action_reply">Reply</string>
     <string name="action_reply_all">Reply all</string>
