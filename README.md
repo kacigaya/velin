@@ -57,9 +57,9 @@ The project is under active development across sequential milestones. See [docs/
 | **M0** | Project scaffold, M3 Expressive theme, stateless screens, Roborazzi screenshot tests | **Done** |
 | **M1** | Native Rust SDK AAR build (`arm64-v8a`, `x86_64`), `:core:sdk` adapter, REST transport | **Done** |
 | **M2** | Authentication: Argon2id/bcrypt KDF, session lifecycle, Keystore credential storage, TOTP | **Done** (live check pending) |
-| **M3** | Read path: mailbox folders, message list paging, decryption pipeline, HTML sanitizer, inline images | **In progress** (pipeline, sanitizer, UI and attachment download done; unread counters not checked live) |
+| **M3** | Read path: mailbox folders, message list paging, decryption pipeline, HTML sanitizer, inline images | **Done** |
 | **M4** | Sync & offline: WebSocket event bus, encrypted local store, durable sync cursors | **Done** |
-| **M5** | Mail actions: read state, archive, move, trash, labels, spam reporting | **In progress** (all but spam reporting done) |
+| **M5** | Mail actions: read state, archive, move, trash, labels, spam reporting | **Done** (spam and phishing reports not sent live) |
 | **M6** | Compose & send: drafts, attachment encryption/upload, internal confidential and external mail | **In progress** (drafts, confidential send to Tuta, reply and forward done) |
 | **M7** | Background sync: SSE push notifications, quick actions, background lifecycle | Planned |
 
