@@ -67,6 +67,11 @@ These checks remain UNVERIFIED. Use the pinned release and a test account.
 5. Check stored phishing and deprecated-key examples. Check that no message claims Authenticated.
 6. Open received and draft mail with attachments. Check names, sizes, MIME types, downloads, and cid images. Compare downloaded bytes with the official client. Check rejection above 20 MiB.
 7. Sync folders. Check initial unread counts and updates after a second client changes read state. Disable and restore the network. Check reconnect. Switch accounts and sign out. Check socket cleanup and no count leakage.
+   - Verified live on 2026-11-13 on Android 15 in the container, except account switch and sign-out. Those need a new sign-in by the owner. Unit tests cover them.
+   - Mark unread, then read: the Inbox count went to 1, then away. Each count came from a server push, because folder counts have no other source.
+   - A self-mail to the test account: the count went to 1 about 12 s after Send, with no user action. After an app restart, the count was correct at once.
+   - Outbound HTTPS was blocked on the device. The socket ended after about 50 s. While offline, the drawer kept the last count, because the folder refresh also needs the server. 5 s after the block ended, the socket opened again. The server sent the count on connect.
+   - Found during this check: the new mail did not show in the list until a pull to refresh. It was in the list, but just above the view. See M4-SYNC.md, live check 4.
 8. Cause an HTTP read failure in a debug build. Check that the failure reports its variant and contains no credentials or mail text.
 
 ## Encoding evidence

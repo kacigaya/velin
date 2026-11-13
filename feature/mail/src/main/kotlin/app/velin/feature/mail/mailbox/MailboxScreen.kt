@@ -50,6 +50,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -125,6 +126,14 @@ fun MailboxScreen(
     highlightOpenMail: Boolean = false,
 ) {
     val listState = rememberLazyListState()
+    // Keyed rows keep the first visible row in place, so a new mail above it stays out of view. A list at the top
+    // stays at the top. Row 0 is the offline banner, which has no height online. This runs before the next layout.
+    val newestMail = state.mails.firstOrNull()?.id
+    remember(newestMail) {
+        Snapshot.withoutReadObservation {
+            if (listState.firstVisibleItemIndex <= 1 && listState.firstVisibleItemScrollOffset == 0) listState.requestScrollToItem(0)
+        }
+    }
     val selectionMode = state.selectedIds.isNotEmpty()
     val fabExpanded by remember { derivedStateOf { listState.firstVisibleItemIndex == 0 } }
     val searchScrollBehavior = SearchBarDefaults.enterAlwaysSearchBarScrollBehavior()
