@@ -1,5 +1,8 @@
 package app.velin.navigation
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SnackbarDuration
@@ -35,6 +38,7 @@ import app.velin.core.domain.AuthRepository
 import app.velin.core.domain.AuthState
 import app.velin.core.domain.MailRepository
 import app.velin.core.domain.MailboxRepository
+import app.velin.core.domain.Outcome
 import app.velin.core.domain.ResponseKind
 import app.velin.feature.auth.SignInScreen
 import app.velin.feature.auth.SignInViewModel
@@ -110,6 +114,7 @@ private fun MailApp(account: Account, auth: AuthRepository, mailbox: MailboxRepo
     var labelRequest by remember { mutableStateOf<Set<String>?>(null) }
     var deleteRequest by remember { mutableStateOf<Set<String>?>(null) }
     var spamReportRequest by remember { mutableStateOf<Set<String>?>(null) }
+    var signingOut by remember { mutableStateOf(false) }
     val tooManyLabels = stringResource(MailR.string.too_many_labels)
     val mailSent = stringResource(MailR.string.composer_sent)
     val noViewer = stringResource(MailR.string.reader_no_viewer)
@@ -333,7 +338,31 @@ private fun MailApp(account: Account, auth: AuthRepository, mailbox: MailboxRepo
                     )
                 }
                 entry<SettingsRoute> {
-                    StatusMessage(icon = VelinIcons.Settings, title = stringResource(R.string.not_available_yet))
+                    fun openSystemSettings(action: String) {
+                        try {
+                            context.startActivity(Intent(action))
+                        } catch (_: ActivityNotFoundException) {
+                            scope.launch { snackbar.showSnackbar(notAvailable) }
+                        }
+                    }
+                    SettingsScreen(
+                        account = account,
+                        signingOut = signingOut,
+                        snackbar = snackbar,
+                        onBack = { backStack.removeLastOrNull() },
+                        onDisplaySettings = { openSystemSettings(Settings.ACTION_DISPLAY_SETTINGS) },
+                        onAccessibilitySettings = { openSystemSettings(Settings.ACTION_ACCESSIBILITY_SETTINGS) },
+                        onSignOut = {
+                            if (!signingOut) scope.launch {
+                                signingOut = true
+                                try {
+                                    if (auth.signOut(account.id) is Outcome.Failed) snackbar.showSnackbar(actionFailed)
+                                } finally {
+                                    signingOut = false
+                                }
+                            }
+                        },
+                    )
                 }
             },
         )

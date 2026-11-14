@@ -13,6 +13,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -29,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
@@ -68,9 +70,14 @@ fun MailRow(
     onLongClick: () -> Unit,
     actions: MailRowActions,
     modifier: Modifier = Modifier,
+    shape: Shape = MaterialTheme.shapes.extraLarge,
 ) {
     val colors = MaterialTheme.colorScheme
-    val container = if (selected) colors.secondaryContainer else Color.Transparent
+    val container = when {
+        selected -> colors.secondaryContainer
+        mail.unread -> colors.surfaceContainer
+        else -> colors.surface
+    }
     val description = mailDescription(mail)
     val archiveLabel = stringResource(R.string.action_archive)
     val trashLabel = stringResource(if (actions.trashDeletes) R.string.action_delete_forever else R.string.action_trash)
@@ -79,8 +86,8 @@ fun MailRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 2.dp)
-            .clip(MaterialTheme.shapes.large)
+            .padding(horizontal = 12.dp)
+            .clip(shape)
             .background(container)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
             .clearAndSetSemantics {
@@ -92,8 +99,8 @@ fun MailRow(
                     CustomAccessibilityAction(readLabel) { actions.onToggleRead(); true },
                 )
             }
-            .padding(horizontal = 12.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         SelectableAvatar(mail = mail, selected = selected, selectionMode = selectionMode)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -101,7 +108,7 @@ fun MailRow(
                 Text(
                     text = mail.heading.ifBlank { mail.headingAddress },
                     modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleSmall,
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = if (mail.unread) FontWeight.Bold else FontWeight.Medium,
                     color = colors.onSurface,
                     maxLines = 1,
@@ -123,28 +130,28 @@ fun MailRow(
                     color = if (mail.unread) colors.primary else colors.onSurfaceVariant,
                 )
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = mail.subject.ifBlank { stringResource(R.string.mail_no_subject) },
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (mail.unread) FontWeight.SemiBold else FontWeight.Normal,
-                    color = if (mail.unread) colors.onSurface else colors.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                StatusIcons(mail)
-                if (mail.unread) {
-                    Box(
-                        Modifier
-                            .padding(start = 8.dp)
-                            .size(8.dp)
-                            .background(colors.primary, CircleShape),
-                    )
+            Text(
+                text = mail.subject.ifBlank { stringResource(R.string.mail_no_subject) },
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (mail.unread) FontWeight.SemiBold else FontWeight.Normal,
+                color = if (mail.unread) colors.onSurface else colors.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (mail.labels.isNotEmpty() || mail.confidential || mail.hasAttachments || mail.replyState != ReplyState.None || mail.unread) {
+                FlowRow(
+                    modifier = Modifier.padding(top = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    if (mail.labels.isNotEmpty()) LabelRow(mail.labels)
+                    Row(Modifier.align(Alignment.CenterVertically), verticalAlignment = Alignment.CenterVertically) {
+                        StatusIcons(mail)
+                        if (mail.unread) {
+                            Box(Modifier.padding(start = 8.dp).size(8.dp).background(colors.primary, CircleShape))
+                        }
+                    }
                 }
-            }
-            if (mail.labels.isNotEmpty()) {
-                LabelRow(mail.labels, Modifier.padding(top = 4.dp))
             }
         }
     }
@@ -199,7 +206,7 @@ private fun StatusIcons(mail: MailSummaryUi) {
 @Composable
 private fun LabelRow(labels: List<LabelUi>, modifier: Modifier = Modifier) {
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        labels.take(MAX_VISIBLE_LABELS).forEach { LabelChip(it) }
+        labels.take(MAX_VISIBLE_LABELS).forEach { LabelChip(it, tonal = true) }
         if (labels.size > MAX_VISIBLE_LABELS) {
             Text(
                 text = "+${labels.size - MAX_VISIBLE_LABELS}",
@@ -211,8 +218,12 @@ private fun LabelRow(labels: List<LabelUi>, modifier: Modifier = Modifier) {
 }
 
 @Composable
-internal fun LabelChip(label: LabelUi, modifier: Modifier = Modifier) {
-    val (container, content) = labelColors(label.colorHex)
+internal fun LabelChip(label: LabelUi, modifier: Modifier = Modifier, tonal: Boolean = false) {
+    val (container, content) = if (tonal) {
+        MaterialTheme.colorScheme.surfaceContainerHighest to MaterialTheme.colorScheme.onSurface
+    } else {
+        labelColors(label.colorHex)
+    }
     Text(
         text = label.name,
         modifier = modifier

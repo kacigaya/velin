@@ -24,6 +24,7 @@
     <string name="mailbox_offline">Offline. Showing saved mail.</string>
     <string name="mailbox_selected_count">%1$d selected</string>
     <string name="mailbox_clear_selection">Clear selection</string>
+    <string name="mailbox_read">Read</string>
 
     <!-- Mail row -->
     <string name="mail_unread">Unread</string>

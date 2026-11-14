@@ -9,6 +9,8 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -17,16 +19,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.AppBarWithSearch
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MediumExtendedFloatingActionButton
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SearchBarDefaults
 import androidx.compose.material3.SearchBarScrollBehavior
@@ -54,15 +57,16 @@ import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import app.velin.core.designsystem.component.LoadingPane
-import app.velin.core.designsystem.component.SenderAvatar
 import app.velin.core.designsystem.component.StatusMessage
 import app.velin.core.designsystem.icon.VelinIcons
 import app.velin.feature.mail.R
@@ -158,11 +162,13 @@ fun MailboxScreen(
         floatingActionButton = {
             if (!selectionMode) {
                 val composeLabel = stringResource(R.string.mailbox_compose)
-                MediumExtendedFloatingActionButton(
+                ExtendedFloatingActionButton(
                     text = { Text(composeLabel) },
                     icon = { Icon(painterResource(VelinIcons.Edit), contentDescription = null) },
                     onClick = { onEvent(MailboxEvent.Compose) },
                     expanded = fabExpanded,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
                     // The label text is not exposed to accessibility, and it hides when collapsed.
                     modifier = Modifier.semantics { contentDescription = composeLabel },
                 )
@@ -170,7 +176,16 @@ fun MailboxScreen(
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp)) {
+                Text(
+                    text = state.folder?.let { folderName(it) } ?: stringResource(R.string.folder_inbox),
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.semantics { heading() },
+                )
+
+            }
             when {
                 state.loading && state.mails.isEmpty() -> LoadingPane(stringResource(R.string.mailbox_loading))
                 else -> MailList(state, listState, selectionMode, highlightOpenMail, onEvent)
@@ -222,15 +237,40 @@ private fun MailList(
                     exit = shrinkVertically() + fadeOut(),
                 ) { OfflineBanner() }
             }
-            items(state.mails, key = { it.id }, contentType = { "mail" }) { mail ->
-                SwipeableMailRow(
-                    mail = mail,
-                    folderKind = state.folder?.kind,
-                    selected = mail.id in state.selectedIds || (highlightOpenMail && !selectionMode && mail.id == state.openMailId),
-                    selectionMode = selectionMode,
-                    onEvent = onEvent,
-                    modifier = Modifier.animateItem(),
-                )
+            itemsIndexed(state.mails, key = { _, mail -> mail.id }, contentType = { _, _ -> "mail" }) { index, mail ->
+                val firstInGroup = index == 0 || state.mails[index - 1].unread != mail.unread
+                val lastInGroup = index == state.mails.lastIndex || state.mails[index + 1].unread != mail.unread
+                Column(Modifier.animateItem()) {
+                    if (firstInGroup) {
+                        Text(
+                            text = stringResource(if (mail.unread) R.string.mail_unread else R.string.mailbox_read),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = if (mail.unread) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 12.dp)
+                                .semantics { heading() },
+                        )
+                    }
+                    SwipeableMailRow(
+                        mail = mail,
+                        folderKind = state.folder?.kind,
+                        selected = mail.id in state.selectedIds || (highlightOpenMail && !selectionMode && mail.id == state.openMailId),
+                        selectionMode = selectionMode,
+                        onEvent = onEvent,
+                        shape = RoundedCornerShape(
+                            topStart = if (firstInGroup) 28.dp else 0.dp,
+                            topEnd = if (firstInGroup) 28.dp else 0.dp,
+                            bottomStart = if (lastInGroup) 28.dp else 0.dp,
+                            bottomEnd = if (lastInGroup) 28.dp else 0.dp,
+                        ),
+                    )
+                    if (mail.unread && !lastInGroup) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                            thickness = 2.dp,
+                            color = MaterialTheme.colorScheme.surface,
+                        )
+                    }
+                }
             }
         }
     }
@@ -244,6 +284,7 @@ private fun SwipeableMailRow(
     selected: Boolean,
     selectionMode: Boolean,
     onEvent: (MailboxEvent) -> Unit,
+    shape: androidx.compose.ui.graphics.Shape,
     modifier: Modifier = Modifier,
 ) {
     val ids = setOf(mail.id)
@@ -284,6 +325,7 @@ private fun SwipeableMailRow(
                 },
                 onLongClick = { onEvent(MailboxEvent.ToggleSelection(mail.id)) },
                 actions = actions,
+                shape = shape,
             )
         }
     }
@@ -347,18 +389,6 @@ private fun SearchTopBar(
                     }
                 } else {
                     { Icon(painterResource(VelinIcons.Search), contentDescription = null) }
-                },
-                trailingIcon = state.account?.let { account ->
-                    {
-                        val accountLabel = stringResource(R.string.mailbox_account, account.address)
-                        IconButton(
-                            onClick = { onEvent(MailboxEvent.OpenAccount) },
-                            // The avatar hides its initials from accessibility; the button names the account.
-                            modifier = Modifier.semantics { contentDescription = accountLabel },
-                        ) {
-                            SenderAvatar(name = account.displayName, address = account.address, size = 32.dp)
-                        }
-                    }
                 },
             )
         },

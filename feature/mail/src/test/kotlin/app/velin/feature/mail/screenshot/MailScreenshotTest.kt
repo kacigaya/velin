@@ -73,6 +73,33 @@ class MailScreenshotTest {
     }
 
     @Test
+    @Config(sdk = [35], qualifiers = "w320dp-h800dp-xhdpi")
+    fun mailboxNarrow() = capture("mailbox_narrow") {
+        MailboxScreen(
+            state = MailboxUiState(folder = SampleMail.inbox, mails = SampleMail.mails, loading = false),
+            onEvent = {},
+        )
+    }
+
+    @Test
+    fun mailboxEmpty() = capture("mailbox_empty") {
+        MailboxScreen(state = MailboxUiState(folder = SampleMail.inbox, loading = false), onEvent = {})
+    }
+
+    @Test
+    fun mailboxLargeText() = capture("mailbox_large_text") {
+        val density = androidx.compose.ui.platform.LocalDensity.current
+        androidx.compose.runtime.CompositionLocalProvider(
+            androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(density.density, 1.5f),
+        ) {
+            MailboxScreen(
+                state = MailboxUiState(folder = SampleMail.inbox, mails = SampleMail.mails, loading = false),
+                onEvent = {},
+            )
+        }
+    }
+
+    @Test
     fun mailboxSelection() = capture("mailbox_selection") {
         MailboxScreen(
             state = MailboxUiState(

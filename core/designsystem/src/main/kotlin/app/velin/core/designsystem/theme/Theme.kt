@@ -11,7 +11,11 @@ import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 
 /**
@@ -26,8 +30,20 @@ fun VelinTheme(
     content: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
-    val colorScheme = remember(context, darkTheme, dynamicColor) {
-        colorScheme(context, darkTheme, dynamicColor)
+    var contrast by remember(context) { mutableFloatStateOf(systemContrast(context)) }
+    DisposableEffect(context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val manager = context.getSystemService(UiModeManager::class.java)
+            val listener = UiModeManager.ContrastChangeListener { contrast = it }
+            manager?.addContrastChangeListener(context.mainExecutor, listener)
+            contrast = manager?.contrast ?: 0f
+            onDispose { manager?.removeContrastChangeListener(listener) }
+        } else {
+            onDispose {}
+        }
+    }
+    val colorScheme = remember(context, darkTheme, dynamicColor, contrast) {
+        colorScheme(context, darkTheme, dynamicColor, contrast)
     }
     MaterialExpressiveTheme(
         colorScheme = colorScheme,
@@ -36,11 +52,11 @@ fun VelinTheme(
     )
 }
 
-private fun colorScheme(context: Context, darkTheme: Boolean, dynamicColor: Boolean): ColorScheme {
+private fun colorScheme(context: Context, darkTheme: Boolean, dynamicColor: Boolean, contrast: Float): ColorScheme {
     if (dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         return if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
     }
-    return when (systemContrast(context)) {
+    return when (contrastLevel(contrast)) {
         Contrast.Standard -> if (darkTheme) darkScheme else lightScheme
         Contrast.Medium -> if (darkTheme) darkSchemeMediumContrast else lightSchemeMediumContrast
         Contrast.High -> if (darkTheme) darkSchemeHighContrast else lightSchemeHighContrast
@@ -49,10 +65,13 @@ private fun colorScheme(context: Context, darkTheme: Boolean, dynamicColor: Bool
 
 private enum class Contrast { Standard, Medium, High }
 
-private fun systemContrast(context: Context): Contrast {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return Contrast.Standard
+private fun systemContrast(context: Context): Float {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return 0f
+    return context.getSystemService(UiModeManager::class.java)?.contrast ?: 0f
+}
+
+private fun contrastLevel(level: Float): Contrast {
     // Platform levels are 0 (standard), 0.5 (medium) and 1 (high).
-    val level = context.getSystemService(UiModeManager::class.java)?.contrast ?: 0f
     return when {
         level >= 0.75f -> Contrast.High
         level >= 0.25f -> Contrast.Medium
