@@ -81,7 +81,13 @@ internal fun SettingsScreen(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Row(Modifier.padding(20.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        SenderAvatar(account.address.name, account.address.address, size = 56.dp)
+                        SenderAvatar(
+                            name = account.address.name,
+                            address = account.address.address,
+                            size = 56.dp,
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary,
+                        )
                         Column(Modifier.weight(1f)) {
                             Text(account.address.name.ifBlank { account.address.address }, style = MaterialTheme.typography.titleLarge)
                             if (account.address.name.isNotBlank()) Text(account.address.address, style = MaterialTheme.typography.bodyMedium)
@@ -92,13 +98,12 @@ internal fun SettingsScreen(
             item {
                 SettingsGroup(stringResource(R.string.settings_interface)) {
                     SettingsRow(VelinIcons.Visibility, stringResource(R.string.settings_appearance), stringResource(R.string.settings_display_summary), onDisplaySettings)
-                    SettingsRow(VelinIcons.FilterList, stringResource(R.string.settings_contrast), stringResource(R.string.settings_contrast_summary), onAccessibilitySettings)
-                    SettingsRow(VelinIcons.AccountCircle, stringResource(R.string.settings_accessibility), stringResource(R.string.settings_accessibility_summary), onAccessibilitySettings)
+                    SettingsRow(VelinIcons.Contrast, stringResource(R.string.settings_contrast), stringResource(R.string.settings_contrast_summary), onAccessibilitySettings)
+                    SettingsRow(VelinIcons.Accessibility, stringResource(R.string.settings_accessibility), stringResource(R.string.settings_accessibility_summary), onAccessibilitySettings)
                 }
             }
             item {
-                SettingsGroup(stringResource(R.string.settings_account)) {
-                    SettingsRow(VelinIcons.Person, stringResource(R.string.settings_account), account.address.address)
+                SettingsGroup(stringResource(R.string.settings_privacy)) {
                     SettingsRow(VelinIcons.Image, stringResource(R.string.settings_remote_images), stringResource(R.string.settings_remote_images_summary))
                 }
             }

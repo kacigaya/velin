@@ -75,8 +75,8 @@ fun MailRow(
     val colors = MaterialTheme.colorScheme
     val container = when {
         selected -> colors.secondaryContainer
-        mail.unread -> colors.surfaceContainer
-        else -> colors.surface
+        mail.unread -> colors.surfaceContainerHigh
+        else -> colors.surfaceContainerLow
     }
     val description = mailDescription(mail)
     val archiveLabel = stringResource(R.string.action_archive)

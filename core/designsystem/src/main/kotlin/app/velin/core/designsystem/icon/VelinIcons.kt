@@ -5,7 +5,7 @@ import app.velin.core.designsystem.R
 
 /** Material Symbols Rounded (24dp, weight 400). Filled variants mark selected navigation items. */
 object VelinIcons {
-    @DrawableRes val AccountCircle = R.drawable.ic_account_circle
+    @DrawableRes val Accessibility = R.drawable.ic_accessibility
     @DrawableRes val Add = R.drawable.ic_add
     @DrawableRes val Archive = R.drawable.ic_archive
     @DrawableRes val ArchiveFilled = R.drawable.ic_archive_filled
@@ -15,6 +15,7 @@ object VelinIcons {
     @DrawableRes val Close = R.drawable.ic_close
     @DrawableRes val CloudOff = R.drawable.ic_cloud_off
     @DrawableRes val Contacts = R.drawable.ic_contacts
+    @DrawableRes val Contrast = R.drawable.ic_contrast
     @DrawableRes val Delete = R.drawable.ic_delete
     @DrawableRes val DeleteFilled = R.drawable.ic_delete_filled
     @DrawableRes val Deselect = R.drawable.ic_deselect
@@ -26,7 +27,6 @@ object VelinIcons {
     @DrawableRes val Error = R.drawable.ic_error
     @DrawableRes val ExpandLess = R.drawable.ic_expand_less
     @DrawableRes val ExpandMore = R.drawable.ic_expand_more
-    @DrawableRes val FilterList = R.drawable.ic_filter_list
     @DrawableRes val Fingerprint = R.drawable.ic_fingerprint
     @DrawableRes val Folder = R.drawable.ic_folder
     @DrawableRes val FolderFilled = R.drawable.ic_folder_filled
@@ -50,7 +50,6 @@ object VelinIcons {
     @DrawableRes val Move = R.drawable.ic_drive_file_move
     @DrawableRes val MoveToInbox = R.drawable.ic_move_to_inbox
     @DrawableRes val Notifications = R.drawable.ic_notifications
-    @DrawableRes val Person = R.drawable.ic_person
     @DrawableRes val Phishing = R.drawable.ic_gpp_maybe
     @DrawableRes val Reply = R.drawable.ic_reply
     @DrawableRes val ReplyAll = R.drawable.ic_reply_all

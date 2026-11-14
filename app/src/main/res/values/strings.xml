@@ -16,7 +16,7 @@
     <string name="settings_contrast_summary">Follow system contrast settings</string>
     <string name="settings_accessibility">Accessibility</string>
     <string name="settings_accessibility_summary">Open Android accessibility settings</string>
-    <string name="settings_account">Your account</string>
+    <string name="settings_privacy">Privacy</string>
     <string name="settings_remote_images">Remote images</string>
     <string name="settings_remote_images_summary">Blocked by default. Load only when you choose to in a message.</string>
     <string name="settings_signing_out">Signing out…</string>

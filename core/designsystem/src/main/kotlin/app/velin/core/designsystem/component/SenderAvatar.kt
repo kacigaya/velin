@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -25,9 +26,13 @@ fun SenderAvatar(
     address: String,
     modifier: Modifier = Modifier,
     size: Dp = 40.dp,
+    containerColor: Color = Color.Unspecified,
+    contentColor: Color = Color.Unspecified,
 ) {
     val initials = remember(name, address) { initialsOf(name.ifBlank { address }) }
-    val (container, content) = avatarColors(address)
+    val (hashedContainer, hashedContent) = avatarColors(address)
+    val container = containerColor.takeOrElse { hashedContainer }
+    val content = contentColor.takeOrElse { hashedContent }
     Box(
         modifier = modifier
             .size(size)

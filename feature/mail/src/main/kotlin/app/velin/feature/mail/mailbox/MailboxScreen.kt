@@ -10,7 +10,6 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -256,14 +255,17 @@ private fun MailList(
                         selected = mail.id in state.selectedIds || (highlightOpenMail && !selectionMode && mail.id == state.openMailId),
                         selectionMode = selectionMode,
                         onEvent = onEvent,
-                        shape = RoundedCornerShape(
-                            topStart = if (firstInGroup) 28.dp else 0.dp,
-                            topEnd = if (firstInGroup) 28.dp else 0.dp,
-                            bottomStart = if (lastInGroup) 28.dp else 0.dp,
-                            bottomEnd = if (lastInGroup) 28.dp else 0.dp,
-                        ),
+                        shape = MaterialTheme.shapes.extraLarge.let { outer ->
+                            val inner = MaterialTheme.shapes.extraSmall.topStart
+                            outer.copy(
+                                topStart = if (firstInGroup) outer.topStart else inner,
+                                topEnd = if (firstInGroup) outer.topEnd else inner,
+                                bottomStart = if (lastInGroup) outer.bottomStart else inner,
+                                bottomEnd = if (lastInGroup) outer.bottomEnd else inner,
+                            )
+                        },
                     )
-                    if (mail.unread && !lastInGroup) {
+                    if (!lastInGroup) {
                         HorizontalDivider(
                             modifier = Modifier.padding(horizontal = 12.dp),
                             thickness = 2.dp,

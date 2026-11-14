@@ -29,7 +29,7 @@ fun AdaptiveShell(
     permanent: Boolean,
     folderPane: @Composable () -> Unit,
     content: @Composable () -> Unit,
-) {
+) = Surface(color = MaterialTheme.colorScheme.surface) {
     if (permanent) {
         Row {
             Surface(
