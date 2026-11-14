@@ -21,6 +21,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -122,7 +123,13 @@ private fun FolderItem(folder: FolderUi, selected: Boolean, onClick: () -> Unit,
         },
         selected = selected,
         onClick = onClick,
-        modifier = modifier,
+        modifier = modifier.sizeIn(minHeight = 48.dp),
+        colors = NavigationDrawerItemDefaults.colors(
+            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+            selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            selectedTextColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            selectedBadgeColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        ),
     )
 }
 
@@ -135,8 +142,8 @@ private fun AccountHeader(account: AccountUi) {
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        SenderAvatar(name = account.displayName, address = account.address)
-        Column {
+        SenderAvatar(name = account.displayName, address = account.address, size = 48.dp)
+        Column(Modifier.weight(1f)) {
             Text(account.displayName.ifBlank { account.address }, style = MaterialTheme.typography.titleMedium, maxLines = 1)
             if (account.displayName.isNotBlank()) {
                 Text(

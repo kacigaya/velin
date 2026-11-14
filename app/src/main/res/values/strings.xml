@@ -7,4 +7,20 @@
     <string name="mail_not_available_yet">Velin cannot show mail yet. Mail loading comes in the next version.</string>
     <string name="sign_out">Sign out</string>
     <string name="action_failed">That did not work. Try again.</string>
+    <string name="settings_title">Settings</string>
+    <string name="settings_back">Back to mail</string>
+    <string name="settings_interface">Your interface</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_display_summary">System theme, text size, and display</string>
+    <string name="settings_contrast">Contrast</string>
+    <string name="settings_contrast_summary">Follow system contrast settings</string>
+    <string name="settings_accessibility">Accessibility</string>
+    <string name="settings_accessibility_summary">Open Android accessibility settings</string>
+    <string name="settings_account">Your account</string>
+    <string name="settings_remote_images">Remote images</string>
+    <string name="settings_remote_images_summary">Blocked by default. Load only when you choose to in a message.</string>
+    <string name="settings_signing_out">Signing out…</string>
+    <string name="settings_sign_out_title">Sign out?</string>
+    <string name="settings_sign_out_body">You will need to sign in again to use this account.</string>
+    <string name="settings_cancel">Cancel</string>
 </resources>

@@ -38,6 +38,19 @@ It uses a native Android interface with gesture navigation, adaptive layouts for
   <img src="docs/screenshots/shell_tablet.png" alt="Velin adaptive list-detail layout on tablet" width="720">
 </p>
 
+### Folders & Settings
+
+| Folders | Settings |
+| :---: | :---: |
+| <img src="docs/screenshots/folders_dark.png" alt="Account-first folder drawer without an app-name header" width="240"> | <img src="docs/screenshots/settings_dark.png" alt="Grouped interface settings and account details" width="240"> |
+
+The mailbox uses tonal unread groups and two-line subjects. Mail stays in date order.
+The search bar has no profile button. Account details stay in the folder drawer.
+Settings links open Android display and accessibility controls. Remote images remain blocked by default.
+
+The approved [UI mock](docs/mockups/material-3-review.html) is a design reference.
+Its filter control is not implemented. Settings uses system controls instead of separate app preferences.
+
 ## Features
 
 - **Native interface:** Uses `MaterialExpressiveTheme` and expressive motion tokens. Supports Android 12+ dynamic color (Material You), with high, medium, and standard contrast palettes from M3 tokens.
