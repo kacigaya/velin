@@ -8,6 +8,7 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MotionScheme
+import androidx.compose.material3.Typography
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
@@ -17,6 +18,24 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
+import androidx.compose.ui.text.font.FontWeight
+import app.velin.core.designsystem.R
+
+private val GoogleSansFlex = FontFamily(
+    listOf(FontWeight.Light, FontWeight.Normal, FontWeight.Medium, FontWeight.SemiBold, FontWeight.Bold, FontWeight.ExtraBold)
+        .map { weight ->
+            Font(
+                R.font.google_sans_flex,
+                weight = weight,
+                variationSettings = FontVariation.Settings(FontVariation.weight(weight.weight), FontVariation.Setting("ROND", 100f)),
+            )
+        },
+)
+
+private val VelinTypography = Typography(fontFamily = GoogleSansFlex)
 
 /**
  * Velin's root theme. Dynamic color is the default on Android 12+; the generated fallback
@@ -48,6 +67,7 @@ fun VelinTheme(
     MaterialExpressiveTheme(
         colorScheme = colorScheme,
         motionScheme = MotionScheme.expressive(),
+        typography = VelinTypography,
         content = content,
     )
 }

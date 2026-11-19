@@ -190,4 +190,6 @@ The download page is at [kacigaya.github.io/velin](https://kacigaya.github.io/ve
 
 Velin is licensed under the [GNU General Public License v3.0](LICENSE).
 
+The app and the website bundle the Google Sans Flex typeface. It has its own license, the [SIL Open Font License 1.1](licenses/GoogleSansFlex-OFL.txt).
+
 Icons are [Material Symbols](https://github.com/google/material-design-icons) by Google, licensed under the Apache License 2.0.
