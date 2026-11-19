@@ -3,9 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "predev": "cp ../assets/logo.svg public/logo.svg",
+    "predev": "mkdir -p public && cp ../assets/logo.svg public/logo.svg",
     "dev": "next dev",
-    "prebuild": "cp ../assets/logo.svg public/logo.svg",
+    "prebuild": "mkdir -p public && cp ../assets/logo.svg public/logo.svg",
     "build": "next build",
     "test": "node --test app/*.test.ts"
   },
