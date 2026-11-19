@@ -24,11 +24,12 @@ v1.0.0 means: you can use Velin every day in place of the official Tuta Android 
 | Release | Theme | Scope | Exit check |
 |---|---|---|---|
 | 0.5.0-alpha | Trust and finish reading | Check the sender key of received TutaCrypt mail against the pinned identity, as upstream does, and warn when the check fails. Velin shows no "verified" mark, so a trust-on-first-use result is not over-trusted. Screen to check a recipient's key by hand. Spam and phishing reports. Encrypted entity update in Rust, then the replied and forwarded state. Live check of unread counters. | M3 and M5 done. A mail with a mismatched sender key shows a warning. |
-| 0.6.0-alpha | Attachments out | Encrypted attachment upload. Attach files in compose. Forward with the original files. Inline images in quotes. | A file sent from Velin opens in the official client. |
-| 0.7.0-alpha | Mail to everyone | Send to external addresses without and with a password (port from TS). Scheduled send and undo send. | M6 done. Mail arrives at a Tuta and a non-Tuta address. |
-| 0.8.0-beta | Notifications | Background push service, new-mail notifications, quick actions. Releases are beta from here: Velin is usable every day. | M7 done. New mail notifies with the app in the background. |
-| 0.9.0-beta | Search and contacts | Replace the encrypted file store with SQLCipher and migrate saved data. Local search index. Contact suggestions. SQLCipher is a new production dependency and needs owner approval. | Search finds mail offline. An update from 0.8 keeps saved mail. |
-| 0.10.0-beta | Settings and accounts | Signatures, alias and sender names, inbox rules, multi-account. | M8 done. All feature parity rows are checked. |
+| 0.6.0-alpha to 0.7.0-alpha | Interface | Shipped instead of the planned scope: mail list groups, settings screen, right-to-left icons, Google Sans Flex typeface, download website. No attachment upload or external send. | Done. |
+| 0.8.0-alpha | Attachments out | Encrypted attachment upload. Attach files in compose. Forward with the original files. Inline images in quotes. | A file sent from Velin opens in the official client. |
+| 0.9.0-alpha | Mail to everyone | Send to external addresses without and with a password (port from TS). Scheduled send and undo send. | M6 done. Mail arrives at a Tuta and a non-Tuta address. |
+| 0.10.0-beta | Notifications | Background push service, new-mail notifications, quick actions. Releases are beta from here: Velin is usable every day. | M7 done. New mail notifies with the app in the background. |
+| 0.11.0-beta | Search and contacts | Replace the encrypted file store with SQLCipher and migrate saved data. Local search index. Contact suggestions. SQLCipher is a new production dependency and needs owner approval. | Search finds mail offline. An update from 0.10 keeps saved mail. |
+| 0.12.0-beta | Settings and accounts | Signatures, alias and sender names, inbox rules, multi-account. | M8 done. All feature parity rows are checked. |
 | 1.0.0-rc.1 | Hardening | External security review, performance and battery check, accessibility audit, parity review. Updates tested from every earlier release. A written process to follow upstream client versions (HTTP 474). | M9 done. No open high-severity findings. |
 | 1.0.0 | Release | Fixes from the rc phase only. | The rc ran for two weeks or more with no new high-severity bug. |
 
