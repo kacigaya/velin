@@ -182,6 +182,10 @@ See [docs/backend/NATIVE-BUILD.md](docs/backend/NATIVE-BUILD.md) for toolchain d
 - [Native Build Guide](docs/backend/NATIVE-BUILD.md) — Compiling the Rust SDK AAR and binding generation.
 - [Backend Feasibility Study](docs/research/backend-feasibility.md) — Upstream protocol analysis, encryption scheme, and entity hierarchy.
 
+## Website
+
+The download page is at [kacigaya.github.io/velin](https://kacigaya.github.io/velin/). It links to the APK of the newest release. Its source is in [`site/`](site/). GitHub Actions deploys it on each release and on each push to `main` that changes the site.
+
 ## License
 
 Velin is licensed under the [GNU General Public License v3.0](LICENSE).

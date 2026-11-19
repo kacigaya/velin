@@ -1,0 +1,26 @@
+{
+  "name": "app-site",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "predev": "cp ../assets/logo.svg public/logo.svg",
+    "dev": "next dev",
+    "prebuild": "cp ../assets/logo.svg public/logo.svg",
+    "build": "next build",
+    "test": "node --test app/*.test.ts"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "next": "16.4.6",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "typescript": "6.0.3"
+  }
+}
