@@ -28,7 +28,7 @@ GITHUB_TOKEN=$(gh auth token) PAGES_BASE_PATH=/velin npm run build
 
 The output is in `site/out/`. The base path on GitHub Pages is `/velin`. The URL is `https://kacigaya.github.io/velin/`.
 
-Deploy: `.github/workflows/pages.yml` runs on a push to `main` that changes `site/**`, `assets/logo.svg`, or the workflow file. It also runs when a release is published, edited, or deleted, and on a manual run. Pages must use the "GitHub Actions" source.
+Deploy: `.github/workflows/pages.yml` runs on a push to `main` that changes `site/**`, `assets/logo.svg`, or the workflow file. It also runs when the `Release` workflow succeeds, when a release is published, edited, or deleted, and on a manual run. The `Release` trigger is required: `release.yml` publishes with `GITHUB_TOKEN`, and GitHub does not start other workflows from events that `GITHUB_TOKEN` makes. If you rename the `Release` workflow, change `workflows: [Release]` in `pages.yml`. Pages must use the "GitHub Actions" source.
 
 ## Typography
 
