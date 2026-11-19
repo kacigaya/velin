@@ -33,7 +33,13 @@ export const site: SiteConfig = {
   lead: "Read, sort, and answer your Tuta mail in a native Android app. Open source, end-to-end encrypted, no analytics, no crash telemetry.",
   minAndroid: "Android 8.0 or later",
   themeColor: { light: "#faf8ff", dark: "#121318" },
-  demo: null,
+  demo: {
+    video: "demo.mp4",
+    poster: "demo-poster.webp",
+    width: 1280,
+    height: 720,
+    caption: "The inbox, blocked remote images, the encrypted composer, and two panes on a tablet.",
+  },
   features: {
     title: "What it does",
     items: [
