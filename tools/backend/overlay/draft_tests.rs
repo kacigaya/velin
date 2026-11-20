@@ -16,7 +16,7 @@ mod velin_draft_tests {
         VelinDraftInput { id: updating.then(|| id("draft")), sender: VelinSender { address: "sender@example.invalid".into(), name: "Sender".into() },
             to: vec![VelinSender { address: "recipient@example.invalid".into(), name: "Recipient".into() }], cc: vec![], bcc: vec![],
             subject: "Draft subject".into(), html: "<b>Draft</b>".into(), confidential: true,
-            attachments: if updating { vec![id("retained")] } else { vec![] }, previous: None, conversation_type: 0 }
+            attachments: if updating { vec![id("retained")] } else { vec![] }, previous: None, conversation_type: 0, forwarded: vec![], new_files: vec![] }
     }
     fn mail(input: &VelinDraftInput) -> Mail {
         Mail { _id: Some(id("draft")), _ownerGroup: Some("group".to_owned().into()), _ownerEncSessionKey: Some(vec![17; 80]),
@@ -65,7 +65,7 @@ mod velin_draft_tests {
                 params.velin_session_transfer.as_ref().is_some_and(|p| p.scheme == VelinEncryptionScheme::Aead && p.owner_key.version == 7)
         }).return_once(|_, _| Ok(DraftCreateReturn { _format: 0, draft: id("draft") }));
         let facade = MailFacade::new(Arc::new(client), Arc::new(user()), Arc::new(services));
-        assert_eq!(facade.velin_save_draft(input).await.unwrap(), id("draft"));
+        assert_eq!(facade.velin_save_draft(input).await.unwrap().id, id("draft"));
     }
 
     #[tokio::test]
@@ -93,7 +93,7 @@ mod velin_draft_tests {
                 params.velin_session_transfer.as_ref().is_some_and(|p| p.owner_key.version == 3 && p.scheme == VelinEncryptionScheme::Aead)
         }).return_once(|_, _| Ok(DraftUpdateReturn { _format: 0, ..create_test_entity() }));
         let facade = MailFacade::new(Arc::new(client), Arc::new(user()), Arc::new(services));
-        assert_eq!(facade.velin_save_draft(input).await.unwrap(), id("draft"));
+        assert_eq!(facade.velin_save_draft(input).await.unwrap().id, id("draft"));
     }
 
     #[tokio::test]
@@ -131,7 +131,7 @@ mod velin_draft_tests {
             services.expect_post::<DraftService>().withf(move |data, _| data.conversationType == 1 && data.previousMessageId.as_deref() == expected)
                 .return_once(|_, _| Ok(DraftCreateReturn { _format: 0, draft: id("draft") }));
             let facade = MailFacade::new(Arc::new(client), Arc::new(user()), Arc::new(services));
-            assert_eq!(facade.velin_save_draft(input).await.unwrap(), id("draft"));
+            assert_eq!(facade.velin_save_draft(input).await.unwrap().id, id("draft"));
         }
     }
     #[tokio::test]
@@ -146,7 +146,7 @@ mod velin_draft_tests {
     }
     #[test]
     fn velin_draft_update_preserves_implicit_legacy_version() {
-        let data = velin_draft_data(&input(true), vec![7; 16], None, None, 0, vec![], vec![]);
+        let data = velin_draft_data(&input(true), vec![7; 16], None, None, 0, vec![], vec![], vec![]);
         let mail = data.mail.unwrap();
         let details = data.mailDetailsBlob.unwrap();
         assert_eq!(mail._ownerKeyVersion, None);

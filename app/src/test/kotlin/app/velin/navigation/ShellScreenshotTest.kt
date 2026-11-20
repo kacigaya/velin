@@ -139,7 +139,7 @@ internal object FakeGraph : AppGraph {
         override suspend fun setUnread(account: AccountId, ids: List<MailId>, unread: Boolean): Outcome<Unit> = Outcome.Success(Unit)
         override suspend fun move(account: AccountId, ids: List<MailId>, target: FolderId): Outcome<Unit> = Outcome.Success(Unit)
         override suspend fun setLabels(account: AccountId, ids: List<MailId>, labels: List<LabelId>): Outcome<Unit> = Outcome.Success(Unit)
-        override suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<DraftId> = Outcome.Failed(Failure.Unsupported)
+        override suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<app.velin.core.domain.SavedDraft> = Outcome.Failed(Failure.Unsupported)
         override suspend fun sendDraft(account: AccountId, id: DraftId): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)
         override suspend fun downloadAttachment(account: AccountId, id: AttachmentId): Outcome<File> = Outcome.Failed(Failure.Unsupported)
         override fun search(account: AccountId, query: String): Flow<Outcome<List<MailSummary>>> = flowOf(Outcome.Success(emptyList()))

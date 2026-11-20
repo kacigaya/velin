@@ -641,7 +641,7 @@ class BackendReadRepository internal constructor(private val source: MailReadSou
             }
         }
     }
-    override suspend fun prepareResponse(account: AccountId, previous: MailId, kind: ResponseKind): Outcome<PreparedResponse> =
+    override suspend fun prepareResponse(account: AccountId, previous: MailId, kind: ResponseKind): Outcome<Draft> =
         io(account, save = true) {
             // Saved mail from v0.3 has no state, so read the direction fresh. A response needs the server anyway.
             val fresh = when (val result = source.message(account, previous)) {
@@ -656,7 +656,7 @@ class BackendReadRepository internal constructor(private val source: MailReadSou
                         ?.let { Outcome.Success(it) } ?: Outcome.Failed(Failure.Unsupported)
             }
         }
-    override suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<DraftId> = io(account, save = true) {
+    override suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<SavedDraft> = io(account, save = true) {
         val state = this.account(account)
         fun remember(id: MailId) {
             if (draft.rejectedRecipients.isEmpty()) state.draftRejections.remove(id)
@@ -669,10 +669,10 @@ class BackendReadRepository internal constructor(private val source: MailReadSou
         when (val saved = source.saveDraft(account, draft)) {
             is Outcome.Failed -> saved
             is Outcome.Success -> {
-                val id = saved.value.value
+                val id = saved.value.id.value
                 remember(id)
                 // Rejection is a send block, so a failed durable write must reach the composer.
-                try { write(account) } catch (_: Exception) { return@io Outcome.Failed(Failure.DraftPersistence(saved.value)) }
+                try { write(account) } catch (_: Exception) { return@io Outcome.Failed(Failure.DraftPersistence(saved.value.id, saved.value)) }
                 state.messages.remove(id)
                 state.rawBodies.remove(id)
                 state.summaries.remove(id)

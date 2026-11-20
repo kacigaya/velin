@@ -72,20 +72,22 @@ data class Draft(val id: DraftId?, val sender: SenderAlias, val to: List<Recipie
     val confidential: Boolean, val attachments: List<Attachment>, val scheduledSendAt: Instant?,
     val htmlBody: String? = null, val response: DraftResponse? = null,
     /** Local-only fingerprint rejections. Never sent to the mail server. */
-    val rejectedRecipients: Set<String> = emptySet())
+    val rejectedRecipients: Set<String> = emptySet(),
+    val newAttachments: List<NewAttachment> = emptyList())
+class NewAttachment(val name: String, val mimeType: String, val bytes: ByteArray)
+const val MAX_ATTACHMENTS_BYTES = 25L * 1024 * 1024
+data class SavedDraft(val id: DraftId, val attachments: List<Attachment>)
 enum class ResponseKind { Reply, ReplyAll, Forward }
 /** The mail a new draft answers. The server threads the draft into its conversation when it is created. */
 data class DraftResponse(val previous: MailId, val kind: ResponseKind)
-/** A new response draft. [omittedAttachments] counts files of the previous mail that the draft does not carry. */
-data class PreparedResponse(val draft: Draft, val omittedAttachments: Int)
 data class MailPage(val mails: List<MailSummary>, val next: PageCursor?)
 enum class RecipientResolutionReason { InvalidAddress, KeyMismatch, RateLimited, InvalidKeyData, TrustStorageUnavailable }
 enum class UnsupportedReason { Unspecified, ScheduledSend, NonConfidentialSend, Attachments, ReplyOrForward, IdentityTrustStore, ExternalRecipient, CalendarMail, CustomReplyTo }
 enum class SendBlockReason { RecipientNotFound, KeyMismatch }
 sealed interface Failure {
     data object Offline : Failure
-    /** The server saved the draft, but its local send block could not be saved. Retry with this ID. */
-    data class DraftPersistence(val id: DraftId) : Failure
+    /** The local send block could not be saved. Retry with this ID. [saved] is set when the server saved the draft. */
+    data class DraftPersistence(val id: DraftId, val saved: SavedDraft? = null) : Failure
     data object Unauthorized : Failure
     data object Decryption : Failure
     data object InvalidSoftwareVersion : Failure

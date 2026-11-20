@@ -36,14 +36,14 @@ interface MailRepository {
     /** Permanent deletion is restricted to mails currently in Trash or Spam. */
     suspend fun delete(account: AccountId, ids: List<MailId>): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)
     suspend fun loadDraft(account: AccountId, id: MailId): Outcome<Draft> = Outcome.Failed(Failure.Unsupported)
-    /** Builds an unsaved reply or forward of [previous]: recipients, subject and quoted text. */
-    suspend fun prepareResponse(account: AccountId, previous: MailId, kind: ResponseKind): Outcome<PreparedResponse> =
+    /** Builds an unsaved reply or forward of [previous]: recipients, subject, quoted text and, for a forward, its files. */
+    suspend fun prepareResponse(account: AccountId, previous: MailId, kind: ResponseKind): Outcome<Draft> =
         Outcome.Failed(Failure.Unsupported)
     suspend fun recipientFingerprint(account: AccountId, address: String): Outcome<String> = Outcome.Failed(Failure.Unsupported)
     suspend fun verifyRecipient(account: AccountId, address: String, fingerprint: String): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)
     suspend fun untrustRecipient(account: AccountId, address: String): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)
     suspend fun resolveRecipient(account: AccountId, address: String): Outcome<Recipient> = Outcome.Failed(Failure.Unsupported)
-    suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<DraftId>
+    suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<SavedDraft>
     suspend fun sendDraft(account: AccountId, id: DraftId): Outcome<Unit>
     /**
      * Reports mails to Tuta. Each report sends that mail's session key, so the server can read the mail: ask the

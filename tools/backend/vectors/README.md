@@ -56,8 +56,11 @@ build. The temporary bundle is removed after each run.
    request. `encryptionRandomOffset` is the byte offset after key wrapping
    and model mapping, before attribute encryption.
 
-All eight draft vectors use `WithSessionKey`. These fixtures do not cover `WithInstanceKey`,
-attachment upload, reply construction, recipient key lookup, or send.
+All eight draft vectors use `WithSessionKey`. Two `attachmentVectors` add a
+forward draft with one new file and one forwarded file, for AES-CBC and AEAD.
+They follow `MailFacade.ts:462` and `:721`. The blob upload itself is not covered.
+These fixtures do not cover `WithInstanceKey`, reply construction, recipient key
+lookup, or send.
 They verify offline protocol construction. Server acceptance remains unverified.
 
 The crypto barrel also exports Ed25519. This program does not use it.

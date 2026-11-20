@@ -54,3 +54,11 @@
         let mail: crate::entities::generated::tutanota::TutanotaFile = self.instance_mapper.parse_entity(decrypted).map_err(|_| ApiCallError::internal("Invalid draft".into()))?;
         Ok(mail)
     }
+
+    pub async fn velin_file_key(&self, file: crate::entities::generated::tutanota::TutanotaFile) -> Result<crypto_primitives::key::GenericAesKey, ApiCallError> {
+        let model = self.entity_client.resolve_server_type_ref(&crate::entities::generated::tutanota::TutanotaFile::type_ref())?;
+        let raw = self.instance_mapper.serialize_entity(file).map_err(|_| ApiCallError::internal("Invalid attachment".into()))?;
+        Ok(self.crypto_facade.resolve_session_key(&raw, &model).await
+            .map_err(|_| ApiCallError::internal("Attachment key resolution failed".into()))?
+            .ok_or_else(|| ApiCallError::internal("Missing attachment key".into()))?.session_key)
+    }

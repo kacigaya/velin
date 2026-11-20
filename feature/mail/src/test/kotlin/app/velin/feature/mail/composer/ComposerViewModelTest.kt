@@ -9,7 +9,9 @@ import app.velin.core.domain.Failure
 import app.velin.core.domain.Outcome
 import app.velin.core.domain.DraftId
 import app.velin.core.domain.DraftResponse
-import app.velin.core.domain.PreparedResponse
+import app.velin.core.domain.Attachment
+import app.velin.core.domain.AttachmentId
+import app.velin.core.domain.NewAttachment
 import app.velin.core.domain.ResponseKind
 import app.velin.core.domain.FolderKind
 import app.velin.core.domain.MailId
@@ -164,12 +166,12 @@ class ComposerViewModelTest {
         assertEquals("<b>Hello</b>", repo.savedDrafts.single().htmlBody)
     }
 
-    private fun response(kind: ResponseKind, omitted: Int = 0) = PreparedResponse(Draft(
+    private fun response(kind: ResponseKind, attachments: List<Attachment> = emptyList()) = Draft(
         id = null, sender = SenderAlias(Address("alex@tuta.com", "Alex"), true),
         to = listOf(Recipient(Address("lena@tuta.com"), RecipientType.Unknown)), cc = emptyList(), bcc = emptyList(),
-        subject = "Re: Plan", plainText = "\n\n> Hello", confidential = true, attachments = emptyList(), scheduledSendAt = null,
+        subject = "Re: Plan", plainText = "\n\n> Hello", confidential = true, attachments = attachments, scheduledSendAt = null,
         response = DraftResponse(MailId(eid("inbox", "m1")), kind),
-    ), omitted)
+    )
 
     @Test
     fun replyStartsAboveTheQuoteAndClosesWithoutDraftWhenUntouched() = runTest {
@@ -205,13 +207,63 @@ class ComposerViewModelTest {
     }
 
     @Test
-    fun forwardReportsAttachmentsItCannotCarry() = runTest {
-        repo.response = Outcome.Success(response(ResponseKind.Forward, omitted = 2))
+    fun forwardCarriesFilesAndUsesTheCopiesAfterCreation() = runTest {
+        val original = Attachment(AttachmentId(eid("inbox-files", "a")), "a.pdf", "application/pdf", 3)
+        repo.response = Outcome.Success(response(ResponseKind.Forward, listOf(original)))
         val vm = viewModel(respondTo = "inbox/m1", kind = ResponseKind.Forward)
-        assertEquals(ComposerEffect.AttachmentsNotForwarded(2), vm.effects.first())
+        assertEquals(listOf("a.pdf"), vm.state.value.attachments.map { it.name })
+        edit { vm.body.edit { insert(0, "FYI") } }
+        advanceTimeBy(2_500); runCurrent()
+        assertEquals(listOf(original), repo.savedDrafts.single().attachments)
+        edit { vm.body.edit { insert(0, "Hi ") } }
+        advanceTimeBy(2_500); runCurrent()
+        val copy = repo.savedDrafts.last().attachments.single()
+        assertEquals("a.pdf", copy.name)
+        assertTrue("the update keeps the copy, not the forwarded file", copy.id != original.id)
         repo.response = Outcome.Failed(Failure.Offline)
         val failed = viewModel(respondTo = "inbox/m1")
         assertEquals(listOf(ComposerEffect.Failed(Failure.Offline), ComposerEffect.Close), failed.effects.take(2).toList())
+    }
+
+    @Test
+    fun pickedFilesUploadOnceAndStayInLaterSaves() = runTest {
+        val vm = viewModel()
+        vm.onEvent(ComposerEvent.AddAttachments(listOf(NewAttachment("notes.txt", "text/plain", byteArrayOf(1, 2)))))
+        runCurrent()
+        assertEquals(listOf("notes.txt"), vm.state.value.attachments.map { it.name })
+        advanceTimeBy(2_500); runCurrent()
+        val first = repo.savedDrafts.single()
+        assertEquals(listOf("notes.txt"), first.newAttachments.map { it.name })
+        edit { vm.subject.setTextAndPlaceCursorAtEnd("Notes") }
+        advanceTimeBy(2_500); runCurrent()
+        val second = repo.savedDrafts.last()
+        assertTrue("the file is not uploaded twice", second.newAttachments.isEmpty())
+        assertEquals(listOf("notes.txt"), second.attachments.map { it.name })
+        vm.onEvent(ComposerEvent.RemoveAttachment(vm.state.value.attachments.single().id))
+        advanceTimeBy(2_500); runCurrent()
+        assertTrue(repo.savedDrafts.last().attachments.isEmpty())
+    }
+
+    @Test
+    fun filesCannotBeRemovedWhileTheyUpload() = runTest {
+        val vm = viewModel()
+        repo.saveGate = kotlinx.coroutines.CompletableDeferred()
+        vm.onEvent(ComposerEvent.AddAttachments(listOf(NewAttachment("a.txt", "text/plain", byteArrayOf(1)))))
+        advanceTimeBy(2_500); runCurrent()
+        assertTrue(vm.state.value.uploading)
+        vm.onEvent(ComposerEvent.RemoveAttachment(vm.state.value.attachments.single().id))
+        repo.saveGate!!.complete(Unit)
+        runCurrent()
+        assertFalse(vm.state.value.uploading)
+        assertEquals(listOf("a.txt"), vm.state.value.attachments.map { it.name })
+    }
+
+    @Test
+    fun filesOverTheLimitAreRefused() = runTest {
+        val vm = viewModel()
+        vm.onEvent(ComposerEvent.AddAttachments(listOf(NewAttachment("big.bin", "application/octet-stream", ByteArray(25 * 1024 * 1024 + 1)))))
+        assertEquals(ComposerEffect.AttachmentsTooLarge, vm.effects.first())
+        assertTrue(vm.state.value.attachments.isEmpty())
     }
 
     private fun TestScope.withRecipient(key: RecipientKeyState): ComposerViewModel {

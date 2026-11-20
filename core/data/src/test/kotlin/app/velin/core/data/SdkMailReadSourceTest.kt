@@ -42,10 +42,12 @@ class SdkMailReadSourceTest {
         val saved = mutableListOf<WriteDraft>()
         var draftFailure: SdkFailure? = null
         var loadedDraft: ReadMessage? = null
-        override suspend fun saveDraft(draft: WriteDraft): ReadId {
+        override suspend fun saveDraft(draft: WriteDraft): SavedDraftRead {
             draftFailure?.let { throw SdkException(it) }
             saved += draft
-            return draft.id ?: ReadId("mail", "draft")
+            val added = draft.forwarded.map { ReadAttachment(ReadId("files", "copy-${it.element}"), "Forwarded", "text/plain", 1, null) } +
+                draft.newFiles.map { ReadAttachment(ReadId("files", "new-${it.name}"), it.name, it.mimeType, it.bytes.size.toLong(), null) }
+            return SavedDraftRead(draft.id ?: ReadId("mail", "draft"), added)
         }
         override suspend fun loadDraft(id: ReadId): ReadMessage = requireNotNull(loadedDraft)
 
@@ -135,8 +137,8 @@ class SdkMailReadSourceTest {
         val reader = Reader()
         val source = source(reader)
         val first = source.saveDraft(account, draft()) as Outcome.Success
-        assertEquals(DraftId(MailId(ReadId("mail", "draft").domain())), first.value)
-        assertEquals(Outcome.Success(first.value), source.saveDraft(account, draft(first.value).copy(subject = "Changed")))
+        assertEquals(DraftId(MailId(ReadId("mail", "draft").domain())), first.value.id)
+        assertEquals(Outcome.Success(first.value), source.saveDraft(account, draft(first.value.id).copy(subject = "Changed")))
         assertNull(reader.saved.first().id)
         assertEquals(ReadId("mail", "draft"), reader.saved.last().id)
         assertEquals("a &lt; b &amp; c<br>next", reader.saved.first().html)
@@ -151,6 +153,24 @@ class SdkMailReadSourceTest {
             source(reader).saveDraft(account, draft().copy(response = DraftResponse(previous, kind)))
             assertEquals(ReadId("mail", "previous") to type, reader.saved.last().let { it.previous to it.conversationType })
         }
+    }
+
+    @Test fun newForwardCopiesItsFilesAndUploadsNewOnes() = runBlocking {
+        val reader = Reader()
+        val previous = MailId(ReadId("mail", "previous").domain())
+        val original = Attachment(AttachmentId(ReadId("files", "original").domain()), "Forwarded", "text/plain", 1)
+        val forward = draft().copy(response = DraftResponse(previous, ResponseKind.Forward), attachments = listOf(original),
+            newAttachments = listOf(NewAttachment("a.txt", "text/plain", byteArrayOf(7))))
+        val saved = (source(reader).saveDraft(account, forward) as Outcome.Success).value
+        val written = reader.saved.single()
+        assertTrue("forwarded files are not kept draft files", written.attachments.isEmpty())
+        assertEquals(listOf(ReadId("files", "original")), written.forwarded)
+        assertEquals(listOf("a.txt"), written.newFiles.map { it.name })
+        assertEquals(listOf("copy-original", "new-a.txt"), saved.attachments.map { it.id.value.element.value })
+        val update = forward.copy(id = saved.id, attachments = saved.attachments, newAttachments = emptyList())
+        assertEquals(saved, (source(reader).saveDraft(account, update) as Outcome.Success).value)
+        assertEquals(saved.attachments.map { ReadId(it.id.value.list.value, it.id.value.element.value) }, reader.saved.last().attachments)
+        assertTrue(reader.saved.last().forwarded.isEmpty() && reader.saved.last().newFiles.isEmpty())
     }
 
     @Test fun draftReopeningRetainsHtmlAndAttachmentIdsUntilEdited() = runBlocking {

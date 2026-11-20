@@ -9,7 +9,7 @@ interface MailReadSource {
     suspend fun verifyRecipient(account: AccountId, address: String, fingerprint: String): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)
     suspend fun untrustRecipient(account: AccountId, address: String): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)
     suspend fun resolveRecipient(account: AccountId, address: String): Outcome<Recipient> = Outcome.Failed(Failure.Unsupported)
-    suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<DraftId> = Outcome.Failed(Failure.Unsupported)
+    suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<SavedDraft> = Outcome.Failed(Failure.Unsupported)
     suspend fun loadDraft(account: AccountId, id: MailId): Outcome<Draft> = Outcome.Failed(Failure.Unsupported)
     suspend fun setUnread(account: AccountId, ids: List<MailId>, unread: Boolean): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)
     suspend fun move(account: AccountId, ids: List<MailId>, target: FolderId): Outcome<Unit> = Outcome.Failed(Failure.Unsupported)

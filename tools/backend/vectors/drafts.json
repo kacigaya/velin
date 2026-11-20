@@ -50,6 +50,294 @@
     }
   ],
   "draftUpdateReturnWire": "{\"524\":\"0\",\"525\":[[\"test-file-list\",\"retained-file\"]]}",
+  "attachmentVectors": [
+    {
+      "scheme": "aes-cbc",
+      "operation": "create",
+      "seed": "velin-draft-attachments-0-v1",
+      "encryptionRandomOffset": 104,
+      "ownerKeyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "ownerKeyVersion": 7,
+      "sessionKeyHex": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "fileSessionKeyHex": "606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f",
+      "mappedInput": {
+        "509": "0",
+        "510": "<previous@example.invalid>",
+        "511": "2",
+        "512": null,
+        "515": [
+          {
+            "497": "x6Io7g",
+            "498": null,
+            "499": null,
+            "500": null,
+            "501": null,
+            "502": null,
+            "503": [],
+            "504": [],
+            "505": [],
+            "506": [
+              {
+                "492": "4elIeA",
+                "493": null,
+                "494": [
+                  {
+                    "487": "tCCToQ",
+                    "488": null,
+                    "489": null,
+                    "925": null,
+                    "1226": [
+                      {
+                        "1991": "SLxk5A",
+                        "1992": "test-blob-token"
+                      }
+                    ],
+                    "2068": [
+                      {
+                        "2022": "clWB8Q",
+                        "2023": "Af3jmf6dBAivLzygSQSgGmOwKVNLrRXy8AuoGb4Qb6hFYUIbnshnF9Q9bwHqYKkX/QKdITzkatrI6hUa1EaQ71IjxvHzCXrQZ8Z5rvklLH+o",
+                        "2024": "7",
+                        "2025": null,
+                        "2026": "Report λ.pdf",
+                        "2027": "application/pdf",
+                        "2028": null
+                      }
+                    ]
+                  }
+                ],
+                "495": [],
+                "1430": null
+              },
+              {
+                "492": "qXm0qA",
+                "493": "AZCRbqnLDp6hYPgAI6PpS3uLHxK5jWnnkvi7cHTrigSEpS9VTmnn+eoG/AEKEDxzh8EccE0X7SEjm2T+rKY60n+Di7p5K4KEIsJN94Uy2o8G",
+                "494": [],
+                "495": [
+                  [
+                    "test-file-list",
+                    "forwarded-file"
+                  ]
+                ],
+                "1430": "7"
+              }
+            ],
+            "507": [],
+            "819": [],
+            "1116": null,
+            "1194": null,
+            "2069": [
+              {
+                "2059": "QfnMIA",
+                "2060": "AfMpkPKxkYi5PN37LTaA3NZJY4nYiBgFBBSVsEWhOnxHPo/k1xZb1L0WxNNvbWDWapsMATr3YSBTFRUxxyEx74ikmS2thQZ0HmfjvEgLN/K6",
+                "2061": "7",
+                "2062": null,
+                "2063": "Files",
+                "2064": "1",
+                "2065": "0",
+                "2066": [
+                  {
+                    "2030": "y-0tdw",
+                    "2031": "Test Sender",
+                    "2032": "sender@example.invalid",
+                    "2033": []
+                  }
+                ],
+                "2067": [
+                  {
+                    "2030": "TMscdg",
+                    "2031": "Recipient",
+                    "2032": "recipient@example.invalid",
+                    "2033": []
+                  }
+                ]
+              }
+            ],
+            "2070": [
+              {
+                "2053": "--fizg",
+                "2054": "AfMpkPKxkYi5PN37LTaA3NZJY4nYiBgFBBSVsEWhOnxHPo/k1xZb1L0WxNNvbWDWapsMATr3YSBTFRUxxyEx74ikmS2thQZ0HmfjvEgLN/K6",
+                "2055": "7",
+                "2056": null,
+                "2057": [
+                  {
+                    "2048": "klYu4Q",
+                    "2049": [],
+                    "2050": [
+                      {
+                        "2043": "hRSMaw",
+                        "2044": [
+                          {
+                            "2030": "s82dPA",
+                            "2031": "Recipient",
+                            "2032": "recipient@example.invalid",
+                            "2033": []
+                          }
+                        ],
+                        "2045": [],
+                        "2046": []
+                      }
+                    ],
+                    "2051": [
+                      {
+                        "2039": "lkl9pg",
+                        "2040": "",
+                        "2041": "<div>See files</div>"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "1427": null
+      },
+      "wireJson": "{\"509\":\"0\",\"510\":\"<previous@example.invalid>\",\"511\":\"2\",\"512\":null,\"515\":[{\"497\":\"x6Io7g\",\"498\":null,\"499\":null,\"500\":null,\"501\":null,\"502\":null,\"503\":[],\"504\":[],\"505\":[],\"506\":[{\"492\":\"4elIeA\",\"493\":null,\"494\":[{\"487\":\"tCCToQ\",\"488\":null,\"489\":null,\"925\":null,\"1226\":[{\"1991\":\"SLxk5A\",\"1992\":\"test-blob-token\"}],\"2068\":[{\"2022\":\"clWB8Q\",\"2023\":\"Af3jmf6dBAivLzygSQSgGmOwKVNLrRXy8AuoGb4Qb6hFYUIbnshnF9Q9bwHqYKkX/QKdITzkatrI6hUa1EaQ71IjxvHzCXrQZ8Z5rvklLH+o\",\"2024\":\"7\",\"2025\":null,\"2026\":\"AW4OYzN28QcOF01UDldJmyOEEiG3uvwcwywLORha87tTLkp938gMQ/5C5j2yBtgq+YV4EJVBFXu/FtewVtW8AZo=\",\"2027\":\"AVQ8kYtNmhL0dMH2M5Xrp8DN188fx4US5fhaxbE0tKjM1SSR+RpXHWmFOYa5K5ULx452HlbKtqy7d/B3oKcjk8k=\",\"2028\":null}]}],\"495\":[],\"1430\":null},{\"492\":\"qXm0qA\",\"493\":\"AZCRbqnLDp6hYPgAI6PpS3uLHxK5jWnnkvi7cHTrigSEpS9VTmnn+eoG/AEKEDxzh8EccE0X7SEjm2T+rKY60n+Di7p5K4KEIsJN94Uy2o8G\",\"494\":[],\"495\":[[\"test-file-list\",\"forwarded-file\"]],\"1430\":\"7\"}],\"507\":[],\"819\":[],\"1116\":null,\"1194\":null,\"2069\":[{\"2059\":\"QfnMIA\",\"2060\":\"AfMpkPKxkYi5PN37LTaA3NZJY4nYiBgFBBSVsEWhOnxHPo/k1xZb1L0WxNNvbWDWapsMATr3YSBTFRUxxyEx74ikmS2thQZ0HmfjvEgLN/K6\",\"2061\":\"7\",\"2062\":null,\"2063\":\"AQNZB7u+qOyNzdYUNo1KiJp4Lxg+QeYybGpQ9akyc+NVkRc/2HQq9hWiWkJxyI6VbetDdqP4C9EDZbZaN5UWUE0=\",\"2064\":\"AQGlu8y68XYWxq5x56pWfGgLx2wKuXrTKeae29+n+DYe9wLI6ZOKA0qOyUKp2jd+lucoArG91rSE5Q0bVLfNKdE=\",\"2065\":\"AS6CBMrcu+yHPQ+aQLbL/jU2Upgt++rwLJXdNKYvviu3qGhPcWVDSE2WLICA42MyP1CpvWR+DcNmaW+am2GmwBo=\",\"2066\":[{\"2030\":\"y-0tdw\",\"2031\":\"ARRkTF4BgDCAGNStl7ckr30uMqD34oEGjqVP/EMVUF02qdwN7JRd05Yk6fOUDFzJ/zUP1VHYHlXU+yAiWItWbgw=\",\"2032\":\"sender@example.invalid\",\"2033\":[]}],\"2067\":[{\"2030\":\"TMscdg\",\"2031\":\"AR+gNMgIaE2qqRpoAEOdI2QaspMIo+Tng8yxjFDGYjDhiBVFM20hGlrb5ShzxrQaOHP/znzFdGi0tXf58EOanJI=\",\"2032\":\"recipient@example.invalid\",\"2033\":[]}]}],\"2070\":[{\"2053\":\"--fizg\",\"2054\":\"AfMpkPKxkYi5PN37LTaA3NZJY4nYiBgFBBSVsEWhOnxHPo/k1xZb1L0WxNNvbWDWapsMATr3YSBTFRUxxyEx74ikmS2thQZ0HmfjvEgLN/K6\",\"2055\":\"7\",\"2056\":null,\"2057\":[{\"2048\":\"klYu4Q\",\"2049\":[],\"2050\":[{\"2043\":\"hRSMaw\",\"2044\":[{\"2030\":\"s82dPA\",\"2031\":\"AXdfQs3NMDIZcS2h92LVWXmuW9CubcLT0wj3gE+4VR07qpKDZ/8SafW/z9349XoKDd9DjOhsZX8yHe4bnkJwWbA=\",\"2032\":\"recipient@example.invalid\",\"2033\":[]}],\"2045\":[],\"2046\":[]}],\"2051\":[{\"2039\":\"lkl9pg\",\"2040\":\"AVmqv7oN0MsJVedJVQL1eqmnDtoZkvMJTEen1QT+GDDpzl7/QXXfX5Q4VhxylgoXt2Bcp3W5tdeYK5lP1/QA/qg=\",\"2041\":\"AbZKGstVdQGLBDGISjOBieSMplcwMEHB6wWhs+CfGE4yNQ+7iodB0VwQxW+IeWHe8D6qAnDtFTr9JBlhbvIhB0NgRLkhufmekacK2eSKN0jf\"}]}]}]}],\"1427\":null}"
+    },
+    {
+      "scheme": "aead",
+      "operation": "create",
+      "seed": "velin-draft-attachments-1-v1",
+      "encryptionRandomOffset": 104,
+      "ownerKeyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "ownerKeyVersion": 7,
+      "sessionKeyHex": "202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "fileSessionKeyHex": "606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f",
+      "mappedInput": {
+        "509": "0",
+        "510": "<previous@example.invalid>",
+        "511": "2",
+        "512": null,
+        "515": [
+          {
+            "497": "0KTgZw",
+            "498": null,
+            "499": null,
+            "500": null,
+            "501": null,
+            "502": null,
+            "503": [],
+            "504": [],
+            "505": [],
+            "506": [
+              {
+                "492": "O8xKrg",
+                "493": null,
+                "494": [
+                  {
+                    "487": "ZKS2IQ",
+                    "488": null,
+                    "489": null,
+                    "925": null,
+                    "1226": [
+                      {
+                        "1991": "eBuA-w",
+                        "1992": "test-blob-token"
+                      }
+                    ],
+                    "2068": [
+                      {
+                        "2022": "3nOUCA",
+                        "2023": "AdDXM7adAszCMKOQ+NLMwcI9LTRCKfZlarQcuh+ClYvtq6CS7+5W9v9PZrk1F/zkWXHBBnIu89scvOARaVjJz6U1blP0Q44IdwSoC1Ot/3Vy",
+                        "2024": "7",
+                        "2025": null,
+                        "2026": "Report λ.pdf",
+                        "2027": "application/pdf",
+                        "2028": null
+                      }
+                    ]
+                  }
+                ],
+                "495": [],
+                "1430": null
+              },
+              {
+                "492": "-JqtRA",
+                "493": "AaTvsCBsF8YekrBKxtFEircOhVibP6A4bIDrQNXWVXLwAjeajvfSpmZraFgD/ch2M5V6dG7ABKw9pn+jhhAzMRbS9moDJm+AwSCP+QcPD1Qe",
+                "494": [],
+                "495": [
+                  [
+                    "test-file-list",
+                    "forwarded-file"
+                  ]
+                ],
+                "1430": "7"
+              }
+            ],
+            "507": [],
+            "819": [],
+            "1116": null,
+            "1194": null,
+            "2069": [
+              {
+                "2059": "_O9ugw",
+                "2060": "AciUTd8BpIJiiL+q/nuE2D0krtNPuzEbzArtwSnYBT3UT9lj2FDzOheq5OeSt4j1mw1gM5HTJIvpQHBCBn4HFHTbAknfTheXfxTTAnCNR8Gv",
+                "2061": "7",
+                "2062": null,
+                "2063": "Files",
+                "2064": "1",
+                "2065": "0",
+                "2066": [
+                  {
+                    "2030": "v14MWA",
+                    "2031": "Test Sender",
+                    "2032": "sender@example.invalid",
+                    "2033": []
+                  }
+                ],
+                "2067": [
+                  {
+                    "2030": "kIJhTA",
+                    "2031": "Recipient",
+                    "2032": "recipient@example.invalid",
+                    "2033": []
+                  }
+                ]
+              }
+            ],
+            "2070": [
+              {
+                "2053": "Su935g",
+                "2054": "AciUTd8BpIJiiL+q/nuE2D0krtNPuzEbzArtwSnYBT3UT9lj2FDzOheq5OeSt4j1mw1gM5HTJIvpQHBCBn4HFHTbAknfTheXfxTTAnCNR8Gv",
+                "2055": "7",
+                "2056": null,
+                "2057": [
+                  {
+                    "2048": "q5YabA",
+                    "2049": [],
+                    "2050": [
+                      {
+                        "2043": "82Eypg",
+                        "2044": [
+                          {
+                            "2030": "hWv4hg",
+                            "2031": "Recipient",
+                            "2032": "recipient@example.invalid",
+                            "2033": []
+                          }
+                        ],
+                        "2045": [],
+                        "2046": []
+                      }
+                    ],
+                    "2051": [
+                      {
+                        "2039": "9_IIAg",
+                        "2040": "",
+                        "2041": "<div>See files</div>"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "1427": null
+      },
+      "wireJson": "{\"509\":\"0\",\"510\":\"<previous@example.invalid>\",\"511\":\"2\",\"512\":null,\"515\":[{\"497\":\"0KTgZw\",\"498\":null,\"499\":null,\"500\":null,\"501\":null,\"502\":null,\"503\":[],\"504\":[],\"505\":[],\"506\":[{\"492\":\"O8xKrg\",\"493\":null,\"494\":[{\"487\":\"ZKS2IQ\",\"488\":null,\"489\":null,\"925\":null,\"1226\":[{\"1991\":\"eBuA-w\",\"1992\":\"test-blob-token\"}],\"2068\":[{\"2022\":\"3nOUCA\",\"2023\":\"AdDXM7adAszCMKOQ+NLMwcI9LTRCKfZlarQcuh+ClYvtq6CS7+5W9v9PZrk1F/zkWXHBBnIu89scvOARaVjJz6U1blP0Q44IdwSoC1Ot/3Vy\",\"2024\":\"7\",\"2025\":null,\"2026\":\"A+sBzOZiN0M2+JawbRa1Cz0PrQby0DG7dp90H2ux2bhBWaSDFptmHHzFSU+BmpEJNSToSN5IA0NchYdCp9vECaA=\",\"2027\":\"Ax/TQxNExo2bdRAwFOznG6uQ3jN5SIDeMydBZRxy1mtM3V7mnp5BrWWa/wWVvOAFOdJr/0n7W8VMiBEMwvmvVIs=\",\"2028\":null}]}],\"495\":[],\"1430\":null},{\"492\":\"-JqtRA\",\"493\":\"AaTvsCBsF8YekrBKxtFEircOhVibP6A4bIDrQNXWVXLwAjeajvfSpmZraFgD/ch2M5V6dG7ABKw9pn+jhhAzMRbS9moDJm+AwSCP+QcPD1Qe\",\"494\":[],\"495\":[[\"test-file-list\",\"forwarded-file\"]],\"1430\":\"7\"}],\"507\":[],\"819\":[],\"1116\":null,\"1194\":null,\"2069\":[{\"2059\":\"_O9ugw\",\"2060\":\"AciUTd8BpIJiiL+q/nuE2D0krtNPuzEbzArtwSnYBT3UT9lj2FDzOheq5OeSt4j1mw1gM5HTJIvpQHBCBn4HFHTbAknfTheXfxTTAnCNR8Gv\",\"2061\":\"7\",\"2062\":null,\"2063\":\"A1wNVSPe7z3LmJydzAacr/FKRZLb7ZJzFmjY4kWfRLCLwBmzkMG7ap6c0wYxFdu/zINCdxGmB4/d\",\"2064\":\"A87SX1zxNLlW0+V1YXH9sIRzvWMSic/+jBxB0KIDVvb9hsRX0BaIEE1gzUQDU5OMCfLDDCw=\",\"2065\":\"A9Tr/0b9Qu++Fx85Gjg5xUZ0ZWV4RfwyQWZyh0nCvWDYSlK4plklfm3OMFfsI41EIejDvzk=\",\"2066\":[{\"2030\":\"v14MWA\",\"2031\":\"A8j46bk8Qg+3vgiJPy9j1Jetk3RkeF+GjW9OZT8I2zSC0unZuZZ8SBEfCaOzeGMucLkcavlYapnlz3O/qQ==\",\"2032\":\"sender@example.invalid\",\"2033\":[]}],\"2067\":[{\"2030\":\"kIJhTA\",\"2031\":\"AziB3Xo6vHb0gd8JVUzwRWMP2cdOUSeLrWjilyLn+DuHtzGW1SYPCRZWZW+D6Oocu+sdb5uGt/SQ0kh4HQ==\",\"2032\":\"recipient@example.invalid\",\"2033\":[]}]}],\"2070\":[{\"2053\":\"Su935g\",\"2054\":\"AciUTd8BpIJiiL+q/nuE2D0krtNPuzEbzArtwSnYBT3UT9lj2FDzOheq5OeSt4j1mw1gM5HTJIvpQHBCBn4HFHTbAknfTheXfxTTAnCNR8Gv\",\"2055\":\"7\",\"2056\":null,\"2057\":[{\"2048\":\"q5YabA\",\"2049\":[],\"2050\":[{\"2043\":\"82Eypg\",\"2044\":[{\"2030\":\"hWv4hg\",\"2031\":\"A2UGsy2wTcqVM3lK+De3TV2XWrvkY52yQFQT+O9ipioeZTm16i80UWlluW+OqZG4XXOiWXQWzG4cwj7wHw==\",\"2032\":\"recipient@example.invalid\",\"2033\":[]}],\"2045\":[],\"2046\":[]}],\"2051\":[{\"2039\":\"9_IIAg\",\"2040\":\"Azd50HZEAkVMEePn3qF+j+NYMGQosEtGShJUxGyvMK+OPL3SF3Q+mR6M6mLU90OSmMVC3vI=\",\"2041\":\"A9b/rC9QuhUlq3Wiz6S4fGuzzWveUbp48mYAuMc2nAj6RfACHA+Io/WVW5rbzfGRPwZ3CygLWMXUvSkGsLHRLIdsBdhci+gNQw==\"}]}]}]}],\"1427\":null}"
+    }
+  ],
   "upstreamCommit": "332e57461cdc4fe4a4ad9bdc8555f56df02931c0",
   "vectors": [
     {

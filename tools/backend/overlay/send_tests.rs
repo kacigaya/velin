@@ -25,7 +25,7 @@ mod velin_send_tests {
             assert_eq!(velin_verify_recipient_key(&signed, Some(&identity)).unwrap(), 1);
             let data = velin_send_data(IdTupleGenerated::new("test-mail-list".to_owned().into(), "test-draft".to_owned().into()), wrapped,
                 vec![InternalRecipientKeyData { _id: None, mailAddress: "self@tuta.com".into(), pubEncBucketKey: encrypted,
-                    recipientKeyVersion: 0, senderKeyVersion: None, protocolVersion: 0 }], false, None);
+                    recipientKeyVersion: 0, senderKeyVersion: None, protocolVersion: 0 }], false, None, vec![]);
             let models = provider(false);
             let mapper = crate::instance_mapper::InstanceMapper::new(models.clone());
             let parsed = mapper.serialize_entity(data).unwrap();
@@ -109,7 +109,7 @@ mod velin_send_preflight_tests {
     async fn velin_send_rejects_excluded_drafts_before_lookup_or_post() {
         for reason in [1, 2, 3] {
             let mut mail = draft();
-            match reason { 1 => mail.sendAt = Some(crate::date::DateTime::from_millis(1)), 2 => mail.confidential = false, _ => mail.attachments = vec![id("file")] }
+            match reason { 1 => mail.sendAt = Some(crate::date::DateTime::from_millis(1)), 2 => mail.confidential = false, _ => mail.attachments = (0..101).map(|i| id(&i.to_string())).collect() }
             let mut client = MockCryptoEntityClient::default();
             client.expect_velin_draft_mail().return_once(move |_| Ok(mail));
             let facade = MailFacade::new(Arc::new(client), Arc::new(MockUserFacade::default()), Arc::new(MockResolvingServiceExecutor::default()));
@@ -198,11 +198,14 @@ mod velin_send_preflight_tests {
 
     #[tokio::test]
     async fn velin_send_legacy_identity_is_allowed_and_posts_only_ciphertext() {
-        use crate::entities::generated::{sys::PublicKeyGetOut, tutanota::{InternalRecipientKeyData, SendDraftReturn}};
+        use crate::entities::generated::{sys::PublicKeyGetOut, tutanota::{InternalRecipientKeyData, SendDraftReturn, TutanotaFile}};
         use crate::services::generated::sys::IdentityKeyService;
         use crypto_primitives::key::GenericAesKey;
-        let mail = draft();
+        let mut mail = draft();
+        mail.attachments = vec![id("file")];
         let mut client = MockCryptoEntityClient::default();
+        client.expect_velin_draft_file().times(1).returning(|id| Ok(TutanotaFile { _id: Some(id.clone()), ..create_test_entity() }));
+        client.expect_velin_file_key().times(1).return_once(|_| Ok(GenericAesKey::from_bytes(&[23; 32]).unwrap()));
         sender(&mut client, &mail);
         client.expect_velin_draft_mail().return_once(move |_| Ok(mail));
         client.expect_velin_draft_details().return_once(move |_| Ok(MailDetails {
@@ -210,8 +213,11 @@ mod velin_send_preflight_tests {
             replyTos: vec![], ..create_test_entity() }));
         client.expect_velin_send_plaintext_setting().return_once(|_| Ok(false));
         client.expect_velin_send_mail_key().return_once(|_| Ok(GenericAesKey::from_bytes(&[19; 32]).unwrap()));
-        client.expect_velin_send_recipient_key().times(1).return_once(|_, bucket, _, address| {
+        let bucket_seen = Arc::new(std::sync::Mutex::new(None));
+        let bucket_tx = bucket_seen.clone();
+        client.expect_velin_send_recipient_key().times(1).return_once(move |_, bucket, _, address| {
             assert_eq!(bucket.as_bytes().len(), 32);
+            *bucket_tx.lock().unwrap() = Some(bucket.clone());
             Ok(InternalRecipientKeyData { _id: None, mailAddress: address, pubEncBucketKey: vec![11; 256],
                 recipientKeyVersion: 0, senderKeyVersion: None, protocolVersion: 0 })
         });
@@ -220,7 +226,7 @@ mod velin_send_preflight_tests {
             _format: 0, pubKeyVersion: 0, pubRsaKey: Some(crypto_primitives::compatibility_test_utils::get_compatibility_test_data().rsa_encryption_tests.remove(0).public_key),
             pubEccKey: None, pubKyberKey: None, signature: None }));
         services.expect_get::<IdentityKeyService>().return_once(|_, _| Err(ApiCallError::ServerResponseError { source: HttpError::NotFoundError }));
-        services.expect_post::<SendDraftService>().times(1).return_once(|data, params| {
+        services.expect_post::<SendDraftService>().times(1).return_once(move |data, params| {
             assert!(params.velin_send);
             assert!(data.mailSessionKey.is_none());
             assert!(data.bucketEncMailSessionKey.as_ref().unwrap().len() > 32);
@@ -230,6 +236,13 @@ mod velin_send_preflight_tests {
             assert!(nested.mailSessionKey.is_none());
             assert_eq!(nested.bucketEncMailSessionKey, data.bucketEncMailSessionKey);
             assert!(!data.allowUndo && data.sendAt.is_none());
+            let bucket = bucket_seen.lock().unwrap().clone().unwrap();
+            let [file] = data.attachmentKeyData.as_slice() else { panic!("one file key") };
+            assert_eq!(file.file, id("file"));
+            assert!(file.fileSessionKey.is_none());
+            assert_eq!(bucket.decrypt_aes_key(file.bucketEncFileSessionKey.as_ref().unwrap()).unwrap().as_bytes(), &[23; 32]);
+            assert_eq!(nested.attachmentKeyData.len(), 1);
+            assert_eq!(nested.attachmentKeyData[0].bucketEncFileSessionKey, file.bucketEncFileSessionKey);
             Ok(SendDraftReturn { ..create_test_entity() })
         });
         let facade = MailFacade::new(Arc::new(client), Arc::new(user()), Arc::new(services));

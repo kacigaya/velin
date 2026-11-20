@@ -14,6 +14,47 @@ pub struct VelinDraftInput {
     pub previous: Option<IdTupleGenerated>,
     /// ConversationType: 0 new, 1 reply, 2 forward. Used only when the draft is created.
     pub conversation_type: i64,
+    pub forwarded: Vec<IdTupleGenerated>,
+    pub new_files: Vec<VelinNewFile>,
+}
+
+#[derive(uniffi::Record, Clone)]
+pub struct VelinNewFile {
+    pub name: String,
+    pub mime_type: String,
+    pub data: Vec<u8>,
+}
+
+#[derive(uniffi::Record, Clone)]
+pub struct VelinSavedDraft {
+    pub id: IdTupleGenerated,
+    pub added: Vec<crate::entities::generated::tutanota::TutanotaFile>,
+}
+
+const VELIN_MAX_ATTACHMENT_BYTES: usize = 25 * 1024 * 1024;
+
+fn velin_valid_mime_type(value: &str) -> bool {
+    let Some((kind, subtype)) = value.split_once('/') else { return false };
+    !kind.is_empty() && kind.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') &&
+        !subtype.is_empty() && subtype.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '+' | '-'))
+}
+
+fn velin_valid_files(input: &VelinDraftInput) -> bool {
+    let total = input.new_files.iter().try_fold(0usize, |sum, f| sum.checked_add(f.data.len())).filter(|t| *t <= VELIN_MAX_ATTACHMENT_BYTES);
+    total.is_some() && input.attachments.len() + input.forwarded.len() + input.new_files.len() <= 100 &&
+        input.new_files.iter().all(|f| !f.name.trim().is_empty() && f.name.chars().count() <= 255 && !f.name.chars().any(char::is_control) && velin_valid_mime_type(&f.mime_type)) &&
+        input.forwarded.iter().enumerate().all(|(i, id)| !input.forwarded[..i].contains(id))
+}
+
+fn velin_new_attachment(owner_key: &crypto_primitives::versioned::VersionedAesKey, wrapped: Vec<u8>, file: &VelinNewFile,
+    tokens: Vec<crate::entities::generated::sys::BlobReferenceTokenWrapper>,
+) -> Result<crate::entities::generated::tutanota::DraftAttachment, ApiCallError> {
+    use crate::entities::generated::tutanota::*;
+    Ok(DraftAttachment { _id: None, ownerEncFileSessionKey: None, ownerKeyVersion: None, existingFile: None,
+        newFile: Some(NewDraftAttachment { _id: None, encFileName: None, encMimeType: None, encCid: None, referenceTokens: tokens,
+            file: Some(FileTransferAggregatedType { _id: None, _ownerEncSessionKey: Some(wrapped),
+                _ownerKeyVersion: Some(owner_key.version.try_into().map_err(|_| ApiCallError::internal("Invalid draft key version".into()))?),
+                _kdfNonce: None, name: file.name.clone(), mimeType: Some(file.mime_type.clone()), cid: None, _errors: Default::default() }) }) })
 }
 
 #[derive(uniffi::Record, Clone)]
@@ -25,6 +66,7 @@ pub struct VelinDraftContent {
 
 fn velin_draft_data(input: &VelinDraftInput, wrapped: Vec<u8>, version: Option<i64>, nonce: Option<Vec<u8>>,
     method: i64, reply_tos: Vec<crate::entities::generated::tutanota::EncryptedMailAddress>, removed: Vec<IdTupleGenerated>,
+    added: Vec<crate::entities::generated::tutanota::DraftAttachment>,
 ) -> crate::entities::generated::tutanota::DraftData {
     use crate::entities::generated::tutanota::*;
     let address = |a: &VelinSender| MailAddressTransferAggregatedType {
@@ -32,7 +74,7 @@ fn velin_draft_data(input: &VelinDraftInput, wrapped: Vec<u8>, version: Option<i
     };
     DraftData { _id: None, subject: None, bodyText: None, senderMailAddress: None, senderName: None,
         confidential: None, method: None, compressedBodyText: None, toRecipients: vec![], ccRecipients: vec![], bccRecipients: vec![],
-        addedAttachments: vec![], removedAttachments: removed, replyTos: vec![], _errors: Default::default(),
+        addedAttachments: added, removedAttachments: removed, replyTos: vec![], _errors: Default::default(),
         mail: Some(MailTransferAggregatedType {
             _id: None, _ownerEncSessionKey: Some(wrapped.clone()), _ownerKeyVersion: version, _kdfNonce: nonce.clone(),
             subject: input.subject.clone(), confidential: input.confidential, method, sender: address(&input.sender),
@@ -89,17 +131,49 @@ impl MailFacade {
         Ok(Some(entry.messageId))
     }
 
-    async fn velin_draft_matches(&self, id: &IdTupleGenerated, input: &VelinDraftInput) -> Result<bool, ApiCallError> {
+    async fn velin_draft_matches(&self, id: &IdTupleGenerated, input: &VelinDraftInput) -> Result<Option<Mail>, ApiCallError> {
         let mail = self.crypto_entity_client.velin_draft_mail(id).await?;
         let details = self.crypto_entity_client.velin_draft_details(&mail).await?;
         let addresses_match = |actual: &[crate::entities::generated::tutanota::MailAddress], expected: &[VelinSender]| {
             actual.len() == expected.len() && actual.iter().zip(expected).all(|(a, b)| a.address == b.address && a.name == b.name)
         };
-        Ok(mail.subject == input.subject && mail.sender.address == input.sender.address && mail.sender.name == input.sender.name &&
+        let added = input.forwarded.len() + input.new_files.len();
+        Ok((mail.subject == input.subject && mail.sender.address == input.sender.address && mail.sender.name == input.sender.name &&
             mail.confidential == input.confidential && details.body.compressedText.as_deref().or(details.body.text.as_deref()).unwrap_or("") == input.html &&
             addresses_match(&details.recipients.toRecipients, &input.to) && addresses_match(&details.recipients.ccRecipients, &input.cc) &&
             addresses_match(&details.recipients.bccRecipients, &input.bcc) &&
-            mail.attachments.len() == input.attachments.len() && mail.attachments.iter().all(|a| input.attachments.contains(a)))
+            mail.attachments.len() == input.attachments.len() + added && input.attachments.iter().all(|a| mail.attachments.contains(a))).then_some(mail))
+    }
+
+    async fn velin_new_attachments(&self, group: &GeneratedId, owner_key: &crypto_primitives::versioned::VersionedAesKey, files: &[VelinNewFile],
+    ) -> Result<Vec<crate::entities::generated::tutanota::DraftAttachment>, ApiCallError> {
+        use crypto_primitives::{aes::Aes256Key, key::GenericAesKey, randomizer_facade::RandomizerFacade};
+        if files.is_empty() { return Ok(vec![]) }
+        let blob = self.velin_blob.as_ref().ok_or(ApiCallError::VelinDraftUnsupported)?;
+        let random = RandomizerFacade::from_core(rand_core::OsRng);
+        let mut added = Vec::with_capacity(files.len());
+        for file in files {
+            let key = GenericAesKey::from(Aes256Key::generate(&random));
+            let tokens = blob.encrypt_and_upload_single_legacy(crate::tutanota_constants::ArchiveDataType::Attachments, group, &key, &file.data).await?;
+            let wrapped = crate::velin_session_transfer::wrap_session_key(&owner_key.object, &key, &random);
+            added.push(velin_new_attachment(owner_key, wrapped, file, tokens)?);
+        }
+        Ok(added)
+    }
+
+    async fn velin_forwarded_attachments(&self, previous: &IdTupleGenerated, owner_key: &crypto_primitives::versioned::VersionedAesKey, files: &[IdTupleGenerated],
+    ) -> Result<Vec<crate::entities::generated::tutanota::DraftAttachment>, ApiCallError> {
+        use crate::entities::generated::tutanota::DraftAttachment;
+        let random = crypto_primitives::randomizer_facade::RandomizerFacade::from_core(rand_core::OsRng);
+        let version = owner_key.version.try_into().map_err(|_| ApiCallError::internal("Invalid draft key version".into()))?;
+        let mut added = Vec::with_capacity(files.len());
+        for id in files {
+            let file = self.crypto_entity_client.velin_file(previous.clone(), id.clone()).await?;
+            let key = self.crypto_entity_client.velin_file_key(file).await?;
+            added.push(DraftAttachment { _id: None, ownerEncFileSessionKey: Some(crate::velin_session_transfer::wrap_session_key(&owner_key.object, &key, &random)),
+                ownerKeyVersion: Some(version), existingFile: Some(id.clone()), newFile: None });
+        }
+        Ok(added)
     }
 }
 
@@ -120,7 +194,7 @@ impl MailFacade {
         }).catch_unwind().await.unwrap_or_else(|_| Err(ApiCallError::internal("Draft load failed".into())))
     }
 
-    pub async fn velin_save_draft(&self, input: VelinDraftInput) -> Result<IdTupleGenerated, ApiCallError> {
+    pub async fn velin_save_draft(&self, input: VelinDraftInput) -> Result<VelinSavedDraft, ApiCallError> {
         use crate::entities::generated::tutanota::{DraftCreateData, DraftUpdateData};
         use crate::services::generated::tutanota::DraftService;
         use crate::services::ExtraServiceParams;
@@ -129,10 +203,12 @@ impl MailFacade {
         AssertUnwindSafe(async {
             if input.html.len() > 1024 * 1024 || input.attachments.len() > 100 ||
                 std::iter::once(&input.sender).chain(&input.to).chain(&input.cc).chain(&input.bcc)
-                    .any(|a| a.address.is_empty() || a.address.chars().any(|c| matches!(c, '\r' | '\n' | '\0'))) || input.attachments.iter().enumerate().any(|(i, id)| input.attachments[..i].contains(id)) {
+                    .any(|a| a.address.is_empty() || a.address.chars().any(|c| matches!(c, '\r' | '\n' | '\0'))) || input.attachments.iter().enumerate().any(|(i, id)| input.attachments[..i].contains(id)) ||
+                !velin_valid_files(&input) {
                 return Err(ApiCallError::internal("Invalid draft input".into()));
             }
-            if !matches!(input.conversation_type, 0..=2) || input.previous.is_some() != (input.conversation_type != 0) {
+            if !matches!(input.conversation_type, 0..=2) || input.previous.is_some() != (input.conversation_type != 0) ||
+                (!input.forwarded.is_empty() && (input.id.is_some() || input.conversation_type != 2)) {
                 return Err(ApiCallError::internal("Invalid draft conversation".into()));
             }
             let group = self.velin_draft_sender_group(&input.sender.address).await?;
@@ -145,9 +221,10 @@ impl MailFacade {
                 let version = draft._ownerKeyVersion.unwrap_or(0);
                 let owner_key = self.crypto_entity_client.velin_draft_owner_key(&group, Some(version.try_into().map_err(|_| ApiCallError::internal("Invalid draft key version".into()))?)).await?;
                 let details = self.crypto_entity_client.velin_draft_details(&draft).await?;
+                let added = self.velin_new_attachments(&group, &owner_key, &input.new_files).await?;
                 let data = velin_draft_data(&input, draft._ownerEncSessionKey.ok_or_else(|| ApiCallError::internal("Missing draft session key".into()))?,
                     draft._ownerKeyVersion, draft._kdfNonce, draft.method, details.replyTos,
-                    draft.attachments.into_iter().filter(|id| !input.attachments.contains(id)).collect());
+                    draft.attachments.into_iter().filter(|id| !input.attachments.contains(id)).collect(), added);
                 self.service_executor.put::<DraftService>(DraftUpdateData { _format: 0, draft: id.clone(), draftData: data, _errors: Default::default() },
                     ExtraServiceParams { velin_session_transfer: Some(VelinSessionTransferEncryption { owner_key, scheme }), ..Default::default() }).await?;
                 id.clone()
@@ -158,11 +235,16 @@ impl MailFacade {
                     None => None,
                 };
                 let owner_key = self.crypto_entity_client.velin_draft_owner_key(&group, None).await?;
+                let mut added = match &input.previous {
+                    Some(previous) if !input.forwarded.is_empty() => self.velin_forwarded_attachments(previous, &owner_key, &input.forwarded).await?,
+                    _ => vec![],
+                };
+                added.extend(self.velin_new_attachments(&group, &owner_key, &input.new_files).await?);
                 let random = RandomizerFacade::from_core(rand_core::OsRng);
                 let session_key = Aes256Key::generate(&random).into();
                 let wrapped = crate::velin_session_transfer::wrap_session_key(&owner_key.object, &session_key, &random);
                 let version = owner_key.version.try_into().map_err(|_| ApiCallError::internal("Invalid draft key version".into()))?;
-                let data = velin_draft_data(&input, wrapped, Some(version), None, 0, vec![], vec![]);
+                let data = velin_draft_data(&input, wrapped, Some(version), None, 0, vec![], vec![], added);
                 self.service_executor.post::<DraftService>(DraftCreateData { _format: 0, previousMessageId: previous_message_id, conversationType: input.conversation_type,
                     ownerEncSessionKey: None, ownerKeyVersion: None, draftData: data, _errors: Default::default() },
                     ExtraServiceParams { velin_session_transfer: Some(VelinSessionTransferEncryption { owner_key, scheme }), ..Default::default() }).await?.draft
@@ -171,8 +253,16 @@ impl MailFacade {
             // Never retry POST/PUT: a lost response can already mean a saved draft.
             for attempt in 0..20 {
                 match self.velin_draft_matches(&id, &input).await {
-                    Ok(true) => return Ok(id),
-                    Ok(false) | Err(ApiCallError::ServerResponseError { source: HttpError::NotFoundError }) => {},
+                    Ok(Some(mail)) => {
+                        let mut added = Vec::new();
+                        for file_id in mail.attachments.iter().filter(|a| !input.attachments.contains(a)) {
+                            let file = self.crypto_entity_client.velin_draft_file(file_id).await?;
+                            if file._id.as_ref() != Some(file_id) || !file._errors.is_empty() { return Err(ApiCallError::internal("Invalid draft attachment".into())) }
+                            added.push(file);
+                        }
+                        return Ok(VelinSavedDraft { id, added });
+                    },
+                    Ok(None) | Err(ApiCallError::ServerResponseError { source: HttpError::NotFoundError }) => {},
                     Err(error) => return Err(error),
                 }
                 if attempt < 19 { tokio::time::sleep(std::time::Duration::from_millis(250)).await; }

@@ -73,8 +73,9 @@ val htmlBody: String? = null
    and the original HTML. A subject-only edit keeps that HTML. A body edit
    converts the new plain text to HTML.
 5. Update retains the supplied existing attachment IDs. It removes omitted
-   IDs. It rejects new files until encrypted upload exists. Scheduled drafts
-   and moves between sender mail groups remain unsupported.
+   IDs. New files are uploaded with the save; see
+   [M6c attachments](M6C-ATTACHMENTS.md). Scheduled drafts and moves between
+   sender mail groups remain unsupported.
 6. After POST or PUT, read the draft until its content matches. The limit is
    20 reads, with 250 ms between reads. A timeout, cancellation, or lost
    response can follow a successful server write. There is no automatic
@@ -101,7 +102,8 @@ Server acceptance and device behavior remain UNVERIFIED.
 
 M6b implements verified recipient lookup and confidential internal send.
 See [contracts, release evidence, limits, and live checks](M6B-REPORT.md).
-External send, upload, and scheduling remain unsupported.
+M6c adds attachment upload, see [M6c attachments](M6C-ATTACHMENTS.md).
+External send and scheduling remain unsupported.
 
 ## Reply and forward
 
@@ -170,9 +172,10 @@ Live check on 2026-11-12, Android 15 in a container, against production:
 
 Limits:
 
-1. Forwarding does not copy attachments. Attachment upload is not built yet.
-   The composer tells the user how many files it left out.
+1. A forward copies every file of the forwarded mail. See
+   [M6c attachments](M6C-ATTACHMENTS.md).
 2. Inline images in the quote are not carried. The quote keeps text only.
+   A forward attaches them as ordinary files.
 
 ## Owner live checks: UNVERIFIED
 
