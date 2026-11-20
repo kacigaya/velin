@@ -44,7 +44,9 @@ data class SavedDraft(val id: DraftId, val attachments: List<Attachment>)
    `AttachmentKeyData` with the file key encrypted with the bucket key, in the
    top-level data and in `parameters`.
 5. The draft readback now expects the kept files plus one new file per upload
-   or forward. It then reads the new files and returns them.
+   or forward. A file that the draft had before the save and did not keep
+   fails the match, so a stale read is never taken as the result. Velin then
+   reads the new files and returns them.
 6. One source change: the release's chunk iterator in `blob_facade.rs` gets a
    `Send` bound. UniFFI futures must be `Send`. The bytes do not change.
 
@@ -70,9 +72,9 @@ data class SavedDraft(val id: DraftId, val attachments: List<Attachment>)
    (`attachmentVectors`) cover a forward draft with one new file and one
    forwarded file, for AES-CBC and AEAD. Rust matches every wire byte.
    The eight earlier draft vectors did not change.
-2. `tools/backend/test-read-overlay.sh` passed all 67 selected Rust tests.
+2. `tools/backend/test-read-overlay.sh` passed all 68 selected Rust tests.
    New tests cover the attachment shape, MIME validation, forwarded key
-   wrapping, input limits, and file keys in send.
+   wrapping, input limits, stale readbacks, and file keys in send.
 3. The Gradle unit tests passed: 231 JVM tests, no failures.
    `:app:assembleDebug` passed. `m6c-artifacts.sha256` records the libraries.
 

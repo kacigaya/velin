@@ -107,6 +107,32 @@ mod velin_attachment_tests {
     }
 
     #[tokio::test]
+    async fn velin_readback_rejects_a_stale_draft_that_still_has_a_removed_file() {
+        let mut input = input();
+        input.id = Some(id("draft"));
+        input.previous = None;
+        input.conversation_type = 0;
+        input.forwarded = vec![];
+        input.attachments = vec![id("kept")];
+        input.new_files = vec![file("c.txt", "text/plain", 1)];
+        for (files, matches) in [(vec![id("kept"), id("removed")], false), (vec![id("kept"), id("uploaded")], true)] {
+            let mut client = MockCryptoEntityClient::default();
+            let subject = input.subject.clone();
+            client.expect_velin_draft_mail().returning(move |_| Ok(Mail { _id: Some(id("draft")), mailDetailsDraft: Some(id("details")),
+                subject: subject.clone(), confidential: true, attachments: files.clone(),
+                sender: MailAddress { name: "Sender".into(), address: "sender@example.invalid".into(), ..create_test_entity() }, ..create_test_entity() }));
+            let html = input.html.clone();
+            client.expect_velin_draft_details().returning(move |_| Ok(MailDetails {
+                body: Body { text: Some(String::new()), compressedText: Some(html.clone()), ..create_test_entity() },
+                recipients: Recipients { toRecipients: vec![MailAddress { address: "recipient@example.invalid".into(), name: String::new(), ..create_test_entity() }],
+                    ccRecipients: vec![], bccRecipients: vec![], ..create_test_entity() }, replyTos: vec![], ..create_test_entity() }));
+            let facade = MailFacade::new(Arc::new(client), Arc::new(user()), Arc::new(MockResolvingServiceExecutor::default()));
+            let result = facade.velin_draft_matches(&id("draft"), &input, &[id("kept"), id("removed")]).await.unwrap();
+            assert_eq!(result.is_some(), matches);
+        }
+    }
+
+    #[tokio::test]
     async fn velin_new_files_need_the_uploader_and_never_post_without_it() {
         let mut input = input();
         input.previous = None;
