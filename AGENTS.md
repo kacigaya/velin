@@ -33,3 +33,15 @@ Deploy: `.github/workflows/pages.yml` runs on a push to `main` that changes `sit
 ## Typography
 
 The app font is Google Sans Flex. It is bundled unmodified in `core/designsystem/src/main/res/font/google_sans_flex.ttf`, under the SIL Open Font License 1.1. `VelinTheme` sets it for the whole Material type scale, with the roundness axis (`ROND`) at 100. Keep `licenses/GoogleSansFlex-OFL.txt` with the font. The website uses `site/app/fonts/google-sans-flex.woff2`, under the same license.
+
+## Android checks
+
+CI uses JDK 21, the Gradle wrapper, and Android SDK platform 37.0. From the repo root, run:
+
+```sh
+./gradlew testDebugUnitTest :core:domain:test :core:html:test --console=plain
+./gradlew :app:assembleDebug --console=plain
+./gradlew :feature:mail:testDebugUnitTest --tests '*MailScreenshotTest*' -Proborazzi.record=true
+```
+
+The debug APK is in `app/build/outputs/apk/debug/`. The mail screenshots are in `feature/mail/build/outputs/roborazzi/`.

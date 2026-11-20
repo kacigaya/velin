@@ -11,11 +11,13 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -23,6 +25,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FloatingToolbarDefaults
 import androidx.compose.material3.FloatingToolbarDefaults.ScreenOffset
@@ -509,9 +512,12 @@ private fun ReplyToolbar(
         scrollBehavior = scrollBehavior,
         colors = FloatingToolbarDefaults.vibrantFloatingToolbarColors(),
     ) {
-        IconButton(onClick = { onEvent(ConversationEvent.Reply(messageId)) }) {
-            Icon(painterResource(VelinIcons.Reply), stringResource(R.string.action_reply))
+        Button(onClick = { onEvent(ConversationEvent.Reply(messageId)) }) {
+            Icon(painterResource(VelinIcons.Reply), null, Modifier.size(20.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(stringResource(R.string.action_reply))
         }
+        Spacer(Modifier.width(4.dp))
         if (canReplyAll) {
             IconButton(onClick = { onEvent(ConversationEvent.ReplyAll(messageId)) }) {
                 Icon(painterResource(VelinIcons.ReplyAll), stringResource(R.string.action_reply_all))

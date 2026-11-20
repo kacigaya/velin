@@ -13,20 +13,17 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -78,7 +75,8 @@ fun MailRow(
         mail.unread -> colors.surfaceContainerHigh
         else -> colors.surfaceContainerLow
     }
-    val description = mailDescription(mail)
+    val date = formatListDate(mail.receivedAt)
+    val description = mailDescription(mail, date)
     val archiveLabel = stringResource(R.string.action_archive)
     val trashLabel = stringResource(if (actions.trashDeletes) R.string.action_delete_forever else R.string.action_trash)
     val readLabel = stringResource(if (mail.unread) R.string.action_mark_read else R.string.action_mark_unread)
@@ -101,57 +99,56 @@ fun MailRow(
             }
             .padding(horizontal = 16.dp, vertical = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         SelectableAvatar(mail = mail, selected = selected, selectionMode = selectionMode)
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = mail.heading.ifBlank { mail.headingAddress },
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = if (mail.unread) FontWeight.Bold else FontWeight.Medium,
-                    color = colors.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (mail.conversationSize > 1) {
+                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = mail.conversationSize.toString(),
-                        modifier = Modifier.padding(start = 4.dp),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = colors.onSurfaceVariant,
+                        text = mail.heading.ifBlank { mail.headingAddress },
+                        modifier = Modifier.weight(1f, fill = false),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = if (mail.unread) FontWeight.Bold else FontWeight.Medium,
+                        color = colors.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
+                    if (mail.conversationSize > 1) {
+                        Text(
+                            text = mail.conversationSize.toString(),
+                            modifier = Modifier.padding(start = 6.dp)
+                                .clip(CircleShape)
+                                .background(colors.secondaryContainer)
+                                .padding(horizontal = 6.dp),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = colors.onSecondaryContainer,
+                            maxLines = 1,
+                        )
+                    }
                 }
-                Spacer(Modifier.width(8.dp))
                 Text(
-                    text = remember(mail.receivedAt) { formatListDate(mail.receivedAt) },
+                    text = date,
+                    modifier = Modifier.padding(start = 8.dp),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = if (mail.unread) FontWeight.Bold else FontWeight.Normal,
                     color = if (mail.unread) colors.primary else colors.onSurfaceVariant,
                 )
             }
-            Text(
-                text = mail.subject.ifBlank { stringResource(R.string.mail_no_subject) },
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = if (mail.unread) FontWeight.SemiBold else FontWeight.Normal,
-                color = if (mail.unread) colors.onSurface else colors.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (mail.labels.isNotEmpty() || mail.confidential || mail.hasAttachments || mail.replyState != ReplyState.None || mail.unread) {
-                FlowRow(
-                    modifier = Modifier.padding(top = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    if (mail.labels.isNotEmpty()) LabelRow(mail.labels)
-                    Row(Modifier.align(Alignment.CenterVertically), verticalAlignment = Alignment.CenterVertically) {
-                        StatusIcons(mail)
-                        if (mail.unread) {
-                            Box(Modifier.padding(start = 8.dp).size(8.dp).background(colors.primary, CircleShape))
-                        }
-                    }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = mail.subject.ifBlank { stringResource(R.string.mail_no_subject) },
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = if (mail.unread) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (mail.unread) colors.onSurface else colors.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                mail.labels.firstOrNull()?.let {
+                    LabelChip(it, Modifier.padding(start = 8.dp).widthIn(max = 80.dp), tonal = true)
                 }
+                StatusIcons(mail)
             }
         }
     }
@@ -204,20 +201,6 @@ private fun StatusIcons(mail: MailSummaryUi) {
 }
 
 @Composable
-private fun LabelRow(labels: List<LabelUi>, modifier: Modifier = Modifier) {
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        labels.take(MAX_VISIBLE_LABELS).forEach { LabelChip(it, tonal = true) }
-        if (labels.size > MAX_VISIBLE_LABELS) {
-            Text(
-                text = "+${labels.size - MAX_VISIBLE_LABELS}",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
 internal fun LabelChip(label: LabelUi, modifier: Modifier = Modifier, tonal: Boolean = false) {
     val (container, content) = if (tonal) {
         MaterialTheme.colorScheme.surfaceContainerHighest to MaterialTheme.colorScheme.onSurface
@@ -262,12 +245,12 @@ internal fun contentColorFor(background: Color): Color {
 }
 
 @Composable
-private fun mailDescription(mail: MailSummaryUi): String {
+private fun mailDescription(mail: MailSummaryUi, date: String): String {
     val parts = buildList {
         if (mail.unread) add(stringResource(R.string.mail_unread))
         add(mail.heading.ifBlank { mail.headingAddress })
         add(mail.subject.ifBlank { stringResource(R.string.mail_no_subject) })
-        add(formatListDate(mail.receivedAt))
+        add(date)
         if (mail.conversationSize > 1) add(pluralStringResource(R.plurals.mail_conversation_size, mail.conversationSize, mail.conversationSize))
         when (mail.replyState) {
             ReplyState.None -> Unit
@@ -281,5 +264,3 @@ private fun mailDescription(mail: MailSummaryUi): String {
     }
     return parts.joinToString(", ")
 }
-
-private const val MAX_VISIBLE_LABELS = 2

@@ -2,10 +2,22 @@ package app.velin.feature.mail.mailbox
 
 import android.text.format.DateFormat
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import java.util.Locale
+
+internal enum class MailDayGroup { Today, Yesterday, Earlier }
+
+internal fun mailDayGroup(instant: Instant, today: LocalDate, zone: ZoneId): MailDayGroup {
+    val day = instant.atZone(zone).toLocalDate()
+    return when {
+        day >= today -> MailDayGroup.Today
+        day == today.minusDays(1) -> MailDayGroup.Yesterday
+        else -> MailDayGroup.Earlier
+    }
+}
 
 internal enum class DateStyle { Time, MonthDay, Date }
 

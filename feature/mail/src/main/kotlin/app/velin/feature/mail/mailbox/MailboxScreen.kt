@@ -80,6 +80,8 @@ import kotlinx.collections.immutable.persistentSetOf
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.ZoneId
 
 data class MailboxUiState(
     val account: AccountUi? = null,
@@ -223,6 +225,8 @@ private fun MailList(
             )
             return@PullToRefreshBox
         }
+        val zone = ZoneId.systemDefault()
+        val today = LocalDate.now(zone)
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize(),
@@ -237,14 +241,21 @@ private fun MailList(
                 ) { OfflineBanner() }
             }
             itemsIndexed(state.mails, key = { _, mail -> mail.id }, contentType = { _, _ -> "mail" }) { index, mail ->
-                val firstInGroup = index == 0 || state.mails[index - 1].unread != mail.unread
-                val lastInGroup = index == state.mails.lastIndex || state.mails[index + 1].unread != mail.unread
+                val group = mailDayGroup(mail.receivedAt, today, zone)
+                val firstInGroup = index == 0 || mailDayGroup(state.mails[index - 1].receivedAt, today, zone) != group
+                val lastInGroup = index == state.mails.lastIndex || mailDayGroup(state.mails[index + 1].receivedAt, today, zone) != group
                 Column(Modifier.animateItem()) {
                     if (firstInGroup) {
                         Text(
-                            text = stringResource(if (mail.unread) R.string.mail_unread else R.string.mailbox_read),
+                            text = stringResource(
+                                when (group) {
+                                    MailDayGroup.Today -> R.string.mailbox_today
+                                    MailDayGroup.Yesterday -> R.string.mailbox_yesterday
+                                    MailDayGroup.Earlier -> R.string.mailbox_earlier
+                                },
+                            ),
                             style = MaterialTheme.typography.labelLarge,
-                            color = if (mail.unread) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 12.dp)
                                 .semantics { heading() },
                         )

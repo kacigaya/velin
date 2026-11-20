@@ -2,6 +2,7 @@ package app.velin.feature.mail.mailbox
 
 import androidx.compose.ui.graphics.Color
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -10,6 +11,14 @@ import org.junit.Test
 class MailListFormattingTest {
     private val zone = ZoneId.of("Europe/Berlin")
     private val now = Instant.parse("2026-11-08T10:00:00Z")
+
+    @Test
+    fun groupsMailByLocalDayAcrossMidnight() {
+        val today = LocalDate.of(2026, 11, 8)
+        assertEquals(MailDayGroup.Today, mailDayGroup(Instant.parse("2026-11-07T23:00:00Z"), today, zone))
+        assertEquals(MailDayGroup.Yesterday, mailDayGroup(Instant.parse("2026-11-07T22:59:59Z"), today, zone))
+        assertEquals(MailDayGroup.Earlier, mailDayGroup(Instant.parse("2026-11-06T22:59:59Z"), today, zone))
+    }
 
     @Test
     fun sameLocalDayUsesTime() {
