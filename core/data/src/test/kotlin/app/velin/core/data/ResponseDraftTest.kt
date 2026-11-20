@@ -22,15 +22,15 @@ class ResponseDraftTest {
             MailAuthentication.Authenticated, null, null, received)
     private fun respond(previous: MailMessage, kind: ResponseKind, senders: List<SenderAlias> = listOf(disabled, me, alias)) =
         responseDraft(previous, kind, senders, ZoneOffset.UTC, Locale.UK)!!
-    private val PreparedResponse.recipients get() = listOf(draft.to, draft.cc, draft.bcc).map { list -> list.map { it.address.address } }
+    private val Draft.recipients get() = listOf(to, cc, bcc).map { list -> list.map { it.address.address } }
 
     @Test fun replyGoesToSenderOrReplyToFromTheReceivingAddress() {
         val reply = respond(message(), ResponseKind.Reply)
         assertEquals(listOf(listOf("ann@tuta.com"), emptyList(), emptyList()), reply.recipients)
-        assertEquals(alias, reply.draft.sender)
-        assertEquals("Re: Plans", reply.draft.subject)
-        assertEquals(DraftResponse(id, ResponseKind.Reply), reply.draft.response)
-        assertTrue(reply.draft.confidential && reply.draft.id == null && reply.draft.attachments.isEmpty())
+        assertEquals(alias, reply.sender)
+        assertEquals("Re: Plans", reply.subject)
+        assertEquals(DraftResponse(id, ResponseKind.Reply), reply.response)
+        assertTrue(reply.confidential && reply.id == null && reply.attachments.isEmpty())
         val replyTo = respond(message(replyTo = listOf(Address("list@tuta.com"))), ResponseKind.Reply)
         assertEquals(listOf("list@tuta.com"), replyTo.recipients[0])
     }
@@ -43,35 +43,36 @@ class ResponseDraftTest {
         assertEquals(listOf(listOf("alias@tuta.com", "bob@tuta.com"), emptyList(), emptyList()), respond(sent, ResponseKind.Reply).recipients)
         val all = respond(sent, ResponseKind.ReplyAll)
         assertEquals(listOf(listOf("alias@tuta.com", "bob@tuta.com"), listOf("Carl@tuta.com"), listOf("hidden@tuta.com")), all.recipients)
-        assertEquals(me, all.draft.sender)
+        assertEquals(me, all.sender)
         // Mail state decides the direction, not the sender address.
         val oldAlias = respond(message(from = disabled.address, received = false), ResponseKind.Reply)
         assertEquals(listOf("alias@tuta.com", "bob@tuta.com"), oldAlias.recipients[0])
-        assertEquals(me, oldAlias.draft.sender)
+        assertEquals(me, oldAlias.sender)
         val selfSent = respond(message(from = me.address, replyTo = listOf(Address("list@tuta.com"))), ResponseKind.Reply)
         assertEquals(listOf("list@tuta.com"), selfSent.recipients[0])
     }
     @Test fun replyQuotesTheBodyWithOneMoreLevel() {
         val reply = respond(message(), ResponseKind.Reply)
-        assertEquals("\n\n12 Nov 2026, 09:30 by ann@tuta.com:\n> Hello\n>> Earlier", reply.draft.plainText)
+        assertEquals("\n\n12 Nov 2026, 09:30 by ann@tuta.com:\n> Hello\n>> Earlier", reply.plainText)
         assertEquals("<br><br>12 Nov 2026, 09:30 by ann@tuta.com:<blockquote>Hello<blockquote>Earlier</blockquote></blockquote>",
-            DraftHtml.fromPlainText(reply.draft.plainText))
+            DraftHtml.fromPlainText(reply.plainText))
     }
     @Test fun replySubjectPrefixIsNotRepeated() {
-        assertEquals("RE: Plans", respond(message(subject = "RE: Plans"), ResponseKind.Reply).draft.subject)
-        assertEquals("", respond(message(subject = ""), ResponseKind.Reply).draft.subject)
+        assertEquals("RE: Plans", respond(message(subject = "RE: Plans"), ResponseKind.Reply).subject)
+        assertEquals("", respond(message(subject = ""), ResponseKind.Reply).subject)
     }
-    @Test fun forwardHasNoRecipientsAHeaderAndReportsOmittedFiles() {
-        val forward = respond(message(attachments = 2), ResponseKind.Forward)
+    @Test fun forwardHasNoRecipientsAHeaderAndCarriesTheFiles() {
+        val previous = message(attachments = 2)
+        val forward = respond(previous, ResponseKind.Forward)
         assertEquals(listOf(emptyList<String>(), emptyList(), emptyList()), forward.recipients)
-        assertEquals("FWD: Plans", forward.draft.subject)
-        assertEquals(2, forward.omittedAttachments)
-        assertEquals(0, respond(message(attachments = 2), ResponseKind.Reply).omittedAttachments)
+        assertEquals("FWD: Plans", forward.subject)
+        assertEquals(previous.attachments, forward.attachments)
+        assertTrue(respond(previous, ResponseKind.Reply).attachments.isEmpty())
         assertEquals("\n\nDate: 12 Nov 2026, 09:30\nFrom: ann@tuta.com\nTo: alias@tuta.com, bob@tuta.com\n" +
-            "Cc: Carl@tuta.com, bob@tuta.com\nSubject: Plans\n\n> Hello\n>> Earlier", forward.draft.plainText)
+            "Cc: Carl@tuta.com, bob@tuta.com\nSubject: Plans\n\n> Hello\n>> Earlier", forward.plainText)
     }
     @Test fun withoutEnabledSenderThereIsNoResponse() {
         assertNull(responseDraft(message(), ResponseKind.Reply, listOf(disabled)))
-        assertEquals(me, respond(message(to = listOf(Address("other@tuta.com")), cc = emptyList()), ResponseKind.Reply).draft.sender)
+        assertEquals(me, respond(message(to = listOf(Address("other@tuta.com")), cc = emptyList()), ResponseKind.Reply).sender)
     }
 }

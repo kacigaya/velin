@@ -118,7 +118,7 @@ internal class FakeMailRepo : MailRepository {
     var storedDraft: Draft? = null
     override suspend fun loadDraft(account: AccountId, id: MailId): Outcome<Draft> =
         storedDraft?.let { Outcome.Success(it) } ?: Outcome.Failed(app.velin.core.domain.Failure.Unsupported)
-    var response: Outcome<app.velin.core.domain.PreparedResponse> = Outcome.Failed(app.velin.core.domain.Failure.Unsupported)
+    var response: Outcome<Draft> = Outcome.Failed(app.velin.core.domain.Failure.Unsupported)
     val responseCalls = mutableListOf<Pair<MailId, app.velin.core.domain.ResponseKind>>()
     override suspend fun prepareResponse(account: AccountId, previous: MailId, kind: app.velin.core.domain.ResponseKind) =
         response.also { responseCalls += previous to kind }
@@ -127,13 +127,20 @@ internal class FakeMailRepo : MailRepository {
     val savedDrafts = mutableListOf<Draft>()
     val sentDrafts = mutableListOf<DraftId>()
     private val responseDrafts = mutableSetOf<MailId>()
-    override suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<DraftId> {
+    private var nextFile = 0
+    override suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<app.velin.core.domain.SavedDraft> {
         savedDrafts += draft
         saveGate?.await()
         saveFailure?.let { return Outcome.Failed(it) }
         val id = draft.id ?: DraftId(MailId(eid("drafts", "d${savedDrafts.size}")))
         if (draft.response != null) responseDrafts += id.value
-        return Outcome.Success(id)
+        fun stored(name: String, mimeType: String, size: Long) =
+            app.velin.core.domain.Attachment(app.velin.core.domain.AttachmentId(eid("files", "f${nextFile++}")), name, mimeType, size)
+        val kept = if (draft.id == null && draft.response?.kind == app.velin.core.domain.ResponseKind.Forward) {
+            draft.attachments.map { stored(it.name, it.mimeType, it.sizeBytes) }
+        } else draft.attachments
+        return Outcome.Success(app.velin.core.domain.SavedDraft(id,
+            kept + draft.newAttachments.map { stored(it.name, it.mimeType, it.bytes.size.toLong()) }))
     }
     var sendOutcome: Outcome<Unit> = Outcome.Success(Unit)
     val responded = mutableListOf<MailId>()

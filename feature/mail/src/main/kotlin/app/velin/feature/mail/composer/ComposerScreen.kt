@@ -80,6 +80,7 @@ import androidx.compose.ui.unit.dp
 import app.velin.core.designsystem.component.SenderAvatar
 import app.velin.core.designsystem.icon.VelinIcons
 import app.velin.core.domain.Failure
+import app.velin.core.domain.NewAttachment
 import app.velin.core.domain.RecipientResolutionReason
 import app.velin.core.domain.SendBlockReason
 import app.velin.core.domain.UnsupportedReason
@@ -163,6 +164,7 @@ data class ComposerUiState(
     /** Password per external address, required when [confidential] is on. */
     val externalPasswords: Map<String, String> = emptyMap(),
     val sending: Boolean = false,
+    val uploading: Boolean = false,
     val canSend: Boolean = false,
     val recipientKey: RecipientKeyUi? = null,
 )
@@ -178,6 +180,7 @@ sealed interface ComposerEvent {
     data class AddRecipient(val field: RecipientField, val recipient: RecipientUi) : ComposerEvent
     data class RemoveRecipient(val field: RecipientField, val address: String) : ComposerEvent
     data class RemoveAttachment(val id: String) : ComposerEvent
+    data class AddAttachments(val files: List<NewAttachment>) : ComposerEvent
     data class SetConfidential(val confidential: Boolean) : ComposerEvent
     data class SetExternalPassword(val address: String, val password: String) : ComposerEvent
     data class OpenRecipientKey(val field: RecipientField, val address: String) : ComposerEvent
@@ -233,7 +236,7 @@ fun ComposerScreen(
                         SendSplitButton(state, onEvent, Modifier.padding(end = 8.dp))
                     },
                 )
-                if (state.sending) LinearWavyProgressIndicator(Modifier.fillMaxWidth())
+                if (state.sending || state.uploading) LinearWavyProgressIndicator(Modifier.fillMaxWidth())
             }
         },
     ) { padding ->
@@ -272,7 +275,7 @@ fun ComposerScreen(
                 )
                 FieldDivider()
                 if (state.attachments.isNotEmpty()) {
-                    AttachmentChips(state.attachments, onEvent)
+                    AttachmentChips(state.attachments, enabled = !state.uploading && !state.sending, onEvent)
                     FieldDivider()
                 }
                 PlainField(
@@ -527,7 +530,7 @@ private fun ExternalPasswords(state: ComposerUiState, onEvent: (ComposerEvent) -
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun AttachmentChips(attachments: List<AttachmentUi>, onEvent: (ComposerEvent) -> Unit) {
+private fun AttachmentChips(attachments: List<AttachmentUi>, enabled: Boolean, onEvent: (ComposerEvent) -> Unit) {
     val context = LocalContext.current
     FlowRow(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         attachments.forEach { attachment ->
@@ -535,6 +538,7 @@ private fun AttachmentChips(attachments: List<AttachmentUi>, onEvent: (ComposerE
             InputChip(
                 selected = false,
                 onClick = { onEvent(ComposerEvent.RemoveAttachment(attachment.id)) },
+                enabled = enabled,
                 label = {
                     Text(
                         "${attachment.name} · ${Formatter.formatShortFileSize(context, attachment.sizeBytes)}",

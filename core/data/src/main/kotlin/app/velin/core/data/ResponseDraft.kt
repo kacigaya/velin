@@ -13,7 +13,7 @@ import java.util.Locale
  * The header words are English, like the fixed send language.
  */
 internal fun responseDraft(previous: MailMessage, kind: ResponseKind, senders: List<SenderAlias>,
-    zone: ZoneId = ZoneId.systemDefault(), locale: Locale = Locale.getDefault()): PreparedResponse? {
+    zone: ZoneId = ZoneId.systemDefault(), locale: Locale = Locale.getDefault()): Draft? {
     val enabled = senders.filter { it.enabled }
     if (enabled.isEmpty()) return null
     val own = enabled.mapTo(HashSet()) { it.address.address.lowercase(Locale.ROOT) }
@@ -54,11 +54,10 @@ internal fun responseDraft(previous: MailMessage, kind: ResponseKind, senders: L
         previous.subject.isEmpty() || previous.subject.startsWith("Re: ", ignoreCase = true) -> previous.subject
         else -> "Re: ${previous.subject}"
     }
-    val draft = Draft(id = null, sender = sender, to = to.unique(), cc = cc.unique(), bcc = bcc.unique(), subject = subject,
-        plainText = "\n\n" + (header + quoted).joinToString("\n"), confidential = true, attachments = emptyList(),
+    return Draft(id = null, sender = sender, to = to.unique(), cc = cc.unique(), bcc = bcc.unique(), subject = subject,
+        plainText = "\n\n" + (header + quoted).joinToString("\n"), confidential = true,
+        attachments = if (kind == ResponseKind.Forward) previous.attachments else emptyList(),
         scheduledSendAt = null, response = DraftResponse(previous.id, kind))
-    // Forwarding files needs attachment upload. Velin does not copy them yet.
-    return PreparedResponse(draft, if (kind == ResponseKind.Forward) previous.attachments.size else 0)
 }
 
 /** One more quote level per line, in the `>> text` form that DraftHtml.fromPlainText reads. */

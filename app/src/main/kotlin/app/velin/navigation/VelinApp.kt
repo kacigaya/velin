@@ -43,6 +43,8 @@ import app.velin.core.domain.ResponseKind
 import app.velin.feature.auth.SignInScreen
 import app.velin.feature.auth.SignInViewModel
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import app.velin.core.domain.Failure
 import app.velin.feature.mail.composer.ComposerEffect
 import app.velin.feature.mail.composer.ComposerEvent
@@ -64,7 +66,9 @@ import app.velin.feature.mail.reader.ConversationEffect
 import app.velin.feature.mail.reader.ConversationScreen
 import app.velin.feature.mail.reader.ConversationUiState
 import app.velin.feature.mail.reader.ConversationViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /** Backend entry points. :app builds the real graph; tests can pass fakes. */
 interface AppGraph {
@@ -310,14 +314,24 @@ private fun MailApp(account: Account, auth: AuthRepository, mailbox: MailboxRepo
                         ComposerViewModel(account, mailbox, mail, route.draftId, route.respondTo, route.kind ?: ResponseKind.Reply)
                     }
                     val state by viewModel.state.collectAsStateWithLifecycle()
+                    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+                        if (uris.isEmpty()) return@rememberLauncherForActivityResult
+                        scope.launch {
+                            when (val picked = withContext(Dispatchers.IO) { readPickedFiles(context.contentResolver, uris) }) {
+                                is PickedFiles.Read -> viewModel.onEvent(ComposerEvent.AddAttachments(picked.files))
+                                PickedFiles.TooLarge -> snackbar.showSnackbar(context.getString(MailR.string.composer_attachments_too_large))
+                                PickedFiles.Unreadable -> snackbar.showSnackbar(context.getString(MailR.string.composer_attachment_unreadable))
+                            }
+                        }
+                    }
                     LaunchedEffect(viewModel) {
                         viewModel.effects.collect { effect ->
                             when (effect) {
                                 ComposerEffect.Close -> backStack.remove(route)
                                 ComposerEffect.Sent -> scope.launch { snackbar.showSnackbar(mailSent) }
-                                is ComposerEffect.AttachmentsNotForwarded -> scope.launch {
-                                    snackbar.showSnackbar(context.resources.getQuantityString(
-                                        MailR.plurals.composer_attachments_not_forwarded, effect.count, effect.count))
+                                ComposerEffect.PickFiles -> picker.launch(arrayOf("*/*"))
+                                ComposerEffect.AttachmentsTooLarge -> scope.launch {
+                                    snackbar.showSnackbar(context.getString(MailR.string.composer_attachments_too_large))
                                 }
                                 is ComposerEffect.Failed -> scope.launch {
                                     val message = composerFailureMessage(effect.failure)?.let(context::getString)

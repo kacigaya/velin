@@ -1,15 +1,15 @@
 fn velin_send_data(id: IdTupleGenerated, wrapped: Vec<u8>, internal: Vec<crate::entities::generated::tutanota::InternalRecipientKeyData>,
-    plaintext: bool, status: Option<Vec<u8>>,
+    plaintext: bool, status: Option<Vec<u8>>, attachments: Vec<crate::entities::generated::tutanota::AttachmentKeyData>,
 ) -> crate::entities::generated::tutanota::SendDraftData {
     use crate::entities::generated::tutanota::{SendDraftData, SendDraftParameters};
     let parameters = SendDraftParameters { _id: None, language: "en".into(), mail: id.clone(), mailSessionKey: None,
         bucketEncMailSessionKey: Some(wrapped.clone()), senderNameUnencrypted: None, plaintext, calendarMethod: false,
         sessionEncEncryptionAuthStatus: status.clone(), internalRecipientKeyData: internal.clone(),
-        secureExternalRecipientKeyData: vec![], symEncInternalRecipientKeyData: vec![], attachmentKeyData: vec![] };
+        secureExternalRecipientKeyData: vec![], symEncInternalRecipientKeyData: vec![], attachmentKeyData: attachments.clone() };
     SendDraftData { _format: 0, language: "en".into(), mail: id, mailSessionKey: None,
         bucketEncMailSessionKey: Some(wrapped), senderNameUnencrypted: None, plaintext, calendarMethod: false,
         sessionEncEncryptionAuthStatus: status, sendAt: None, allowUndo: false, internalRecipientKeyData: internal,
-        secureExternalRecipientKeyData: vec![], symEncInternalRecipientKeyData: vec![], attachmentKeyData: vec![], parameters: Some(parameters) }
+        secureExternalRecipientKeyData: vec![], symEncInternalRecipientKeyData: vec![], attachmentKeyData: attachments, parameters: Some(parameters) }
 }
 
 #[uniffi::export]
@@ -23,7 +23,7 @@ impl MailFacade {
             let mail = self.crypto_entity_client.velin_draft_mail(&id).await?;
             if mail.sendAt.is_some() { return Err(ApiCallError::VelinSendUnsupported { reason: 1 }) }
             if !mail.confidential { return Err(ApiCallError::VelinSendUnsupported { reason: 2 }) }
-            if !mail.attachments.is_empty() { return Err(ApiCallError::VelinSendUnsupported { reason: 3 }) }
+            if mail.attachments.len() > 100 { return Err(ApiCallError::VelinSendUnsupported { reason: 3 }) }
             let conversation: ConversationEntry = self.crypto_entity_client.load(&mail.conversationEntry).await?;
             if conversation._id.as_ref() != Some(&mail.conversationEntry) { return Err(ApiCallError::VelinRecipientInvalidKey) }
             // Replies and forwards thread on the server. A new mail has no previous entry.
@@ -77,7 +77,15 @@ impl MailFacade {
             let status = if internal.iter().all(|key| key.protocolVersion == crate::tutanota_constants::CryptoProtocolVersion::TutaCrypt as i64) {
                 Some(session_key.encrypt_data(b"4", InitializationVector::generate(&random)).map_err(|_| ApiCallError::VelinRecipientInvalidKey)?)
             } else { None };
-            let data = velin_send_data(id, wrapped, internal, plaintext, status);
+            let mut attachments = Vec::with_capacity(mail.attachments.len());
+            for file_id in &mail.attachments {
+                let file = self.crypto_entity_client.velin_draft_file(file_id).await?;
+                if file._id.as_ref() != Some(file_id) || !file._errors.is_empty() { return Err(ApiCallError::VelinRecipientInvalidKey) }
+                let key = self.crypto_entity_client.velin_file_key(file).await?;
+                attachments.push(crate::entities::generated::tutanota::AttachmentKeyData { _id: None, file: file_id.clone(), fileSessionKey: None,
+                    bucketEncFileSessionKey: Some(bucket.encrypt_key(&key, InitializationVector::generate(&random))) });
+            }
+            let data = velin_send_data(id, wrapped, internal, plaintext, status, attachments);
             // A failed response may follow a successful send. Never retry this request automatically.
             self.service_executor.post::<SendDraftService>(data, ExtraServiceParams { velin_send: true, ..Default::default() }).await?;
             Ok(())

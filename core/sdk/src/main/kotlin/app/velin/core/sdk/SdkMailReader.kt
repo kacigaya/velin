@@ -24,10 +24,13 @@ data class ReadMessage(val id: ReadId, val sender: ReadAddress, val to: List<Rea
     /** MailState: 0 draft, 1 sent, 2 received, 3 sending. */
     val state: Long = -1)
 
-/** [previous] and [conversationType] (0 new, 1 reply, 2 forward) apply only when the draft is created. */
+/** [previous], [conversationType] (0 new, 1 reply, 2 forward) and [forwarded] apply only when the draft is created. */
 data class WriteDraft(val id: ReadId?, val sender: ReadAddress, val to: List<ReadAddress>, val cc: List<ReadAddress>,
     val bcc: List<ReadAddress>, val subject: String, val html: String, val confidential: Boolean, val attachments: List<ReadId>,
-    val previous: ReadId? = null, val conversationType: Long = 0)
+    val previous: ReadId? = null, val conversationType: Long = 0, val forwarded: List<ReadId> = emptyList(),
+    val newFiles: List<WriteFile> = emptyList())
+class WriteFile(val name: String, val mimeType: String, val bytes: ByteArray)
+data class SavedDraftRead(val id: ReadId, val added: List<ReadAttachment>)
 
 class TrustedIdentity(val key: ByteArray, val version: Long, val manual: Boolean)
 interface SdkIdentityTrustStore {
@@ -45,7 +48,7 @@ interface SdkMailReader {
     suspend fun untrustRecipient(address: String): Unit = throw SdkException(SdkFailure.DraftUnsupported)
     suspend fun sendDraft(id: ReadId): Unit = throw SdkException(SdkFailure.DraftUnsupported)
     suspend fun resolveRecipient(address: String): ReadRecipient = throw SdkException(SdkFailure.DraftUnsupported)
-    suspend fun saveDraft(draft: WriteDraft): ReadId = throw SdkException(SdkFailure.DraftUnsupported)
+    suspend fun saveDraft(draft: WriteDraft): SavedDraftRead = throw SdkException(SdkFailure.DraftUnsupported)
     suspend fun loadDraft(id: ReadId): ReadMessage = throw SdkException(SdkFailure.DraftUnsupported)
     suspend fun setUnread(ids: List<ReadId>, unread: Boolean): Unit = throw SdkException(SdkFailure.Protocol)
     suspend fun move(ids: List<ReadId>, target: ReadFolder): Unit = throw SdkException(SdkFailure.Protocol)
@@ -115,11 +118,13 @@ internal class NativeMailReader(private val facade: MailFacade, private val trus
             else -> throw SdkException(SdkFailure.Protocol)
         })
     }
-    override suspend fun saveDraft(draft: WriteDraft): ReadId = api {
+    override suspend fun saveDraft(draft: WriteDraft): SavedDraftRead = api {
         fun ReadAddress.sender() = VelinSender(address, name)
-        facade.velinSaveDraft(VelinDraftInput(draft.id?.native(), draft.sender.sender(), draft.to.map { it.sender() },
+        val saved = facade.velinSaveDraft(VelinDraftInput(draft.id?.native(), draft.sender.sender(), draft.to.map { it.sender() },
             draft.cc.map { it.sender() }, draft.bcc.map { it.sender() }, draft.subject, draft.html, draft.confidential,
-            draft.attachments.map { it.native() }, draft.previous?.native(), draft.conversationType)).readId()
+            draft.attachments.map { it.native() }, draft.previous?.native(), draft.conversationType,
+            draft.forwarded.map { it.native() }, draft.newFiles.map { VelinNewFile(it.name, it.mimeType, it.bytes) }))
+        SavedDraftRead(saved.id.readId(), saved.added.map { it.metadata() })
     }
     override suspend fun loadDraft(id: ReadId): ReadMessage = api {
         val content = facade.velinLoadDraft(id.native())

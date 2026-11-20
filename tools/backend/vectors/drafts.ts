@@ -11,6 +11,7 @@ import { InstancePipeline } from '@release/src/platform-kit/instance-pipeline/In
 import { ClientModelInfo, ClientOnlyTypeModelResolver } from '@release/src/platform-kit/instance-pipeline/EntityFunctions'
 import { KeyLoaderFacade } from '@release/src/platform-kit/base/base-crypto/KeyLoaderFacade'
 import * as types from '@tutao/entities/tutanota'
+import * as sysTypes from '@tutao/entities/sys'
 import tutanota from '@release/src/entities/tutanota/TypeModels.js'
 import sys from '@release/src/entities/sys/TypeModels.js'
 import storage from '@release/src/entities/storage/TypeModels.js'
@@ -145,8 +146,85 @@ for (const scheme of [SymmetricEncryptionScheme.AesCbc, SymmetricEncryptionSchem
    }
   }
 }
+const attachmentVectors = []
+for (const scheme of [SymmetricEncryptionScheme.AesCbc, SymmetricEncryptionScheme.Aead]) {
+  const seed = `velin-draft-attachments-${scheme}-v1`
+  const random = new TestRandomizer(seed)
+  const utils = new SymmetricCipherUtils(random)
+  const cipher = new SymmetricCipherFacade(new AesCbcFacade(), new AeadFacade(utils), new SymmetricKeyDeriver(), utils)
+  const keyEncryption = new KeyEncryption(cipher, new Aes(cipher))
+  const ownerKey = { object: uint8ArrayToKey(Uint8Array.from({ length: 32 }, (_, i) => i)), version: 7 }
+  const sessionKey = uint8ArrayToKey(Uint8Array.from({ length: 32 }, (_, i) => i + 32))
+  const fileSessionKey = uint8ArrayToKey(Uint8Array.from({ length: 32 }, (_, i) => i + 96))
+  const forwardedSessionKey = uint8ArrayToKey(Uint8Array.from({ length: 32 }, (_, i) => i + 128))
+  const ownerEncSessionKey = keyEncryption.encryptKey(ownerKey.object, sessionKey)
+  const ownerEncFileSessionKey = keyEncryption.encryptKey(ownerKey.object, fileSessionKey)
+  const ownerEncForwardedSessionKey = keyEncryption.encryptKey(ownerKey.object, forwardedSessionKey)
+  const loader = {
+    keyEncryption,
+    loadCurrentKeyPair: async () => { throw new Error('Unexpected asymmetric key lookup') },
+    loadSymUserGroupKey: async () => { throw new Error('Unexpected user-group key lookup') },
+    getCurrentSymGroupKey: async () => ownerKey,
+    loadSymGroupKey: async () => { throw new Error('Unexpected historical key lookup') },
+  }
+  const params = await Reflect.apply(KeyLoaderFacade.prototype.assembleServiceEncryptionParamsForPost, loader, ['test-mail-group', AeadCipherVersion.WithSessionKey])
+  const address = (name: string, address: string) => types.createMailAddressTransferAggregatedType({ name, address, contact: null })
+  const to = [address('Recipient', 'recipient@example.invalid')]
+  const draftData = types.createDraftData({
+    removedAttachments: [],
+    addedAttachments: [
+      types.createDraftAttachment({ ownerEncFileSessionKey: null, ownerKeyVersion: null, existingFile: null,
+        newFile: types.createNewDraftAttachment({
+          file: types.createFileTransferAggregatedType({ _ownerEncSessionKey: ownerEncFileSessionKey, _ownerKeyVersion: String(ownerKey.version),
+            _kdfNonce: null, name: 'Report λ.pdf', mimeType: 'application/pdf', cid: null }),
+          referenceTokens: [sysTypes.createBlobReferenceTokenWrapper({ blobReferenceToken: 'test-blob-token' })],
+          encCid: null, encFileName: null, encMimeType: null,
+        }) }),
+      types.createDraftAttachment({ ownerEncFileSessionKey: ownerEncForwardedSessionKey, ownerKeyVersion: String(ownerKey.version),
+        existingFile: ['test-file-list', 'forwarded-file'], newFile: null }),
+    ],
+    mail: types.createMailTransferAggregatedType({
+      _ownerEncSessionKey: ownerEncSessionKey, _ownerKeyVersion: String(ownerKey.version), _kdfNonce: null,
+      subject: 'Files', sender: address('Test Sender', 'sender@example.invalid'), confidential: true, method: '0', firstRecipient: to[0],
+    }),
+    mailDetailsBlob: types.createMailDetailsBlobTransferAggregatedType({
+      _ownerEncSessionKey: ownerEncSessionKey, _ownerKeyVersion: String(ownerKey.version), _kdfNonce: null,
+      details: types.createMailDetailsTransferAggregatedType({
+        body: types.createBodyTransferAggregatedType({ compressedText: '<div>See files</div>', text: '' }),
+        recipients: types.createRecipientsTransferAggregatedType({ toRecipients: to, ccRecipients: [], bccRecipients: [] }),
+        replyTos: [],
+      }),
+    }),
+    subject: null, compressedBodyText: null, senderMailAddress: null, senderName: null,
+    confidential: null, method: null, toRecipients: [], ccRecipients: [], bccRecipients: [], replyTos: [], bodyText: null,
+  })
+  const input = types.createDraftCreateData({ previousMessageId: '<previous@example.invalid>', conversationType: '2', draftData, ownerEncSessionKey: null, ownerKeyVersion: null })
+  const pipeline = new InstancePipeline(resolver, () => loader, cipher,
+    { getDefaultSymmetricEncryptionScheme: () => scheme,
+      createAuthHeaders: () => { throw new Error('Unexpected auth header creation') },
+      isFullyLoggedIn: () => true,
+      getLoggedInUser: () => { throw new Error('Unexpected user lookup') },
+      getCurrentUserGroupKey: () => { throw new Error('Unexpected user-group key lookup') },
+      setLeaderStatus: () => { throw new Error('Unexpected event bus state') },
+      getUserGroupId: () => { throw new Error('Unexpected user-group ID lookup') } }, () => ({ makeInstanceKeyProvider: async () => null }), random, keyEncryption)
+  let mappedInput: unknown
+  let encryptionRandomOffset = 0
+  const map = pipeline.modelMapper.mapToDecryptedInstance.bind(pipeline.modelMapper)
+  pipeline.modelMapper.mapToDecryptedInstance = async instance => {
+    const parsed = await map(instance)
+    const plain = await Reflect.apply(pipeline.typeMapper.makeServerJson, pipeline.typeMapper, [parsed])
+    mappedInput = JSON.parse(plain.getJsonRepresentation())
+    encryptionRandomOffset = random.calls.reduce((sum, size) => sum + size, 0)
+    return parsed
+  }
+  const wire = await pipeline.mapAndEncryptForDataTransferType(input._type, input, params.ownerKey, params.aeadCipherVersion, params.sessionKeyDecryptor)
+  attachmentVectors.push({ scheme: scheme === SymmetricEncryptionScheme.AesCbc ? 'aes-cbc' : 'aead', operation: 'create', seed,
+    encryptionRandomOffset, ownerKeyHex: hex(keyToUint8Array(ownerKey.object)), ownerKeyVersion: ownerKey.version,
+    sessionKeyHex: hex(keyToUint8Array(sessionKey)), fileSessionKeyHex: hex(keyToUint8Array(fileSessionKey)),
+    mappedInput, wireJson: wire.getJsonRepresentation() })
+}
 const htmlVectors = ['', 'one', 'a < b & c\nnext', 'a\r\nb\n', '\n\n', '> quoted\n> next\nplain',
   '>> nested\n> outer\nplain', '>\n>>', '>no space', '>  two spaces', '  > literal', 'λ 😀 & <tag>'].map(plain => ({ plain, html: plainTextToHtml(plain) }))
-export const output = { htmlVectors, draftUpdateReturnWire, upstreamCommit: '332e57461cdc4fe4a4ad9bdc8555f56df02931c0', vectors }
+export const output = { htmlVectors, draftUpdateReturnWire, attachmentVectors, upstreamCommit: '332e57461cdc4fe4a4ad9bdc8555f56df02931c0', vectors }
 
 export { TestRandomizer, resolver }

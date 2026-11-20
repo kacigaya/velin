@@ -30,10 +30,10 @@ class BackendReadRepositoryTest {
             listOf(Recipient(Address("to@example.invalid"), RecipientType.Internal)), emptyList(), emptyList(),
             "Subject", "Body", true, emptyList(), null)
         override suspend fun loadDraft(account: AccountId, id: MailId) = Outcome.Success(draft)
-        override suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<DraftId> {
+        override suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<SavedDraft> {
             if (offline) return Outcome.Failed(Failure.Offline)
             this.draft = draft.copy(rejectedRecipients = emptySet())
-            return Outcome.Success(draft.id!!)
+            return Outcome.Success(SavedDraft(draft.id!!, draft.attachments))
         }
         var actionFailure = false
         var deleted = false
@@ -210,13 +210,13 @@ class BackendReadRepositoryTest {
             assertEquals(Outcome.Failed(Failure.Unsupported), repo.prepareResponse(account, id, ResponseKind.Reply))
             source.senders = listOf(SenderAlias(Address("me@example.invalid"), true))
             repo.sync(account)
-            val reply = (repo.prepareResponse(account, id, ResponseKind.Reply) as Outcome.Success).value.draft
+            val reply = (repo.prepareResponse(account, id, ResponseKind.Reply) as Outcome.Success).value
             assertEquals(DraftResponse(id, ResponseKind.Reply), reply.response)
             assertTrue(reply.plainText.endsWith("> body"))
             assertEquals(listOf("sender@example.invalid"), reply.to.map { it.address.address })
             // The cached copy says received. The fresh state wins, so the reply goes to the sent mail's recipients.
             source.received = false
-            assertEquals(emptyList<Recipient>(), (repo.prepareResponse(account, id, ResponseKind.Reply) as Outcome.Success).value.draft.to)
+            assertEquals(emptyList<Recipient>(), (repo.prepareResponse(account, id, ResponseKind.Reply) as Outcome.Success).value.to)
             source.offline = true
             assertEquals(Outcome.Failed(Failure.Offline), repo.prepareResponse(account, id, ResponseKind.Reply))
         } finally { cache.deleteRecursively() }

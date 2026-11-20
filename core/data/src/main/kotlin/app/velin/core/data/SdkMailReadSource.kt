@@ -43,20 +43,23 @@ internal class SdkMailReadSource(private val sessions: SessionReadAccess) : Mail
                 })
         }
     }
-    override suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<DraftId> = read(account) { sdk ->
+    override suspend fun saveDraft(account: AccountId, draft: Draft): Outcome<SavedDraft> = read(account) { sdk ->
         if (draft.scheduledSendAt != null) throw SdkException(SdkFailure.DraftUnsupported)
         require(draft.sender.enabled && (draft.to + draft.cc + draft.bcc).none { it.invalid })
         val html = draft.htmlBody?.takeIf { DraftHtml.toPlainText(it) == draft.plainText }
             ?: DraftHtml.fromPlainText(draft.plainText)
         val existingId = draft.id?.value?.value?.readId()
+        val forwarding = existingId == null && draft.response?.kind == ResponseKind.Forward
+        val files = draft.attachments.map { it.id.value.readId() }
         val input = WriteDraft(existingId, ReadAddress(draft.sender.address.address, draft.sender.address.name),
             draft.to.map { ReadAddress(it.address.address, it.address.name) }, draft.cc.map { ReadAddress(it.address.address, it.address.name) },
             draft.bcc.map { ReadAddress(it.address.address, it.address.name) }, draft.subject, html, draft.confidential,
-            draft.attachments.map { it.id.value.readId() }, draft.response?.previous?.value?.readId(),
-            when (draft.response?.kind) { null -> 0L; ResponseKind.Reply, ResponseKind.ReplyAll -> 1L; ResponseKind.Forward -> 2L })
-        val id = sdk.saveDraft(input)
-        require(existingId == null || id == existingId)
-        DraftId(MailId(id.domain()))
+            if (forwarding) emptyList() else files, draft.response?.previous?.value?.readId(),
+            when (draft.response?.kind) { null -> 0L; ResponseKind.Reply, ResponseKind.ReplyAll -> 1L; ResponseKind.Forward -> 2L },
+            if (forwarding) files else emptyList(), draft.newAttachments.map { WriteFile(it.name, it.mimeType, it.bytes) })
+        val saved = sdk.saveDraft(input)
+        require(existingId == null || saved.id == existingId)
+        SavedDraft(DraftId(MailId(saved.id.domain())), (if (forwarding) emptyList() else draft.attachments) + saved.added.map { it.domainAttachment() })
     }
     override suspend fun loadDraft(account: AccountId, id: MailId): Outcome<Draft> = read(account) { sdk ->
         val mail = sdk.loadDraft(id.value.readId())

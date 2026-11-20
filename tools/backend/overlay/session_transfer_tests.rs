@@ -109,6 +109,21 @@ mod velin_session_transfer_tests {
     }
 
     #[test]
+    fn velin_attachment_vectors_match_every_wire_byte() {
+        let models = provider(false);
+        let plain = provider(true);
+        let fixtures = serde_json::from_str::<serde_json::Value>(include_str!("velin_drafts.json")).unwrap()["attachmentVectors"].as_array().unwrap().clone();
+        assert_eq!(fixtures.len(), 2);
+        for vector in fixtures {
+            let (tr, input, params) = inputs(&vector, &plain);
+            let model = models.resolve_client_type_ref(&tr).unwrap();
+            let ciphertext = encrypt(&models, model, &input, &params, &random(&vector, vector["encryptionRandomOffset"].as_u64().unwrap() as usize)).unwrap();
+            let raw = JsonSerializer::new(models.clone()).serialize(&tr, ciphertext).unwrap();
+            assert_eq!(String::from_utf8(wire_json(&raw).unwrap()).unwrap(), vector["wireJson"].as_str().unwrap(), "{}", vector["scheme"]);
+        }
+    }
+
+    #[test]
     fn velin_transfer_rejects_wrong_owner_key_or_missing_wrapped_key() {
         let models = provider(false);
         for vector in fixtures() {

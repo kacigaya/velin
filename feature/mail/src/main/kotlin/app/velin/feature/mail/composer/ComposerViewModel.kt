@@ -14,19 +14,24 @@ import app.velin.core.domain.DraftId
 import app.velin.core.domain.DraftResponse
 import app.velin.core.domain.Failure
 import app.velin.core.domain.FolderKind
+import app.velin.core.domain.MAX_ATTACHMENTS_BYTES
 import app.velin.core.domain.MailId
 import app.velin.core.domain.MailRepository
 import app.velin.core.domain.MailboxRepository
+import app.velin.core.domain.NewAttachment
 import app.velin.core.domain.Outcome
 import app.velin.core.domain.Recipient
 import app.velin.core.domain.RecipientKeyState
 import app.velin.core.domain.RecipientResolutionReason
 import app.velin.core.domain.RecipientType
 import app.velin.core.domain.ResponseKind
+import app.velin.core.domain.SavedDraft
 import app.velin.core.domain.SendBlockReason
 import app.velin.core.domain.SenderAlias
+import app.velin.feature.mail.model.AttachmentUi
 import app.velin.feature.mail.model.RecipientUi
 import app.velin.feature.mail.model.entityIdOf
+import app.velin.feature.mail.model.toUi
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
@@ -55,9 +60,11 @@ sealed interface ComposerEffect {
     data object Close : ComposerEffect
     data object Sent : ComposerEffect
     data class Failed(val failure: Failure) : ComposerEffect
-    /** A forward does not carry the files of the forwarded mail yet. */
-    data class AttachmentsNotForwarded(val count: Int) : ComposerEffect
+    data object PickFiles : ComposerEffect
+    data object AttachmentsTooLarge : ComposerEffect
 }
+
+private class PendingFile(val id: String, val file: NewAttachment)
 
 /**
  * Composer state and draft lifecycle. The draft autosaves [AUTOSAVE_DELAY_MS] after the last
@@ -85,7 +92,11 @@ class ComposerViewModel(
     private val confidential = MutableStateFlow(true)
     /** HTML of a reopened draft; the backend keeps it when the plain text is unchanged. */
     private var originalHtml: String? = null
-    private var attachments: List<Attachment> = emptyList()
+    private val attachments = MutableStateFlow(emptyList<Attachment>())
+    private val pending = MutableStateFlow(emptyList<PendingFile>())
+    private var nextPending = 0
+    private val uploading = MutableStateFlow(false)
+    private val fileEdits = MutableStateFlow(0)
     /** Set for a new reply or forward until its draft exists. */
     private var response: DraftResponse? = null
     /** False until the user changes the loaded content. */
@@ -112,10 +123,11 @@ class ComposerViewModel(
     val state: StateFlow<ComposerUiState> = combine(
         combine(senders, sender, ::Pair),
         combine(recipients, resolving, rejected, ::Triple),
-        combine(confidential, passwords, ::Pair),
+        combine(confidential, passwords, combine(attachments, pending, uploading, ::Triple), ::Triple),
         suggestions,
         combine(sending, recipientKey, ::Pair),
-    ) { (all, chosen), (fields, inFlight, rejectedKeys), (isConfidential, externalPasswords), suggested, (isSending, key) ->
+    ) { (all, chosen), (fields, inFlight, rejectedKeys), (isConfidential, externalPasswords, files), suggested, (isSending, key) ->
+        val (saved, picked, isUploading) = files
         val active = all.filter { it.enabled }
         val from = chosen ?: active.firstOrNull()
         val everyone = fields.values.flatten()
@@ -128,6 +140,9 @@ class ComposerViewModel(
             cc = fields.getValue(RecipientField.Cc).map { it.toUi(inFlight, rejectedKeys) }.toImmutableList(),
             bcc = fields.getValue(RecipientField.Bcc).map { it.toUi(inFlight, rejectedKeys) }.toImmutableList(),
             suggestions = suggested.map { RecipientUi(it.address.name, it.address.address) }.toImmutableList(),
+            attachments = (saved.map { it.toUi() } +
+                picked.map { AttachmentUi(it.id, it.file.name, it.file.mimeType, it.file.bytes.size.toLong()) }).toImmutableList(),
+            uploading = isUploading,
             confidential = isConfidential,
             externalPasswords = externalPasswords,
             sending = isSending,
@@ -151,10 +166,7 @@ class ComposerViewModel(
                 when (val prepared = mail.prepareResponse(account.id, previous, responseKind)) {
                     is Outcome.Success -> {
                         response = DraftResponse(previous, responseKind)
-                        fill(prepared.value.draft, cursorAtStart = true)
-                        if (prepared.value.omittedAttachments > 0) {
-                            effectChannel.send(ComposerEffect.AttachmentsNotForwarded(prepared.value.omittedAttachments))
-                        }
+                        fill(prepared.value, cursorAtStart = true)
                     }
                     is Outcome.Failed -> {
                         // An empty composer here would send a new mail outside the conversation.
@@ -170,8 +182,8 @@ class ComposerViewModel(
                 snapshotFlow { subject.text.toString() to body.text.toString() },
                 recipients.map { fields -> fields.mapValues { (_, list) -> list.map { it.address } } }.distinctUntilChanged(),
                 sender,
-                confidential,
-                rejected,
+                combine(confidential, rejected, ::Pair),
+                fileEdits,
             ) { _, _, _, _, _ -> Unit }
                 .drop(1)
                 .onEach { edited = true }
@@ -188,7 +200,7 @@ class ComposerViewModel(
         recipients.value = mapOf(RecipientField.To to draft.to, RecipientField.Cc to draft.cc, RecipientField.Bcc to draft.bcc)
         confidential.value = draft.confidential
         originalHtml = draft.htmlBody
-        attachments = draft.attachments
+        attachments.value = draft.attachments
         subject.setTextAndPlaceCursorAtEnd(draft.subject)
         body.setTextAndPlaceCursorAtEnd(draft.plainText)
         if (cursorAtStart) body.edit { placeCursorBeforeCharAt(0) }
@@ -232,10 +244,30 @@ class ComposerViewModel(
                 recipientKey.value = key.copy(rejected = true)
             }
             ComposerEvent.ResetRecipientKey -> resetKey()
-            // Attachments, scheduled sending and attachment removal arrive with the M6 backend.
-            ComposerEvent.Attach, ComposerEvent.SendLater, is ComposerEvent.RemoveAttachment ->
-                effectChannel.trySend(ComposerEffect.Failed(Failure.Unsupported))
+            ComposerEvent.Attach -> effectChannel.trySend(ComposerEffect.PickFiles)
+            is ComposerEvent.AddAttachments -> addAttachments(event.files)
+            is ComposerEvent.RemoveAttachment -> removeAttachment(event.id)
+            ComposerEvent.SendLater -> effectChannel.trySend(ComposerEffect.Failed(Failure.Unsupported))
         }
+    }
+
+    private fun addAttachments(files: List<NewAttachment>) {
+        if (files.isEmpty() || sending.value) return
+        val total = attachments.value.sumOf { it.sizeBytes } + pending.value.sumOf { it.file.bytes.size.toLong() } +
+            files.sumOf { it.bytes.size.toLong() }
+        if (total > MAX_ATTACHMENTS_BYTES) {
+            effectChannel.trySend(ComposerEffect.AttachmentsTooLarge)
+            return
+        }
+        pending.update { current -> current + files.map { PendingFile("$PENDING_PREFIX${nextPending++}", it) } }
+        fileEdits.update { it + 1 }
+    }
+
+    private fun removeAttachment(id: String) {
+        if (uploading.value || sending.value) return
+        if (id.startsWith(PENDING_PREFIX)) pending.update { current -> current.filterNot { it.id == id } }
+        else attachments.update { current -> current.filterNot { it.toUi().id == id } }
+        fileEdits.update { it + 1 }
     }
 
     private fun addRecipient(field: RecipientField, recipient: RecipientUi) {
@@ -358,12 +390,12 @@ class ComposerViewModel(
                 sending.value = false
                 return@launch
             }
-            val outcome = if (saved is Outcome.Success) mail.sendDraft(account.id, saved.value) else saved.toUnitOutcome()
+            val outcome = if (saved is Outcome.Success) mail.sendDraft(account.id, saved.value.id) else saved.toUnitOutcome()
             when (outcome) {
                 is Outcome.Success -> {
                     // Best effort, like the automatic mark-read: the mail is already sent. Sending stays on until the
                     // composer closes, so the sent draft cannot be sent again meanwhile.
-                    if (saved is Outcome.Success) mail.markResponded(account.id, saved.value.value)
+                    if (saved is Outcome.Success) mail.markResponded(account.id, saved.value.id.value)
                     effectChannel.send(ComposerEffect.Sent)
                     effectChannel.send(ComposerEffect.Close)
                 }
@@ -403,10 +435,13 @@ class ComposerViewModel(
     }
 
     /** Creates the draft once, then updates the same draft. Serialized so saves never race. */
-    private suspend fun save(): Outcome<DraftId> = saveLock.withLock {
+    private suspend fun save(): Outcome<SavedDraft> = saveLock.withLock {
         val from = sender.value ?: senders.value.firstOrNull { it.enabled }
             ?: return@withLock Outcome.Failed(Failure.Unsupported)
         val fields = recipients.value
+        val files = pending.value
+        val kept = attachments.value
+        val upload = files.isNotEmpty() || (draftId.value == null && response?.kind == ResponseKind.Forward && kept.isNotEmpty())
         val draft = Draft(
             id = draftId.value,
             sender = from,
@@ -416,28 +451,35 @@ class ComposerViewModel(
             subject = subject.text.toString(),
             plainText = body.text.toString(),
             confidential = confidential.value,
-            attachments = attachments,
+            attachments = kept,
             scheduledSendAt = null,
             htmlBody = originalHtml,
             response = response,
             rejectedRecipients = rejected.value,
+            newAttachments = files.map { it.file },
         )
-        val outcome = mail.saveDraft(account.id, draft)
-        if (outcome is Outcome.Failed) {
-            (outcome.failure as? Failure.DraftPersistence)?.let {
-                draftId.value = it.id
-                response = null
-            }
-        }
-        if (outcome is Outcome.Success) {
-            draftId.value = outcome.value
+        uploading.value = upload
+        val outcome = try { mail.saveDraft(account.id, draft) } finally { uploading.value = false }
+        val persistence = (outcome as? Outcome.Failed)?.failure as? Failure.DraftPersistence
+        persistence?.let {
+            draftId.value = it.id
             response = null
+        }
+        val saved = (outcome as? Outcome.Success)?.value ?: persistence?.saved
+        if (saved != null) {
+            draftId.value = saved.id
+            response = null
+            if (upload) {
+                attachments.value = saved.attachments
+                pending.update { current -> current - files.toSet() }
+            }
         }
         outcome
     }
 
     private fun hasContent(): Boolean =
-        subject.text.isNotBlank() || body.text.isNotBlank() || recipients.value.values.any { it.isNotEmpty() }
+        subject.text.isNotBlank() || body.text.isNotBlank() || recipients.value.values.any { it.isNotEmpty() } ||
+            attachments.value.isNotEmpty() || pending.value.isNotEmpty()
 
     private fun report(outcome: Outcome<*>) {
         if (outcome is Outcome.Failed) effectChannel.trySend(ComposerEffect.Failed(outcome.failure))
@@ -446,6 +488,7 @@ class ComposerViewModel(
     private companion object {
         const val STOP_TIMEOUT_MS = 5_000L
         const val AUTOSAVE_DELAY_MS = 2_000L
+        const val PENDING_PREFIX = "new:"
     }
 }
 
@@ -471,7 +514,7 @@ private fun Recipient.toUi(inFlight: Set<String>, rejected: Set<String>) = Compo
     trust = toTrust(),
 )
 
-private fun Outcome<DraftId>.toUnitOutcome(): Outcome<Unit> = when (this) {
+private fun Outcome<SavedDraft>.toUnitOutcome(): Outcome<Unit> = when (this) {
     is Outcome.Success -> Outcome.Success(Unit)
     is Outcome.Failed -> this
 }
