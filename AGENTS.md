@@ -42,6 +42,19 @@ CI uses JDK 21, the Gradle wrapper, and Android SDK platform 37.0. From the repo
 ./gradlew testDebugUnitTest :core:domain:test :core:html:test --console=plain
 ./gradlew :app:assembleDebug --console=plain
 ./gradlew :feature:mail:testDebugUnitTest --tests '*MailScreenshotTest*' -Proborazzi.record=true
+./gradlew :feature:auth:testDebugUnitTest --tests '*SignInScreenshotTest*' -Proborazzi.record=true
 ```
 
 The debug APK is in `app/build/outputs/apk/debug/`. The mail screenshots are in `feature/mail/build/outputs/roborazzi/`.
+
+The sign-in screenshots are in `feature/auth/build/outputs/roborazzi/`.
+On the arm64 development host, the Android SDK is in `~/android-sdk`.
+The Android 15 redroid test device is at `127.0.0.1:5555`. Set
+`QEMU_LD_PREFIX=~/android-sdk/x86_64-root` to run the SDK's x86-64 ADB.
+See [Device testing](docs/DEVICE-TESTING.md) for commands.
+
+## Android release
+
+Follow [Releasing Velin](docs/RELEASING.md). Wait for CI on `main` to pass before
+pushing the version tag. The Release workflow publishes the signed APK and
+`SHA256SUMS` to GitHub Releases. GitHub Pages rebuilds from that release.

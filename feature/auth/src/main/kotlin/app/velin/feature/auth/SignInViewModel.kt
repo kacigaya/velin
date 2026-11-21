@@ -47,7 +47,6 @@ class SignInViewModel(private val auth: AuthRepository) : ViewModel() {
                 is SignInEvent.ResumeAccount -> auth.resume(accountId(event.id))
                 is SignInEvent.RemoveAccount -> auth.removeSavedAccount(accountId(event.id))
                 is SignInEvent.SubmitCode -> auth.answerSecondFactor(SecondFactorAnswer.Totp(event.code))
-                SignInEvent.UseSecurityKey -> auth.answerSecondFactor(SecondFactorAnswer.SecurityKey)
                 SignInEvent.CancelSecondFactor -> auth.cancelSignIn()
             }
         }
@@ -70,6 +69,7 @@ internal fun toUiState(state: AuthState): SignInUiState = when (state) {
         address = state.address,
         totp = state.totp,
         securityKey = state.securityKey,
+        otherSession = state.otherSession,
         busy = state.busy,
         error = state.error?.toUi(),
     )

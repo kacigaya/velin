@@ -37,7 +37,12 @@ class SignInScreenshotTest {
     }
 
     @Test
-    fun credentials() = capture("signin") {
+    fun email() = capture("signin_email") {
+        SignInScreen(SignInUiState.Credentials(), onEvent = {})
+    }
+
+    @Test
+    fun savedAccounts() = capture("signin") {
         SignInScreen(
             SignInUiState.Credentials(savedAccounts = persistentListOf(SavedAccountUi("1", "alex@tuta.com"))),
             onEvent = {},
@@ -47,7 +52,13 @@ class SignInScreenshotTest {
     @Test
     fun secondFactor() = capture("signin_2fa") {
         SignInScreen(
-            SignInUiState.SecondFactor("alex@tuta.com", totp = true, securityKey = true, error = SignInError.InvalidCode),
+            SignInUiState.SecondFactor(
+                "alex@tuta.com",
+                totp = true,
+                securityKey = true,
+                otherSession = true,
+                error = SignInError.InvalidCode,
+            ),
             onEvent = {},
         )
     }

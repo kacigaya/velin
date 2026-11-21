@@ -12,8 +12,8 @@ android {
         applicationId = "app.velin"
         minSdk = 26
         targetSdk = 36
-        versionCode = 11
-        versionName = "0.8.1"
+        versionCode = 12
+        versionName = "0.8.2"
         // The Tuta SDK is built for these ABIs only. JNA ships more; without this filter
         // 32-bit devices could install the app and then fail to load the SDK.
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }

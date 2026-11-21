@@ -1,11 +1,7 @@
 package app.velin.feature.auth
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,12 +10,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
@@ -27,20 +25,22 @@ import androidx.compose.foundation.text.input.TextObfuscationMode
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedSecureTextField
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SecureTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -48,6 +48,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -58,10 +60,10 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import app.velin.core.designsystem.component.SenderAvatar
 import app.velin.core.designsystem.icon.VelinIcons
+import app.velin.core.designsystem.R as DesignR
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 
@@ -84,6 +86,7 @@ sealed interface SignInUiState {
         val address: String,
         val totp: Boolean,
         val securityKey: Boolean,
+        val otherSession: Boolean,
         override val busy: Boolean = false,
         override val error: SignInError? = null,
     ) : SignInUiState
@@ -98,42 +101,78 @@ sealed interface SignInEvent {
     data class ResumeAccount(val id: String) : SignInEvent
     data class RemoveAccount(val id: String) : SignInEvent
     data class SubmitCode(val code: String) : SignInEvent
-    data object UseSecurityKey : SignInEvent
     data object CancelSecondFactor : SignInEvent
 }
 
+private enum class SignInPage { Accounts, Email, Password, Verification }
+
 @Composable
 fun SignInScreen(state: SignInUiState, onEvent: (SignInEvent) -> Unit, modifier: Modifier = Modifier) {
+    val address = rememberTextFieldState()
+    var showEmail by rememberSaveable { mutableStateOf(false) }
+    var confirmedAddress by rememberSaveable { mutableStateOf<String?>(null) }
+    var submittedAddress by rememberSaveable { mutableStateOf<String?>(null) }
+
+    val credentials = state as? SignInUiState.Credentials
+    val verification = state as? SignInUiState.SecondFactor
+    val account = confirmedAddress
+    val accounts = credentials?.savedAccounts.orEmpty()
+    val page = when {
+        verification != null -> SignInPage.Verification
+        account != null -> SignInPage.Password
+        accounts.isNotEmpty() && !showEmail -> SignInPage.Accounts
+        else -> SignInPage.Email
+    }
+    val canGoBack = when (page) {
+        SignInPage.Accounts -> false
+        SignInPage.Email -> accounts.isNotEmpty()
+        SignInPage.Password -> true
+        SignInPage.Verification -> true
+    }
+    val back: () -> Unit = {
+        when (page) {
+            SignInPage.Accounts -> Unit
+            SignInPage.Email -> if (!state.busy) showEmail = false
+            SignInPage.Password -> if (!state.busy) confirmedAddress = null
+            SignInPage.Verification -> onEvent(SignInEvent.CancelSecondFactor)
+        }
+    }
+    BackHandler(enabled = canGoBack, onBack = back)
+
+    val error = credentials?.error?.takeIf { submittedAddress == null || submittedAddress == confirmedAddress }
     Surface(modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
-        Box(
-            Modifier
-                .fillMaxSize()
-                .safeDrawingPadding()
-                .imePadding()
-                .verticalScroll(rememberScrollState()),
-            contentAlignment = Alignment.Center,
-        ) {
-            Column(
+        key(page) {
+            Box(
                 Modifier
-                    .widthIn(max = 420.dp)
-                    .fillMaxWidth()
-                    .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                    .fillMaxSize()
+                    .safeDrawingPadding()
+                    .imePadding()
+                    .verticalScroll(rememberScrollState()),
+                contentAlignment = Alignment.TopCenter,
             ) {
-                AppMark()
-                AnimatedContent(
-                    targetState = state,
-                    contentKey = { it::class },
-                    transitionSpec = {
-                        val forward = targetState is SignInUiState.SecondFactor
-                        (slideInHorizontally { if (forward) it / 4 else -it / 4 } + fadeIn()) togetherWith
-                            (slideOutHorizontally { if (forward) -it / 4 else it / 4 } + fadeOut())
-                    },
-                    label = "signInStep",
-                ) { step ->
-                    when (step) {
-                        is SignInUiState.Credentials -> CredentialsStep(step, onEvent)
-                        is SignInUiState.SecondFactor -> SecondFactorStep(step, onEvent)
+                Box(Modifier.widthIn(max = 420.dp).fillMaxWidth()) {
+                    when {
+                        verification != null -> SecondFactorStep(verification, onEvent, back)
+                        account != null -> PasswordStep(account, state.busy, error, back) {
+                            submittedAddress = account
+                            onEvent(SignInEvent.SignIn(account, it))
+                        }
+                        page == SignInPage.Accounts -> AccountStep(
+                            accounts,
+                            state.busy,
+                            error,
+                            onEvent = {
+                                if (it is SignInEvent.ResumeAccount) submittedAddress = null
+                                onEvent(it)
+                            },
+                            onAdd = {
+                                showEmail = true
+                                address.edit { replace(0, length, "") }
+                            },
+                        )
+                        else -> EmailStep(address, state.busy, error, canGoBack, back) {
+                            confirmedAddress = it
+                        }
                     }
                 }
             }
@@ -142,61 +181,77 @@ fun SignInScreen(state: SignInUiState, onEvent: (SignInEvent) -> Unit, modifier:
 }
 
 @Composable
-private fun AppMark() {
-    Surface(
-        color = MaterialTheme.colorScheme.primaryContainer,
-        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        shape = MaterialTheme.shapes.extraLarge,
-        modifier = Modifier.size(64.dp),
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Icon(painterResource(VelinIcons.Mail), contentDescription = null, Modifier.size(32.dp))
+private fun EmailStep(
+    address: TextFieldState,
+    busy: Boolean,
+    error: SignInError?,
+    canGoBack: Boolean,
+    onBack: () -> Unit,
+    onContinue: (String) -> Unit,
+) {
+    val focus = LocalFocusManager.current
+    val email = address.text.toString().trim()
+    val submit = {
+        if (!busy && email.isNotEmpty()) {
+            focus.clearFocus()
+            onContinue(email)
+        }
+    }
+    Column {
+        if (canGoBack) StepBar(onBack, enabled = !busy)
+        BrandHeader(R.string.signin_title, R.string.signin_subtitle)
+        Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            TextField(
+                state = address,
+                label = { Text(stringResource(R.string.signin_address)) },
+                lineLimits = TextFieldLineLimits.SingleLine,
+                enabled = !busy,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+                onKeyboardAction = { submit() },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics { contentType = ContentType.Username + ContentType.EmailAddress },
+            )
+            ErrorText(error)
+            PrimaryAction(R.string.signin_continue, busy, email.isNotEmpty(), submit)
         }
     }
 }
 
 @Composable
-private fun CredentialsStep(state: SignInUiState.Credentials, onEvent: (SignInEvent) -> Unit) {
-    val address = rememberTextFieldState()
-    // Not saveable: the password must not end up in the saved instance state bundle.
+private fun PasswordStep(
+    address: String,
+    busy: Boolean,
+    error: SignInError?,
+    onBack: () -> Unit,
+    onSignIn: (CharArray) -> Unit,
+) {
     val password = remember { TextFieldState() }
+    val focus = LocalFocusManager.current
     val submit = {
-        if (!state.busy && address.text.isNotBlank() && password.text.isNotEmpty()) {
+        if (!busy && password.text.isNotEmpty()) {
             val chars = CharArray(password.text.length) { password.text[it] }
             password.edit { replace(0, length, "") }
-            onEvent(SignInEvent.SignIn(address.text.toString().trim(), chars))
+            focus.clearFocus()
+            onSignIn(chars)
         }
     }
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Title(stringResource(R.string.signin_title), stringResource(R.string.signin_subtitle))
-        if (state.savedAccounts.isNotEmpty()) SavedAccounts(state, onEvent)
-        OutlinedTextField(
-            state = address,
-            label = { Text(stringResource(R.string.signin_address)) },
-            lineLimits = TextFieldLineLimits.SingleLine,
-            enabled = !state.busy,
-            isError = state.error == SignInError.InvalidCredentials,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
-            modifier = Modifier
-                .fillMaxWidth()
-                .semantics { contentType = ContentType.Username + ContentType.EmailAddress },
-        )
-        PasswordField(password, enabled = !state.busy, isError = state.error == SignInError.InvalidCredentials, onDone = submit)
-        ErrorText(state.error)
-        Button(
-            onClick = submit,
-            enabled = !state.busy,
-            modifier = Modifier.fillMaxWidth().height(56.dp),
-        ) {
-            if (state.busy) BusyIndicator() else Text(stringResource(R.string.signin_action))
+    Column {
+        StepBar(onBack, enabled = !busy)
+        Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            StepTitle(stringResource(R.string.signin_password_title))
+            AccountIdentity(address)
+            PasswordField(password, enabled = !busy, isError = error == SignInError.InvalidCredentials, onDone = submit)
+            ErrorText(error)
+            PrimaryAction(R.string.signin_action, busy, password.text.isNotEmpty(), submit)
         }
     }
 }
 
 @Composable
 private fun PasswordField(state: TextFieldState, enabled: Boolean, isError: Boolean, onDone: () -> Unit) {
-    var visible by rememberSaveable { mutableStateOf(false) }
-    OutlinedSecureTextField(
+    var visible by remember { mutableStateOf(false) }
+    SecureTextField(
         state = state,
         label = { Text(stringResource(R.string.signin_password)) },
         enabled = enabled,
@@ -205,104 +260,198 @@ private fun PasswordField(state: TextFieldState, enabled: Boolean, isError: Bool
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
         onKeyboardAction = { onDone() },
         trailingIcon = {
-            IconButton(onClick = { visible = !visible }) {
+            IconButton(onClick = { visible = !visible }, enabled = enabled) {
                 Icon(
                     painterResource(VelinIcons.Visibility),
                     stringResource(if (visible) R.string.signin_hide_password else R.string.signin_show_password),
                 )
             }
         },
-        modifier = Modifier
-            .fillMaxWidth()
-            .semantics { contentType = ContentType.Password },
+        modifier = Modifier.fillMaxWidth().semantics { contentType = ContentType.Password },
     )
 }
 
 @Composable
-private fun SavedAccounts(state: SignInUiState.Credentials, onEvent: (SignInEvent) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        state.savedAccounts.forEach { account ->
-            Surface(
-                onClick = { onEvent(SignInEvent.ResumeAccount(account.id)) },
-                enabled = !state.busy,
-                shape = MaterialTheme.shapes.large,
-                color = MaterialTheme.colorScheme.surfaceContainer,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Row(
-                    Modifier.padding(start = 16.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    SenderAvatar(name = "", address = account.address)
-                    Text(account.address, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f), maxLines = 1)
-                    IconButton(onClick = { onEvent(SignInEvent.RemoveAccount(account.id)) }, enabled = !state.busy) {
-                        Icon(painterResource(VelinIcons.Close), stringResource(R.string.signin_remove_account, account.address))
+private fun AccountStep(
+    accounts: List<SavedAccountUi>,
+    busy: Boolean,
+    error: SignInError?,
+    onEvent: (SignInEvent) -> Unit,
+    onAdd: () -> Unit,
+) {
+    Column {
+        BrandHeader(R.string.signin_accounts_title, R.string.signin_accounts_subtitle)
+        Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            for (account in accounts) {
+                Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainer) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            onClick = { onEvent(SignInEvent.ResumeAccount(account.id)) },
+                            enabled = !busy,
+                            color = MaterialTheme.colorScheme.surfaceContainer,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            AccountLabel(account.address, Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
+                        }
+                        AccountOptions(account.address, enabled = !busy) {
+                            onEvent(SignInEvent.RemoveAccount(account.id))
+                        }
                     }
                 }
             }
+            ErrorText(error)
+            if (busy) Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { BusyIndicator() }
+            TextButton(onClick = onAdd, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.signin_other_account))
+            }
         }
-        Text(
-            stringResource(R.string.signin_other_account),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 8.dp),
-        )
     }
 }
 
 @Composable
-private fun SecondFactorStep(state: SignInUiState.SecondFactor, onEvent: (SignInEvent) -> Unit) {
-    val code = rememberTextFieldState()
-    val submit = { if (!state.busy && code.text.isNotBlank()) onEvent(SignInEvent.SubmitCode(code.text.toString().filter(Char::isDigit))) }
-    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Title(stringResource(R.string.signin_2fa_title), stringResource(R.string.signin_2fa_subtitle, state.address))
-        if (state.totp) {
-            OutlinedTextField(
-                state = code,
-                label = { Text(stringResource(R.string.signin_2fa_code)) },
-                lineLimits = TextFieldLineLimits.SingleLine,
-                enabled = !state.busy,
-                isError = state.error == SignInError.InvalidCode,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
-                onKeyboardAction = { submit() },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .semantics { contentType = ContentType.SmsOtpCode },
+private fun AccountOptions(address: String, enabled: Boolean, onRemove: () -> Unit) {
+    var expanded by remember(address) { mutableStateOf(false) }
+    Box {
+        IconButton(onClick = { expanded = true }, enabled = enabled) {
+            Icon(painterResource(VelinIcons.MoreVert), stringResource(R.string.signin_account_options, address))
+        }
+        DropdownMenu(expanded = expanded && enabled, onDismissRequest = { expanded = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.signin_remove_account)) },
+                onClick = {
+                    expanded = false
+                    onRemove()
+                },
             )
-            ErrorText(state.error)
-            Button(onClick = submit, enabled = !state.busy, modifier = Modifier.fillMaxWidth().height(56.dp)) {
-                if (state.busy) BusyIndicator() else Text(stringResource(R.string.signin_2fa_verify))
-            }
-        }
-        if (state.securityKey) {
-            OutlinedButton(
-                onClick = { onEvent(SignInEvent.UseSecurityKey) },
-                enabled = !state.busy,
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-            ) {
-                Icon(painterResource(VelinIcons.Key), contentDescription = null)
-                Spacer(Modifier.size(8.dp))
-                Text(stringResource(R.string.signin_2fa_security_key))
-            }
-        }
-        Text(
-            stringResource(R.string.signin_2fa_other_session),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (!state.totp) ErrorText(state.error)
-        TextButton(onClick = { onEvent(SignInEvent.CancelSecondFactor) }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
-            Text(stringResource(R.string.signin_2fa_cancel))
         }
     }
 }
 
 @Composable
-private fun Title(title: String, subtitle: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(title, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.semantics { heading() })
-        Text(subtitle, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+private fun SecondFactorStep(state: SignInUiState.SecondFactor, onEvent: (SignInEvent) -> Unit, onBack: () -> Unit) {
+    val code = rememberTextFieldState()
+    val digits = code.text.filter { it in '0'..'9' }.toString()
+    val canVerify = digits.length == 6
+    val submit = { if (!state.busy && canVerify) onEvent(SignInEvent.SubmitCode(digits)) }
+    Column {
+        StepBar(onBack, backLabel = R.string.signin_2fa_cancel)
+        Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                StepTitle(stringResource(R.string.signin_2fa_title))
+                if (state.totp) {
+                    Text(stringResource(R.string.signin_2fa_subtitle), style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+            AccountIdentity(state.address)
+            if (state.totp) {
+                TextField(
+                    state = code,
+                    label = { Text(stringResource(R.string.signin_2fa_code)) },
+                    lineLimits = TextFieldLineLimits.SingleLine,
+                    enabled = !state.busy,
+                    isError = state.error == SignInError.InvalidCode,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword, imeAction = ImeAction.Done),
+                    onKeyboardAction = { submit() },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .semantics { contentType = ContentType.SmsOtpCode },
+                )
+            }
+            ErrorText(state.error)
+            if (state.totp) PrimaryAction(R.string.signin_2fa_verify, state.busy, canVerify, submit)
+            if (state.otherSession) {
+                Text(
+                    stringResource(if (state.totp) R.string.signin_2fa_other_session else R.string.signin_2fa_approve),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (state.securityKey && state.error != SignInError.SecurityKeyUnsupported) {
+                Text(
+                    stringResource(R.string.signin_error_security_key),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BrandHeader(title: Int, subtitle: Int) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
+        color = MaterialTheme.colorScheme.primaryContainer,
+    ) {
+        Column(Modifier.padding(24.dp)) {
+            Surface(
+                modifier = Modifier.size(48.dp),
+                shape = CircleShape,
+                color = colorResource(DesignR.color.ic_launcher_background),
+            ) {
+                Image(painterResource(DesignR.drawable.ic_launcher_foreground), contentDescription = null)
+            }
+            Spacer(Modifier.height(16.dp))
+            StepTitle(stringResource(title))
+            Spacer(Modifier.height(8.dp))
+            Text(stringResource(subtitle), style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+@Composable
+private fun StepBar(onBack: () -> Unit, enabled: Boolean = true, backLabel: Int = R.string.signin_back) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        IconButton(onClick = onBack, enabled = enabled) {
+            Icon(painterResource(VelinIcons.ArrowBack), stringResource(backLabel))
+        }
+        Text(stringResource(R.string.signin_brand), style = MaterialTheme.typography.titleMedium)
+    }
+}
+
+@Composable
+private fun StepTitle(title: String) {
+    Text(title, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.semantics { heading() })
+}
+
+@Composable
+private fun AccountIdentity(address: String) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+    ) {
+        AccountLabel(address, Modifier.padding(12.dp))
+    }
+}
+
+@Composable
+private fun AccountLabel(address: String, modifier: Modifier = Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        SenderAvatar(
+            name = "",
+            address = address,
+            size = 32.dp,
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
+        Text(address, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+@Composable
+private fun PrimaryAction(label: Int, busy: Boolean, ready: Boolean, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        enabled = !busy && ready,
+        modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp),
+    ) {
+        if (busy) BusyIndicator() else Text(stringResource(label))
     }
 }
 
@@ -320,13 +469,18 @@ private fun ErrorText(error: SignInError?) {
             SignInError.Unknown -> R.string.signin_error_unknown
         },
     )
-    Text(
-        text,
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.error,
-        textAlign = TextAlign.Start,
-        modifier = Modifier.semantics { liveRegion = LiveRegionMode.Assertive },
-    )
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.errorContainer,
+        shape = MaterialTheme.shapes.medium,
+    ) {
+        Text(
+            text,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                .semantics { liveRegion = LiveRegionMode.Assertive },
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)

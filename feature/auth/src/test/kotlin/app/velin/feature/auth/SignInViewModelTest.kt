@@ -47,7 +47,7 @@ class SignInViewModelTest {
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { vm.state.collect {} }
         auth.state.value = AuthState.SecondFactor("a@tuta.com", totp = true, securityKey = false, otherSession = true, error = AuthError.InvalidCode)
         assertEquals(
-            SignInUiState.SecondFactor("a@tuta.com", totp = true, securityKey = false, error = SignInError.InvalidCode),
+            SignInUiState.SecondFactor("a@tuta.com", totp = true, securityKey = false, otherSession = true, error = SignInError.InvalidCode),
             vm.state.value,
         )
     }
